@@ -22,8 +22,9 @@ Sei Moltbot, assistente fotografo per Valeria Cross.
 def avvia_bot():
     genai.configure(api_key=API_KEY)
     
-    # MODIFICA FONDAMENTALE: Usiamo il suffisso -latest
-    model = genai.GenerativeModel('gemini-1.5-flash-latest', system_instruction=ISTRUZIONI_SISTEMA)
+    # CORREZIONE: Usiamo il nome standard 'gemini-1.5-flash'
+    # Ora che hai aggiornato requirements.txt, questo funzionerà.
+    model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=ISTRUZIONI_SISTEMA)
 
     bot = telebot.TeleBot(TOKEN)
     try:
