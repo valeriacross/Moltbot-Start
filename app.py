@@ -61,3 +61,30 @@ def web_service():
 if __name__ == "__main__":
     threading.Thread(target=avvia_bot, daemon=True).start()
     web_service()
+                response = imagen.generate_images(
+                    prompt=p_res.text,
+                    number_of_images=1,
+                    aspect_ratio="3:4"
+                )
+                
+                # 3. Invio
+                for img in response.images:
+                    img_io = io.BytesIO()
+                    img._pil_image.save(img_io, format='PNG')
+                    img_io.seek(0)
+                    bot.send_photo(m.chat.id, img_io, caption="Valeria Cross ✨")
+                
+                bot.delete_message(m.chat.id, wait.message_id)
+            except Exception as e:
+                bot.edit_message_text(f"❌ Errore: {e}", m.chat.id, wait.message_id)
+
+        bot.infinity_polling(skip_pending=True)
+    except Exception as startup_error:
+        print(f"CRASH ALL'AVVIO: {startup_error}")
+
+def web_service():
+    gr.Interface(fn=lambda x:x, inputs="text", outputs="text").launch(server_name="0.0.0.0", server_port=10000)
+
+if __name__ == "__main__":
+    threading.Thread(target=avvia_bot, daemon=True).start()
+    web_service()
