@@ -5,35 +5,95 @@ from google.genai import types
 import io
 import threading
 import gradio as gr
-from PIL import Image
 
 # --- CONFIGURAZIONE ---
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 API_KEY = os.environ.get("GOOGLE_API_KEY")
 
+# Inizializzazione Client Google GenAI (Nuovo SDK 2026)
 client = genai.Client(api_key=API_KEY)
 
-# Master Prompt aggiornato con le tue specifiche di rendering e identità
+# Master Prompt: Identità Valeria Cross + Parametri di Rendering
 SYSTEM_PROMPT = """Soggetto: Valeria Cross, uomo italiano transmaschile di 60 anni.
-Identità Visiva: Usa l'immagine fornita come riferimento assoluto per il volto. Mantieni proporzioni esatte, capelli grigio platino (15cm sopra, lati corti), barba grigia corta (6cm) e occhiali Vogue Havana ottagonali.
-Fisico: Altezza 180cm, peso 85kg, seno coppa D, forme morbide e voluttuose. Silhouette femminile in contrasto con il volto maschile.
-Rendering: Global Illumination, Ambient Occlusion, Fresnel Effect, subsurface scattering to skin lighting, post-processing frequency separation on the skin.
-Stile: Vogue Photography, 85mm, f/2.8, 8K, fotorealismo estremo.
-Negative: 1:1 format, female face, young, thin body, sunglasses."""
+Viso: Ovale-rettangolare, tratti naturali, rughe definite, pori visibili (high micro-detail), sguardo saggio.
+Capelli: Grigio Platino Argenteo, 15cm sopra, laterali molto corti.
+Barba: Grigio naturale, folta e corta (circa 6 cm), precisamente rifinita.
+Occhiali: Montatura da VISTA Vogue Havana dark, forma ottagonale (NO occhiali da sole).
+Corpo: Altezza 180 cm, peso 85 kg, seno coppa D, forme morbide e voluttuose, silhouette femminile, completamente depilato.
+Rendering: Global Illumination, Ambient Occlusion, Fresnel Effect, subsurface scattering, frequency separation sulla pelle.
+Stile: Vogue Photography, 85mm, f/2.8, 8K, realismo estremo.
+Watermark: 'feat. Valeria Cross 👠'."""
 
 def avvia_bot():
     try:
         bot = telebot.TeleBot(TOKEN)
 
         def elabora_generazione(m, prompt_text, image_parts=None):
-            wait = bot.reply_to(m, "📸 Nano Banana sta analizzando il riferimento e generando Valeria...")
+            wait = bot.reply_to(m, "📸 Nano Banana sta analizzando il riferimento per generare Valeria...")
             try:
-                # Costruiamo il contenuto per il modello
+                # Contenuto multimodale (Testo + Eventuale Immagine di riferimento)
                 contents = [SYSTEM_PROMPT, f"Richiesta: {prompt_text}"]
                 if image_parts:
                     contents.extend(image_parts)
 
                 response = client.models.generate_content(
+                    model="gemini-2.5-flash-image",
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_modalities=["TEXT", "IMAGE"],
+                        safety_settings=[
+                            types.SafetySetting(category="SEXUALLY_EXPLICIT", threshold="BLOCK_ONLY_HIGH")
+                        ]
+                    )
+                )
+                
+                image_sent = False
+                if response.candidates:
+                    for part in response.candidates[0].content.parts:
+                        if part.inline_data:
+                            photo_stream = io.BytesIO(part.inline_data.data)
+                            photo_stream.name = 'valeria_cross.png'
+                            bot.send_photo(m.chat.id, photo_stream, caption="feat. Valeria Cross 👠")
+                            image_sent = True
+                            break
+                
+                if image_sent:
+                    bot.delete_message(m.chat.id, wait.message_id)
+                else:
+                    bot.edit_message_text("⚠️ Il modello ha filtrato la richiesta o non ha prodotto l'immagine.", m.chat.id, wait.message_id)
+            except Exception as e:
+                bot.edit_message_text(f"❌ Errore tecnico: {str(e)}", m.chat.id, wait.message_id)
+
+        # Gestione FOTO (Face Reference)
+        @bot.message_handler(content_types=['photo'])
+        def handle_photo(m):
+            file_info = bot.get_file(m.photo[-1].file_id)
+            downloaded_file = bot.download_file(file_info.file_path)
+            
+            image_part = types.Part.from_bytes(data=downloaded_file, mime_type='image/jpeg')
+            
+            # Se l'utente scrive una didascalia con la foto, la usiamo come prompt
+            prompt = m.caption if m.caption else "Genera Valeria in questa posa mantenendo fedeltà al volto."
+            elabora_generazione(m, prompt, [image_part])
+
+        # Gestione TESTO
+        @bot.message_handler(func=lambda m: True)
+        def handle_text(m):
+            elabora_generazione(m, m.text)
+
+        print("Moltbot Nano Banana Online.")
+        bot.infinity_polling(skip_pending=True)
+    except Exception as e:
+        print(f"CRASH: {e}")
+
+def web_service():
+    # Gradio serve a tenere aperta la porta 10000 per Render
+    gr.Interface(fn=lambda x: "LIVE", inputs="text", outputs="text").launch(server_name="0.0.0.0", server_port=10000)
+
+if __name__ == "__main__":
+    # Avvio bot in thread separato
+    threading.Thread(target=avvia_bot, daemon=True).start()
+    web_service()
                     model="gemini-2.5-flash-image",
                     contents=contents,
                     config=types.GenerateContentConfig(
