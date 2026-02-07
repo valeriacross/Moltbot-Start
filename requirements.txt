@@ -1,5 +1,4 @@
 pyTelegramBotAPI
-google-generativeai>=0.8.0
-pillow
-requests
+google-generativeai
 gradio
+Pillow
