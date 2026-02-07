@@ -13,40 +13,37 @@ API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 client = genai.Client(api_key=API_KEY)
 
-# Master Prompt integrato
-SYSTEM_PROMPT = """Soggetto: Valeria Cross, uomo italiano transmaschile di 60 anni. 
-Identità: Barba grigia 6cm, capelli platino, occhiali Vogue Havana ottagonali. 
-Corpo: 180cm, 85kg, coppa D, silhouette femminile voluttuosa. 
-Rendering: Global Illumination, Fresnel Effect, subsurface scattering, 8K. 
-Stile: Vogue Photography. Watermark: 'feat. Valeria Cross 👠'."""
+# MASTER PROMPT: Focus su VOLUMI e CONTRASTO (per evitare il risultato "piatto")
+SYSTEM_PROMPT = """ARTISTIC CONCEPT: 'The Gender Fluid Diva'. 
+Subject: Valeria Cross, 60yo distinguished man.
+Face: Masculine, wise, platinum hair, short grey beard, octagonal Havana glasses.
+Body Architecture: EXTREME HOURGLASS SILHOUETTE. The body must feature highly pronounced, voluminous feminine curves and a very prominent, prosperous bustline (Couture Diva proportions). 
+Fashion: Body-conscious tailoring that emphasizes a 180cm, 85kg soft sculptural frame. 
+Contrast: The juxtaposition between the mature masculine face and the ultra-feminine, curvy torso is the primary focus. 
+Rendering: Global Illumination, Fresnel Effect on the curves, 8K, Vogue editorial style. 
+Watermark: 'feat. Valeria Cross 👠'."""
 
 def avvia_bot():
     try:
         bot = telebot.TeleBot(TOKEN)
 
         def genera_valeria(m, prompt_text, images=None):
-            wait = bot.reply_to(m, "📸 Generazione Nano Banana in corso...")
+            wait = bot.reply_to(m, "📸 Forzando i volumi e la silhouette di Valeria...")
             try:
-                # Struttura contenuti per Gemini 2.5 Flash Image
-                contents = [SYSTEM_PROMPT, f"Richiesta: {prompt_text}"]
+                contents = [SYSTEM_PROMPT, f"Specific Scene: {prompt_text}"]
                 if images:
                     contents.extend(images)
 
-                # Chiamata al modello con nomi categorie corretti (Fix Errore 400)
-                config_gen = types.GenerateContentConfig(
-                    response_modalities=["TEXT", "IMAGE"],
-                    safety_settings=[
-                        types.SafetySetting(
-                            category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                            threshold="BLOCK_ONLY_HIGH"
-                        )
-                    ]
-                )
+                # Rilassiamo i filtri al massimo consentito
+                safe = [types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_ONLY_HIGH")]
 
                 response = client.models.generate_content(
                     model="gemini-2.5-flash-image",
                     contents=contents,
-                    config=config_gen
+                    config=types.GenerateContentConfig(
+                        response_modalities=["TEXT", "IMAGE"],
+                        safety_settings=safe
+                    )
                 )
                 
                 image_sent = False
@@ -55,19 +52,18 @@ def avvia_bot():
                         if part.inline_data:
                             photo_stream = io.BytesIO(part.inline_data.data)
                             photo_stream.name = 'valeria_cross.png'
-                            bot.send_photo(m.chat.id, photo_stream, caption="feat. Valeria Cross 👠")
+                            bot.send_photo(m.chat.id, photo_stream, caption="Valeria Cross: Extreme Silhouette 👠")
                             image_sent = True
                             break
                 
                 if image_sent:
                     bot.delete_message(m.chat.id, wait.message_id)
                 else:
-                    bot.edit_message_text("⚠️ Filtro sicurezza attivo: immagine non generata.", m.chat.id, wait.message_id)
+                    bot.edit_message_text("⚠️ Il filtro ha appiattito la richiesta. Prova a cambiare l'abbigliamento nel prompt.", m.chat.id, wait.message_id)
             
             except Exception:
-                # Report errore dettagliato su Telegram
                 exc_type, exc_value, exc_traceback = sys.exc_info()
-                errore = f"❌ **ERRORE TECNICO**\nTipo: {exc_type.__name__}\nMsg: {exc_value}\nLinea: {exc_traceback.tb_lineno}"
+                errore = f"❌ **ERRORE**\nTipo: {exc_type.__name__}\nMsg: {exc_value}\nLinea: {exc_traceback.tb_lineno}"
                 bot.edit_message_text(errore, m.chat.id, wait.message_id)
 
         @bot.message_handler(content_types=['photo'])
@@ -87,7 +83,6 @@ def avvia_bot():
         print(f"CRASH: {e}")
 
 def web_service():
-    # Porta 10000 per Render
     gr.Interface(fn=lambda x: "LIVE", inputs="text", outputs="text").launch(server_name="0.0.0.0", server_port=10000)
 
 if __name__ == "__main__":
