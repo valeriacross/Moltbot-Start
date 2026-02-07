@@ -56,7 +56,6 @@ def avvia_bot():
                         if hasattr(part, 'inline_data') and part.inline_data:
                             photo_stream = io.BytesIO(part.inline_data.data)
                             photo_stream.name = 'valeria_cross.png'
-                            # Invio con il watermark testuale richiesto
                             bot.send_photo(m.chat.id, photo_stream, caption="feat. Valeria Cross 👠")
                             image_sent = True
                             break
@@ -64,7 +63,7 @@ def avvia_bot():
                 if image_sent:
                     bot.delete_message(m.chat.id, wait.message_id)
                 else:
-                    bot.edit_message_text("❌ Il modello non ha restituito immagini. Potrebbe esserci un filtro di sicurezza attivo su questo specifico prompt.", m.chat.id, wait.message_id)
+                    bot.edit_message_text("❌ Il modello non ha restituito immagini. Verifica i filtri di sicurezza in AI Studio.", m.chat.id, wait.message_id)
 
             except Exception as e:
                 bot.edit_message_text(f"❌ Errore Tecnico: {str(e)}", m.chat.id, wait.message_id)
@@ -80,52 +79,7 @@ def web_service():
     gr.Interface(fn=lambda x: "Moltbot Online", inputs="text", outputs="text").launch(server_name="0.0.0.0", server_port=10000)
 
 if __name__ == "__main__":
+    # Avvia il bot in un thread separato
     threading.Thread(target=avvia_bot, daemon=True).start()
-    web_service()
-
-        @bot.message_handler(func=lambda m: True)
-        def gestisci(m):
-            wait = bot.reply_to(m, "📸 Generazione Nano Banana in corso...")
-            try:
-                # Costruzione del prompt secondo le specifiche della documentazione
-                prompt_full = f"{SYSTEM_PROMPT}\n\nTask: Generate a high-fidelity image of: {m.text}"
-
-                # Configurazione fondamentale per abilitare l'output immagine
-                config = genai.types.GenerationConfig(
-                    response_modalities=["TEXT", "IMAGE"]
-                )
-
-                # Generazione multimodale
-                response = model.generate_content(prompt_full, generation_config=config)
-                
-                image_sent = False
-                if response.candidates:
-                    for part in response.candidates[0].content.parts:
-                        # Estrazione dell'immagine generata dal modello multimodale
-                        if hasattr(part, 'inline_data') and part.inline_data:
-                            photo_stream = io.BytesIO(part.inline_data.data)
-                            photo_stream.name = 'valeria_cross.png'
-                            bot.send_photo(m.chat.id, photo_stream, caption="Valeria Cross (Nano Banana) ✨")
-                            image_sent = True
-                            break
-                
-                if image_sent:
-                    bot.delete_message(m.chat.id, wait.message_id)
-                else:
-                    bot.edit_message_text("❌ Il modello non ha restituito immagini. Controlla i permessi in Google Cloud Console.", m.chat.id, wait.message_id)
-
-            except Exception as e:
-                bot.edit_message_text(f"❌ Errore Tecnico: {str(e)}", m.chat.id, wait.message_id)
-
-        print(f"Moltbot in esecuzione su {MODEL_ID}...")
-        bot.infinity_polling(skip_pending=True)
-    except Exception as e:
-        print(f"CRASH: {e}")
-
-# Keep-alive per Render
-def web_service():
-    gr.Interface(fn=lambda x: "Moltbot Nano Banana Online", inputs="text", outputs="text").launch(server_name="0.0.0.0", server_port=10000)
-
-if __name__ == "__main__":
-    threading.Thread(target=avvia_bot, daemon=True).start()
+    # Avvia il web service Gradio (blocca il main thread)
     web_service()
