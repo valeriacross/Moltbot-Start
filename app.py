@@ -6,85 +6,78 @@ import threading
 import gradio as gr
 from PIL import Image
 
-# --- SETUP CHIAVI E CONFIGURAZIONE ---
+# --- CONFIGURAZIONE ---
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 API_KEY = os.environ.get("GOOGLE_API_KEY")
 
-# Inizializzazione Google AI
 genai.configure(api_key=API_KEY)
 
-# Identità Valeria Cross
-SYSTEM_PROMPT = """Soggetto: Valeria Cross, 60 anni, uomo italiano transmaschile. 
-Look: Capelli grigio platino (15cm, lati corti), barba grigia corta e curata, occhiali da vista Vogue Havana scuri (forma ottagonale).
-Fisico: 180cm, 85kg, seno coppa D, forme morbide.
-Stile fotografico: Vogue Editoriale, 85mm, f/2.8, 8K, illuminazione da studio professionale. 
-Rendering: Global Illumination, Ambient Occlusion, Subsurface scattering.
-Watermark: 'feat. Valeria Cross 👠'."""
+# Master Prompt con tutti i parametri salvati (Rendering + Identità)
+SYSTEM_PROMPT = """Soggetto: Valeria Cross, uomo italiano transmaschile di 60 anni. 
+Viso: Ovale-rettangolare, tratti naturali, rughe visibili e definite, pori della pelle visibili (high micro-detail), sguardo calmo e saggio.
+Capelli: Grigio Platino Argenteo, 15cm sopra, laterali molto corti, leggermente disordinati.
+Barba: Grigio naturale, folta e corta (circa 6 cm), precisamente rifinita.
+Occhiali: Montatura da VISTA Vogue Havana dark, forma ottagonale (NO occhiali da sole).
+Corpo: Altezza 180 cm, peso 85 kg, seno coppa D, forme morbide e femminili, corpo completamente depilato.
+Rendering: Global Illumination, Ambient Occlusion, Fresnel Effect, subsurface scattering to skin lighting, controlled post-processing frequency separation on the skin.
+Stile: Vogue Photographer expert, 8K Texture Fidelity, Cinematic Color Grading, Profondità di Campo Estrema.
+Negative Prompt: female face, woman, girl, young, feminine features, soft baby skin, distortion, low quality, sunglasses, 1:1 format."""
 
 def avvia_bot():
     try:
-        # Modelli aggiornati
-        text_model = genai.GenerativeModel('gemini-1.5-flash')
-        # Utilizziamo il modello Imagen 3
-        imagen = genai.GenerativeModel('imagen-3.0-generate-001')
+        # MODEL_ID specifico dalla documentazione Nano Banana
+        MODEL_ID = "gemini-2.5-flash-image"
+        model = genai.GenerativeModel(MODEL_ID)
         
         bot = telebot.TeleBot(TOKEN)
 
         @bot.message_handler(commands=['start'])
-        def send_welcome(m):
-            bot.reply_to(m, "Ciao! Sono Moltbot. Mandami un'idea e genererò un'immagine di Valeria Cross per te. 📸")
+        def welcome(m):
+            bot.reply_to(m, "Moltbot Nano Banana 🍌 attivo! Pronto per generare Valeria Cross con Gemini 2.5.")
 
         @bot.message_handler(func=lambda m: True)
         def gestisci(m):
-            wait = bot.reply_to(m, "📸 Moltbot in azione... Sto creando Valeria per te.")
+            wait = bot.reply_to(m, "📸 Generazione Nano Banana in corso...")
             try:
-                # 1. Crea il prompt tecnico usando Gemini
-                prompt_input = f"{SYSTEM_PROMPT}\n\nCrea un prompt tecnico dettagliato in inglese per generare questa scena: {m.text}"
-                p_res = text_model.generate_content(prompt_input)
-                prompt_finale = p_res.text
+                # Costruzione del prompt secondo le specifiche della documentazione
+                prompt_full = f"{SYSTEM_PROMPT}\n\nTask: Generate a high-fidelity image of: {m.text}"
 
-                # 2. Genera l'immagine con Imagen 3
-                response = imagen.generate_content(prompt_finale)
+                # Configurazione fondamentale per abilitare l'output immagine
+                config = genai.types.GenerationConfig(
+                    response_modalities=["TEXT", "IMAGE"]
+                )
+
+                # Generazione multimodale
+                response = model.generate_content(prompt_full, generation_config=config)
                 
-                # 3. Estrai l'immagine dalla risposta
-                image_found = False
+                image_sent = False
                 if response.candidates:
-                    for candidate in response.candidates:
-                        for part in candidate.content.parts:
-                            if part.inline_data:
-                                # Conversione dati binari per Telegram
-                                photo_stream = io.BytesIO(part.inline_data.data)
-                                photo_stream.name = 'valeria_cross.png'
-                                bot.send_photo(m.chat.id, photo_stream, caption="Valeria Cross ✨")
-                                image_found = True
-                                break
+                    for part in response.candidates[0].content.parts:
+                        # Estrazione dell'immagine generata dal modello multimodale
+                        if hasattr(part, 'inline_data') and part.inline_data:
+                            photo_stream = io.BytesIO(part.inline_data.data)
+                            photo_stream.name = 'valeria_cross.png'
+                            bot.send_photo(m.chat.id, photo_stream, caption="Valeria Cross (Nano Banana) ✨")
+                            image_sent = True
+                            break
                 
-                if not image_found:
-                    bot.edit_message_text("❌ Google non ha restituito immagini. Potrebbe esserci un filtro di sicurezza o il modello non è ancora attivo.", m.chat.id, wait.message_id)
-                else:
+                if image_sent:
                     bot.delete_message(m.chat.id, wait.message_id)
+                else:
+                    bot.edit_message_text("❌ Il modello non ha restituito immagini. Controlla i permessi in Google Cloud Console.", m.chat.id, wait.message_id)
 
             except Exception as e:
-                errore_str = str(e)
-                if "404" in errore_str:
-                    msg = "❌ Errore 404: Il modello Imagen 3 non è ancora abilitato sulla tua API Key in questa regione."
-                else:
-                    msg = f"❌ Errore tecnico: {errore_str}"
-                bot.edit_message_text(msg, m.chat.id, wait.message_id)
+                bot.edit_message_text(f"❌ Errore Tecnico: {str(e)}", m.chat.id, wait.message_id)
 
-        print("Moltbot sta partendo...")
+        print(f"Moltbot in esecuzione su {MODEL_ID}...")
         bot.infinity_polling(skip_pending=True)
-    except Exception as startup_error:
-        print(f"CRASH: {startup_error}")
+    except Exception as e:
+        print(f"CRASH: {e}")
 
-# Web Service per tenere in vita il bot su Render (Piano Free)
+# Keep-alive per Render
 def web_service():
-    # Creiamo un'interfaccia minima che risponde sulla porta 10000
-    demo = gr.Interface(fn=lambda x: "Moltbot è attivo!", inputs="text", outputs="text")
-    demo.launch(server_name="0.0.0.0", server_port=10000)
+    gr.Interface(fn=lambda x: "Moltbot Nano Banana Online", inputs="text", outputs="text").launch(server_name="0.0.0.0", server_port=10000)
 
 if __name__ == "__main__":
-    # Avvia il bot in un thread separato
     threading.Thread(target=avvia_bot, daemon=True).start()
-    # Avvia il web service Gradio (blocca il main thread)
     web_service()
