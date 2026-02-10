@@ -7,28 +7,15 @@ TOKEN = os.environ.get("TELEGRAM_TOKEN")
 API_KEY = os.environ.get("GOOGLE_API_KEY")
 client = genai.Client(api_key=API_KEY)
 
-# MODELLO: Gemini 2.0 Flash (Veloce, Generalista)
-MODEL_ID = "gemini-2.0-flash"
+# USIAMO NANO BANANA PRO (L'unico che ha dimostrato di funzionare con "Ciao")
+MODEL_ID = "nano-banana-pro-preview" 
 
 # --- GENERAZIONE ---
-def generate_image(prompt_utente, immagine_utente=None):
+def generate_image(prompt_utente):
     try:
-        # Nessun Master Prompt nascosto. Solo quello che scrivi tu.
-        if not prompt_utente: 
-            prompt_utente = "Una foto artistica."
+        if not prompt_utente: return None
 
-        contents = []
-        
-        # Se c'è una foto di riferimento (es. per lo stile), la allega
-        if immagine_utente:
-            contents.append(types.Part.from_bytes(data=immagine_utente, mime_type="image/jpeg"))
-        
-        # Aggiunge il prompt dell'utente
-        contents.append(prompt_utente)
-
-        # CONFIGURAZIONE BASIC
-        # - Safety al minimo (BLOCK_NONE) per massima libertà
-        # - Nessun aspect_ratio forzato (decide il modello in base al prompt)
+        # Configurazione standard
         config_raw = {
             "response_modalities": ["IMAGE"],
             "safety_settings": [
@@ -39,9 +26,10 @@ def generate_image(prompt_utente, immagine_utente=None):
             ]
         }
 
+        # Invio diretto del prompt (senza master prompt, senza facce)
         response = client.models.generate_content(
             model=MODEL_ID,
-            contents=contents,
+            contents=[prompt_utente],
             config=config_raw
         )
         
@@ -58,22 +46,14 @@ def generate_image(prompt_utente, immagine_utente=None):
 def avvia_bot():
     try:
         bot = telebot.TeleBot(TOKEN)
-        print("✅ Bot Basic Online (Nessuna Identità).", flush=True)
+        print("✅ Bot Basic (Motore Stabile) Online.", flush=True)
 
-        @bot.message_handler(content_types=['photo', 'text'])
+        @bot.message_handler(content_types=['text'])
         def handle(m):
             try:
                 wait = bot.reply_to(m, "🎨 Generazione...")
                 
-                prompt = m.caption if m.content_type == 'photo' else m.text
-                img_data = None
-                
-                # Se l'utente manda una foto, la usiamo come riferimento (img2img)
-                if m.content_type == 'photo':
-                    file_info = bot.get_file(m.photo[-1].file_id)
-                    img_data = bot.download_file(file_info.file_path)
-
-                risultato = generate_image(prompt, img_data)
+                risultato = generate_image(m.text)
                 
                 if risultato:
                     bot.send_document(
@@ -84,7 +64,7 @@ def avvia_bot():
                     )
                     bot.delete_message(m.chat.id, wait.message_id)
                 else:
-                    bot.edit_message_text("⚠️ Errore o Filtro Google.", m.chat.id, wait.message_id)
+                    bot.edit_message_text("⚠️ Errore Generazione.", m.chat.id, wait.message_id)
             
             except Exception as e:
                 print(f"❌ Errore Handler: {e}", flush=True)
@@ -99,7 +79,7 @@ def avvia_web():
         img_bytes = generate_image(prompt)
         return io.BytesIO(img_bytes).read() if img_bytes else None
 
-    ui = gr.Interface(fn=web_interface, inputs="text", outputs="image", title="Basic Generator")
+    ui = gr.Interface(fn=web_interface, inputs="text", outputs="image")
     ui.launch(server_name="0.0.0.0", server_port=10000)
 
 if __name__ == "__main__":
