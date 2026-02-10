@@ -18,8 +18,8 @@ client = genai.Client(api_key=API_KEY)
 # PROMPT DI SISTEMA GENERICO E MINIMALE
 # Istruisce solo sul formato richiesto (2:3) e sulla qualità.
 SYSTEM_PROMPT = """INSTRUCTION: Generate highly detailed, photorealistic images.
-ASPECT RATIO requirement: The output MUST be in vertical 2:3 format (portrait).
-QUALITY requirement: Max resolution, 8K detail, realistic lighting."""
+ASPECT RATIO requirement: The output MUST be in vertical format (portrait).
+QUALITY requirement: Max resolution, 2K detail, realistic lighting."""
 
 def avvia_bot():
     # Inizializza il bot Telegram
