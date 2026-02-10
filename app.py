@@ -7,7 +7,7 @@ TOKEN = os.environ.get("TELEGRAM_TOKEN")
 API_KEY = os.environ.get("GOOGLE_API_KEY")
 client = genai.Client(api_key=API_KEY)
 
-# Motore: Nano Banana Pro (Supporta Faccia)
+# Motore: Nano Banana Pro (Supporta Faccia + Identità)
 MODEL_ID = "nano-banana-pro-preview"
 
 # --- GESTIONE FACCIA (MANDATORIA) ---
@@ -21,23 +21,21 @@ def get_master_face():
 
 MASTER_FACE = get_master_face()
 
-# --- MASTER PROMPT (Senza nome reale, Senza vincoli outfit) ---
-MASTER_PROMPT = """MANDATORY IDENTITY: NAMELESS AVATAR.
+# --- MASTER PROMPT ---
+MASTER_PROMPT = """MANDATORY IDENTITY:
 1. FACE: Use the facial features from the attached reference image ONLY. (60yo male, silver beard, glasses).
 2. BODY: Female hourglass figure, D-cup, 180cm, 85kg.
-3. COMPOSITION RULE: Cinematic rectangular framing. DO NOT GENERATE SQUARE (1:1) IMAGES.
-4. OUTFIT & SCENE: Follow user instructions strictly."""
+3. FORMAT RULE: Generate cinematic, horizontal (16:9) or vertical compositions. NEVER generate square (1:1) images.
+4. OUTFIT: Follow user instructions strictly."""
 
 # --- GENERAZIONE ---
 def generate_avatar(prompt_utente, immagine_utente=None):
     try:
         if not MASTER_FACE: return None 
 
-        # Se il prompt è vuoto, default generico
-        if not prompt_utente: 
-            prompt_utente = "Standing pose, cinematic lighting."
+        # Se prompt vuoto, default generico
+        if not prompt_utente: prompt_utente = "Cinematic shot."
 
-        # Costruzione Contenuto
         contents = [MASTER_PROMPT, MASTER_FACE]
         
         if immagine_utente:
@@ -45,13 +43,14 @@ def generate_avatar(prompt_utente, immagine_utente=None):
         
         contents.append(f"SCENE REQUEST: {prompt_utente}")
 
-        # CONFIGURAZIONE PULITA
-        # Rimosso aspect_ratio fisso (lo decide il motore/prompt)
-        # Rimosso Hate Speech e altre categorie inutili
+        # CONFIGURAZIONE SICUREZZA TOTALE (SBLOCCATA)
         config_raw = {
             "response_modalities": ["IMAGE"],
             "safety_settings": [
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"}
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
             ]
         }
 
@@ -74,7 +73,7 @@ def generate_avatar(prompt_utente, immagine_utente=None):
 def avvia_bot():
     try:
         bot = telebot.TeleBot(TOKEN)
-        print("✅ Bot Attivo: Nameless Avatar | No 1:1", flush=True)
+        print("✅ Bot Attivo.", flush=True)
 
         @bot.message_handler(content_types=['photo', 'text'])
         def handle(m):
@@ -90,15 +89,16 @@ def avvia_bot():
                 risultato = generate_avatar(prompt, img_data)
                 
                 if risultato:
-                    # Invio come Documento (Senza nome forzato)
+                    # FIX: Aggiunto visible_file_name per avere l'estensione .jpg
                     bot.send_document(
                         m.chat.id, 
                         io.BytesIO(risultato), 
-                        caption=f"Generazione Completata"
+                        visible_file_name="output.jpg", 
+                        caption="Generazione Completata"
                     )
                     bot.delete_message(m.chat.id, wait.message_id)
                 else:
-                    bot.edit_message_text("⚠️ Errore Generazione.", m.chat.id, wait.message_id)
+                    bot.edit_message_text("⚠️ Immagine bloccata dai filtri Google o errore tecnico.", m.chat.id, wait.message_id)
             
             except Exception as e:
                 print(f"❌ Errore Handler: {e}", flush=True)
@@ -107,16 +107,16 @@ def avvia_bot():
     except Exception as e:
         print(f"💥 Crash Bot: {e}", flush=True)
 
-# --- GRADIO WEB UI ---
+# --- WEB UI ---
 def avvia_web():
     def web_interface(prompt):
         img_bytes = generate_avatar(prompt)
         return io.BytesIO(img_bytes).read() if img_bytes else None
 
-    ui = gr.Interface(fn=web_interface, inputs="text", outputs="image", title="Avatar Control")
+    ui = gr.Interface(fn=web_interface, inputs="text", outputs="image")
     ui.launch(server_name="0.0.0.0", server_port=10000)
 
 if __name__ == "__main__":
     threading.Thread(target=avvia_bot, daemon=True).start()
     avvia_web()
-            
+    
