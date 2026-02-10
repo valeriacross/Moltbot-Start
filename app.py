@@ -7,43 +7,28 @@ TOKEN = os.environ.get("TELEGRAM_TOKEN")
 API_KEY = os.environ.get("GOOGLE_API_KEY")
 client = genai.Client(api_key=API_KEY)
 
-# Motore: Nano Banana Pro (Supporta Faccia + Identità)
-MODEL_ID = "nano-banana-pro-preview"
-
-# --- GESTIONE FACCIA (MANDATORIA) ---
-def get_master_face():
-    try:
-        with open("master_face.png", "rb") as f:
-            return types.Part.from_bytes(data=f.read(), mime_type="image/png")
-    except:
-        print("⚠️ ERRORE: master_face.png MANCANTE.")
-        return None
-
-MASTER_FACE = get_master_face()
-
-# --- MASTER PROMPT ---
-MASTER_PROMPT = """MANDATORY IDENTITY:
-1. FACE: Use the facial features from the attached reference image ONLY. (60yo male, silver beard, glasses).
-2. BODY: Female hourglass figure, D-cup, 180cm, 85kg.
-3. FORMAT RULE: Generate cinematic, horizontal (16:9) or vertical compositions. NEVER generate square (1:1) images.
-4. OUTFIT: Follow user instructions strictly."""
+# MODELLO: Gemini 2.0 Flash (Veloce, Generalista)
+MODEL_ID = "gemini-2.0-flash"
 
 # --- GENERAZIONE ---
-def generate_avatar(prompt_utente, immagine_utente=None):
+def generate_image(prompt_utente, immagine_utente=None):
     try:
-        if not MASTER_FACE: return None 
+        # Nessun Master Prompt nascosto. Solo quello che scrivi tu.
+        if not prompt_utente: 
+            prompt_utente = "Una foto artistica."
 
-        # Se prompt vuoto, default generico
-        if not prompt_utente: prompt_utente = "Cinematic shot."
-
-        contents = [MASTER_PROMPT, MASTER_FACE]
+        contents = []
         
+        # Se c'è una foto di riferimento (es. per lo stile), la allega
         if immagine_utente:
             contents.append(types.Part.from_bytes(data=immagine_utente, mime_type="image/jpeg"))
         
-        contents.append(f"SCENE REQUEST: {prompt_utente}")
+        # Aggiunge il prompt dell'utente
+        contents.append(prompt_utente)
 
-        # CONFIGURAZIONE SICUREZZA TOTALE (SBLOCCATA)
+        # CONFIGURAZIONE BASIC
+        # - Safety al minimo (BLOCK_NONE) per massima libertà
+        # - Nessun aspect_ratio forzato (decide il modello in base al prompt)
         config_raw = {
             "response_modalities": ["IMAGE"],
             "safety_settings": [
@@ -73,32 +58,33 @@ def generate_avatar(prompt_utente, immagine_utente=None):
 def avvia_bot():
     try:
         bot = telebot.TeleBot(TOKEN)
-        print("✅ Bot Attivo.", flush=True)
+        print("✅ Bot Basic Online (Nessuna Identità).", flush=True)
 
         @bot.message_handler(content_types=['photo', 'text'])
         def handle(m):
             try:
-                wait = bot.reply_to(m, "📸 Elaborazione...")
+                wait = bot.reply_to(m, "🎨 Generazione...")
                 
                 prompt = m.caption if m.content_type == 'photo' else m.text
                 img_data = None
+                
+                # Se l'utente manda una foto, la usiamo come riferimento (img2img)
                 if m.content_type == 'photo':
                     file_info = bot.get_file(m.photo[-1].file_id)
                     img_data = bot.download_file(file_info.file_path)
 
-                risultato = generate_avatar(prompt, img_data)
+                risultato = generate_image(prompt, img_data)
                 
                 if risultato:
-                    # FIX: Aggiunto visible_file_name per avere l'estensione .jpg
                     bot.send_document(
                         m.chat.id, 
                         io.BytesIO(risultato), 
-                        visible_file_name="output.jpg", 
-                        caption="Generazione Completata"
+                        visible_file_name="image.jpg", 
+                        caption="✅ Fatto."
                     )
                     bot.delete_message(m.chat.id, wait.message_id)
                 else:
-                    bot.edit_message_text("⚠️ Immagine bloccata dai filtri Google o errore tecnico.", m.chat.id, wait.message_id)
+                    bot.edit_message_text("⚠️ Errore o Filtro Google.", m.chat.id, wait.message_id)
             
             except Exception as e:
                 print(f"❌ Errore Handler: {e}", flush=True)
@@ -110,10 +96,10 @@ def avvia_bot():
 # --- WEB UI ---
 def avvia_web():
     def web_interface(prompt):
-        img_bytes = generate_avatar(prompt)
+        img_bytes = generate_image(prompt)
         return io.BytesIO(img_bytes).read() if img_bytes else None
 
-    ui = gr.Interface(fn=web_interface, inputs="text", outputs="image")
+    ui = gr.Interface(fn=web_interface, inputs="text", outputs="image", title="Basic Generator")
     ui.launch(server_name="0.0.0.0", server_port=10000)
 
 if __name__ == "__main__":
