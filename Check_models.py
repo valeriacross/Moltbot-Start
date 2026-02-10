@@ -6,18 +6,14 @@ API_KEY = os.environ.get("GOOGLE_API_KEY")
 client = genai.Client(api_key=API_KEY)
 
 def verifica_motori():
-    print("--- 🔍 VERIFICA MODELLI DISPONIBILI ---")
+    print("--- 🔍 LISTA COMPLETA MODELLI DISPONIBILI ---", flush=True)
     try:
-        # Recupera la lista completa dei modelli
+        # Stampiamo solo il nome di ogni modello per evitare errori di attributi
         for model in client.models.list():
-            # Filtriamo solo quelli che possono generare immagini
-            if 'generate_content' in model.supported_generation_methods:
-                print(f"Modello ID: {model.name}")
-                print(f"Capacità: {model.supported_generation_methods}")
-                print(f"Descrizione: {model.description}")
-                print("-" * 30)
+            print(f"ID: {model.name}", flush=True)
     except Exception as e:
-        print(f"❌ Errore durante il recupero: {e}")
+        print(f"❌ Errore critico: {e}", flush=True)
 
 if __name__ == "__main__":
     verifica_motori()
+    
