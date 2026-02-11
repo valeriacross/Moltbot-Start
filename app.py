@@ -8,7 +8,7 @@ API_KEY = os.environ.get("GOOGLE_API_KEY")
 client = genai.Client(api_key=API_KEY)
 
 # USIAMO NANO BANANA PRO (L'unico che ha dimostrato di funzionare con "Ciao")
-MODEL_ID = "nano-banana-pro-preview" 
+MODEL_ID = "/gemini-3-pro-image-preview" 
 
 # --- GENERAZIONE ---
 def generate_image(prompt_utente):
