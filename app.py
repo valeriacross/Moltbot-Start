@@ -7,8 +7,8 @@ TOKEN = os.environ.get("TELEGRAM_TOKEN")
 API_KEY = os.environ.get("GOOGLE_API_KEY")
 client = genai.Client(api_key=API_KEY)
 
-# MOTORE AD ALTA RISOLUZIONE (IMAGEN 4.0 ULTRA)
-MODEL_ID = "imagen-4.0-ultra-generate-001" 
+# IL MOTORE HIGH-RES COMPATIBILE CON GENERATE_CONTENT
+MODEL_ID = "gemini-2.0-flash-exp-image-generation" 
 
 # --- GENERAZIONE ---
 def generate_image(prompt_utente, image_bytes=None):
@@ -17,7 +17,7 @@ def generate_image(prompt_utente, image_bytes=None):
 
         contents = []
         
-        # Se viene fornita un'immagine, la inseriamo come riferimento
+        # Se c'è un'immagine di riferimento, la aggiungiamo come "Part"
         if image_bytes:
             contents.append(
                 types.Part.from_bytes(
@@ -26,11 +26,11 @@ def generate_image(prompt_utente, image_bytes=None):
                 )
             )
         
-        # Inserimento del prompt testuale
+        # Aggiungiamo il prompt testuale
+        # Nota: Più dettagliato è il prompt, migliore sarà la risoluzione percepita
         if prompt_utente:
             contents.append(prompt_utente)
 
-        # Configurazione ottimizzata per la massima fedeltà
         config_raw = {
             "response_modalities": ["IMAGE"],
             "safety_settings": [
@@ -41,13 +41,13 @@ def generate_image(prompt_utente, image_bytes=None):
             ]
         }
 
-        # Generazione tramite Imagen 4.0 Ultra
         response = client.models.generate_content(
             model=MODEL_ID,
             contents=contents,
             config=config_raw
         )
         
+        # Estrazione dell'immagine generata
         if response and response.candidates and response.candidates[0].content.parts:
             for part in response.candidates[0].content.parts:
                 if part.inline_data:
@@ -61,7 +61,7 @@ def generate_image(prompt_utente, image_bytes=None):
 def avvia_bot():
     try:
         bot = telebot.TeleBot(TOKEN)
-        print(f"✅ Bot Online - Motore: {MODEL_ID}", flush=True)
+        print(f"✅ Bot Online - Motore High-Res: {MODEL_ID}", flush=True)
 
         @bot.message_handler(content_types=['text', 'photo'])
         def handle(m):
@@ -69,29 +69,31 @@ def avvia_bot():
                 prompt = ""
                 img_data = None
                 
-                wait = bot.reply_to(m, "💎 Generazione in Alta Risoluzione (Ultra)...")
+                wait = bot.reply_to(m, "✨ Generazione High-Res in corso...")
 
                 if m.content_type == 'photo':
+                    # Scarichiamo l'immagine originale inviata dall'utente
                     file_id = m.photo[-1].file_id
                     file_info = bot.get_file(file_id)
                     img_data = bot.download_file(file_info.file_path)
-                    prompt = m.caption if m.caption else ""
+                    # Usiamo la didascalia come prompt, o un testo di default se vuota
+                    prompt = m.caption if m.caption else "generazione basata su questa immagine"
                 else:
                     prompt = m.text
                 
                 risultato = generate_image(prompt, img_data)
                 
                 if risultato:
-                    # Inviamo come documento per preservare la qualità originale (senza compressione Telegram)
+                    # Invio come documento per evitare la compressione di Telegram
                     bot.send_document(
                         m.chat.id, 
                         io.BytesIO(risultato), 
-                        visible_file_name="ultra_quality_render.jpg", 
-                        caption="✨ Immagine generata con Imagen 4.0 Ultra."
+                        visible_file_name="gemini_2_highres.jpg", 
+                        caption="✅ Immagine generata con Gemini 2.0 Flash."
                     )
                     bot.delete_message(m.chat.id, wait.message_id)
                 else:
-                    bot.edit_message_text("⚠️ Errore: Il modello Ultra non ha prodotto risultati.", m.chat.id, wait.message_id)
+                    bot.edit_message_text("⚠️ Non è stato possibile generare l'immagine. Riprova con un prompt diverso.", m.chat.id, wait.message_id)
             
             except Exception as e:
                 print(f"❌ Errore Handler: {e}", flush=True)
@@ -100,7 +102,7 @@ def avvia_bot():
     except Exception as e:
         print(f"💥 Crash Bot: {e}", flush=True)
 
-# --- WEB UI ---
+# --- WEB UI (GRADIO) ---
 def avvia_web():
     def web_interface(prompt, image):
         img_bytes = None
@@ -117,9 +119,10 @@ def avvia_web():
         fn=web_interface, 
         inputs=[
             gr.Textbox(label="Prompt"), 
-            gr.Image(type="pil", label="Immagine di riferimento (Opzionale)")
+            gr.Image(type="pil", label="Immagine sorgente (Opzionale)")
         ], 
-        outputs=gr.Image(label="Risultato Ultra")
+        outputs=gr.Image(label="Risultato Gemini 2.0"),
+        title="Gemini 2.0 High-Res Generator"
     )
     ui.launch(server_name="0.0.0.0", server_port=10000)
 
