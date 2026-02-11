@@ -1,4 +1,4 @@
-import os, telebot, io, threading, time, sys, gradio as gr
+import os, telebot, io, threading, gradio as gr
 from google import genai
 from google.genai import types
 
@@ -7,23 +7,30 @@ TOKEN = os.environ.get("TELEGRAM_TOKEN")
 API_KEY = os.environ.get("GOOGLE_API_KEY")
 client = genai.Client(api_key=API_KEY)
 
-# Motore: Nano Banana Pro (Stabile)
-MODEL_ID = "nano-banana-pro-preview" 
+# MOTORE AD ALTA RISOLUZIONE (IMAGEN 4.0 ULTRA)
+MODEL_ID = "imagen-4.0-ultra-generate-001" 
 
 # --- GENERAZIONE ---
-def generate_image(prompt_utente, immagine_riferimento=None):
+def generate_image(prompt_utente, image_bytes=None):
     try:
-        # Costruiamo la lista dei contenuti
+        if not prompt_utente and not image_bytes: return None
+
         contents = []
         
-        # Se c'è un'immagine allegata, la inseriamo come primo elemento
-        if immagine_riferimento:
-            contents.append(types.Part.from_bytes(data=immagine_riferimento, mime_type="image/jpeg"))
+        # Se viene fornita un'immagine, la inseriamo come riferimento
+        if image_bytes:
+            contents.append(
+                types.Part.from_bytes(
+                    data=image_bytes,
+                    mime_type="image/jpeg"
+                )
+            )
         
-        # Aggiungiamo il testo (se non c'è, mettiamo un default)
-        testo = prompt_utente if prompt_utente else "Generate based on this image."
-        contents.append(testo)
+        # Inserimento del prompt testuale
+        if prompt_utente:
+            contents.append(prompt_utente)
 
+        # Configurazione ottimizzata per la massima fedeltà
         config_raw = {
             "response_modalities": ["IMAGE"],
             "safety_settings": [
@@ -34,6 +41,7 @@ def generate_image(prompt_utente, immagine_riferimento=None):
             ]
         }
 
+        # Generazione tramite Imagen 4.0 Ultra
         response = client.models.generate_content(
             model=MODEL_ID,
             contents=contents,
@@ -46,45 +54,44 @@ def generate_image(prompt_utente, immagine_riferimento=None):
                     return part.inline_data.data
         return None
     except Exception as e:
-        print(f"❌ Errore Generazione: {e}", flush=True)
+        print(f"❌ Errore Generazione ({MODEL_ID}): {e}", flush=True)
         return None
 
 # --- TELEGRAM BOT ---
 def avvia_bot():
     try:
         bot = telebot.TeleBot(TOKEN)
-        print("✅ Bot Multimodale (Testo + Immagine) Online.", flush=True)
+        print(f"✅ Bot Online - Motore: {MODEL_ID}", flush=True)
 
         @bot.message_handler(content_types=['text', 'photo'])
         def handle(m):
             try:
-                wait = bot.reply_to(m, "🎨 Elaborazione in corso...")
-                
                 prompt = ""
                 img_data = None
                 
+                wait = bot.reply_to(m, "💎 Generazione in Alta Risoluzione (Ultra)...")
+
                 if m.content_type == 'photo':
-                    # Scarichiamo la foto (la versione a risoluzione più alta)
-                    file_info = bot.get_file(m.photo[-1].file_id)
+                    file_id = m.photo[-1].file_id
+                    file_info = bot.get_file(file_id)
                     img_data = bot.download_file(file_info.file_path)
-                    # Il testo è nella caption della foto
-                    prompt = m.caption
+                    prompt = m.caption if m.caption else ""
                 else:
-                    # È solo testo
                     prompt = m.text
                 
                 risultato = generate_image(prompt, img_data)
                 
                 if risultato:
+                    # Inviamo come documento per preservare la qualità originale (senza compressione Telegram)
                     bot.send_document(
                         m.chat.id, 
                         io.BytesIO(risultato), 
-                        visible_file_name="output.jpg", 
-                        caption="✅ Elaborazione completata."
+                        visible_file_name="ultra_quality_render.jpg", 
+                        caption="✨ Immagine generata con Imagen 4.0 Ultra."
                     )
                     bot.delete_message(m.chat.id, wait.message_id)
                 else:
-                    bot.edit_message_text("⚠️ Errore Generazione o Filtro.", m.chat.id, wait.message_id)
+                    bot.edit_message_text("⚠️ Errore: Il modello Ultra non ha prodotto risultati.", m.chat.id, wait.message_id)
             
             except Exception as e:
                 print(f"❌ Errore Handler: {e}", flush=True)
@@ -95,11 +102,25 @@ def avvia_bot():
 
 # --- WEB UI ---
 def avvia_web():
-    def web_interface(prompt):
-        img_bytes = generate_image(prompt)
-        return io.BytesIO(img_bytes).read() if img_bytes else None
+    def web_interface(prompt, image):
+        img_bytes = None
+        if image:
+            import PIL.Image
+            buf = io.BytesIO()
+            image.save(buf, format='JPEG')
+            img_bytes = buf.getvalue()
+            
+        gen_bytes = generate_image(prompt, img_bytes)
+        return io.BytesIO(gen_bytes).read() if gen_bytes else None
 
-    ui = gr.Interface(fn=web_interface, inputs="text", outputs="image")
+    ui = gr.Interface(
+        fn=web_interface, 
+        inputs=[
+            gr.Textbox(label="Prompt"), 
+            gr.Image(type="pil", label="Immagine di riferimento (Opzionale)")
+        ], 
+        outputs=gr.Image(label="Risultato Ultra")
+    )
     ui.launch(server_name="0.0.0.0", server_port=10000)
 
 if __name__ == "__main__":
