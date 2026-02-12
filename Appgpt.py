@@ -3,6 +3,7 @@ import io
 import threading
 import flask
 import telebot
+from PIL import Image
 from google import genai
 
 # --- CONFIGURAZIONE ---
@@ -24,13 +25,20 @@ def get_master_face_bytes():
 
 MASTER_FACE_BYTES = get_master_face_bytes()
 
-# --- GENERAZIONE IMMAGINE 4K ---
+# --- FUNZIONE DI UPSCALING 4K ---
+def upscale_to_4k(image_bytes):
+    img = Image.open(io.BytesIO(image_bytes))
+    upscaled = img.resize((3840, 3840), Image.LANCZOS)
+    output = io.BytesIO()
+    upscaled.save(output, format="PNG", quality=95)
+    return output.getvalue()
+
+# --- GENERAZIONE IMMAGINE + UPSCALE ---
 def generate_image(prompt_utente, immagine_riferimento=None):
     try:
         if not MASTER_FACE_BYTES:
             return None, "Manca il file master_face.png"
 
-        # Mandato fisico + prompt scene
         BODY_MANDATE = """
 CRITICAL MANDATE: The final image MUST depict a strictly FEMININE BODY shape, completely HAIRLESS,
 curvaceous hourglass figure, full D-cup breasts, soft contours, narrow waist, wide hips.
@@ -52,18 +60,19 @@ AVOID STRICTLY: {NEGATIVE_PROMPTS}
         # --- CHIAMATA IMAGEN 4 ULTRA ---
         response = client.models.generate_images(
             model=MODEL_ID,
-            prompt=full_prompt,
-            image_size="3840x3840"  # 4K square (~14.7MP)
+            prompt=full_prompt
         )
 
         if response.generated_images:
-            return response.generated_images[0].image.image_bytes, None
+            # Upscale a 4K
+            image_bytes = response.generated_images[0].image.image_bytes
+            image_4k = upscale_to_4k(image_bytes)
+            return image_4k, None
 
         return None, "Nessuna immagine generata."
 
     except Exception as e:
         return None, str(e)
-
 
 # --- BOT TELEGRAM ---
 bot = telebot.TeleBot(TOKEN)
@@ -94,7 +103,6 @@ def handle_message(m):
             m.chat.id,
             wait_msg.message_id
         )
-
 
 # --- WEB SERVER PER RENDER ---
 server = flask.Flask(__name__)
