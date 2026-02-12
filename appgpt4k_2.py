@@ -28,7 +28,7 @@ MASTER_FACE_BYTES = get_master_face_bytes()
 # --- FUNZIONE DI UPSCALING 4K ---
 def upscale_to_4k(image_bytes):
     img = Image.open(io.BytesIO(image_bytes))
-    upscaled = img.resize((3840, 3840), Image.LANCZOS)
+    upscaled = img.resize((2880, 5120), Image.LANCZOS)
     output = io.BytesIO()
     upscaled.save(output, format="PNG", quality=95)
     return output.getvalue()
