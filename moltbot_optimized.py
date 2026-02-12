@@ -555,3 +555,4 @@ if __name__ == "__main__":
             logger.error(f"❌ Errore polling: {e}", exc_info=True)
             logger.info("🔄 Riavvio polling in 5 secondi...")
             time.sleep(5)
+    
