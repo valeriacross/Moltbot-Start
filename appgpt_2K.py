@@ -15,6 +15,7 @@ API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 client = genai.Client(api_key=API_KEY)
 
+# Modello multimodale che supporta input image
 MODEL_ID = "gemini-2.0-flash-exp-image-generation"
 
 # ==============================
@@ -37,7 +38,7 @@ def load_master_face():
 MASTER_FACE = load_master_face()
 
 # ==============================
-# GENERAZIONE FACE LOCK
+# GENERAZIONE FACE LOCK 2K
 # ==============================
 
 def generate_image(prompt_utente):
@@ -46,10 +47,8 @@ def generate_image(prompt_utente):
         return None, "master_face.png mancante"
 
     try:
-
-        SYSTEM_PROMPT = """
-You must strictly preserve the exact identity
-from the provided reference image.
+        full_prompt = f"""
+You must strictly preserve the exact identity from the provided reference image.
 
 IDENTITY RULES:
 - Maintain exact facial bone structure
@@ -71,10 +70,6 @@ BODY RULES:
 - Smooth feminine skin
 
 Face consistency has absolute priority.
-"""
-
-        full_prompt = f"""
-{SYSTEM_PROMPT}
 
 SCENE DESCRIPTION:
 {prompt_utente}
@@ -85,6 +80,7 @@ Realistic lighting.
 High detail.
 """
 
+        # Generazione contenuti multimodale
         response = client.models.generate_content(
             model=MODEL_ID,
             contents=[
@@ -99,10 +95,10 @@ High detail.
             config=types.GenerateContentConfig(
                 temperature=0.2,
                 top_p=0.8,
-                response_modalities=["IMAGE"]
             )
         )
 
+        # Cerchiamo l'immagine generata
         for candidate in response.candidates:
             for part in candidate.content.parts:
                 if hasattr(part, "inline_data") and part.inline_data:
@@ -113,19 +109,25 @@ High detail.
     except Exception as e:
         return None, str(e)
 
-
 # ==============================
 # TELEGRAM BOT
 # ==============================
 
 bot = telebot.TeleBot(TOKEN)
 
-@bot.message_handler(content_types=['text'])
+@bot.message_handler(content_types=['text', 'photo'])
 def handle_message(m):
 
-    wait_msg = bot.reply_to(m, "Generazione Face Lock in corso...")
+    wait_msg = bot.reply_to(m, "⏳ Generazione Face Lock 2K in corso...")
 
-    result, error = generate_image(m.text)
+    img_data = None
+    prompt = m.caption if m.content_type == 'photo' else m.text
+
+    if m.content_type == 'photo':
+        file_info = bot.get_file(m.photo[-1].file_id)
+        img_data = bot.download_file(file_info.file_path)
+
+    result, error = generate_image(prompt)
 
     if result:
         bot.send_document(
@@ -136,14 +138,13 @@ def handle_message(m):
         bot.delete_message(m.chat.id, wait_msg.message_id)
     else:
         bot.edit_message_text(
-            f"ERRORE:\n{error}",
+            f"❌ ERRORE:\n{error}",
             m.chat.id,
             wait_msg.message_id
         )
 
-
 # ==============================
-# SERVER RENDER
+# SERVER PER RENDER
 # ==============================
 
 server = flask.Flask(__name__)
