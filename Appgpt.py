@@ -1,6 +1,9 @@
-import os, telebot, io, threading, flask
+import os
+import io
+import threading
+import flask
+import telebot
 from google import genai
-from google.genai import types
 
 # --- CONFIGURAZIONE ---
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -11,7 +14,7 @@ client = genai.Client(api_key=API_KEY)
 MODEL_ID = "imagen-4.0-ultra-generate-001"
 
 # --- GESTIONE FACCIA MANDATORIA ---
-def get_master_face():
+def get_master_face_bytes():
     try:
         with open("master_face.png", "rb") as f:
             return f.read()
@@ -19,7 +22,7 @@ def get_master_face():
         print("⚠️ ERRORE: master_face.png non trovato!")
         return None
 
-MASTER_FACE_BYTES = get_master_face()
+MASTER_FACE_BYTES = get_master_face_bytes()
 
 # --- GENERAZIONE IMMAGINE 4K ---
 def generate_image(prompt_utente, immagine_riferimento=None):
@@ -27,25 +30,19 @@ def generate_image(prompt_utente, immagine_riferimento=None):
         if not MASTER_FACE_BYTES:
             return None, "Manca il file master_face.png"
 
+        # Mandato fisico + prompt scene
         BODY_MANDATE = """
-CRITICAL MANDATE: The final image MUST depict a strictly FEMININE BODY shape, regardless of the facial features.
-BODY SPECS: Curvaceous hourglass figure, full prosperous feminine breasts (Cup D), soft body contours, narrow waist, wide hips. Height 180cm, weight 85kg.
-SKIN CONDITION: Completely HAIRLESS body from neck down. Smooth, feminine skin on arms, chest, legs. NO BODY HAIR AT ALL.
-"""
-
-        IDENTITY_CONTEXT = """
-CONTEXT: High-fashion Vogue editorial photograph. The subject has the specific facial features derived from the master_face.png reference (older male face with beard) applied onto the voluptuous feminine body described above.
+CRITICAL MANDATE: The final image MUST depict a strictly FEMININE BODY shape, completely HAIRLESS,
+curvaceous hourglass figure, full D-cup breasts, soft contours, narrow waist, wide hips.
 """
 
         NEGATIVE_PROMPTS = """
-NEGATIVE PROMPT - BODY (STRICT): MASCULINE BODY SHAPE, broad male shoulders, flat chest, male torso, muscular frame, hairy chest, hairy arms, hairy legs, prominent Adam's apple.
-NEGATIVE PROMPT - FACE: young face, female face underneath the male features, blurry face.
+NEGATIVE PROMPT - BODY: masculine body shape, broad male shoulders, flat chest, muscular frame, body hair
+NEGATIVE PROMPT - FACE: young female face, blurry face, face drift
 """
 
         full_prompt = f"""
 {BODY_MANDATE}
-
-{IDENTITY_CONTEXT}
 
 SCENE DETAILS: {prompt_utente}
 
@@ -56,15 +53,11 @@ AVOID STRICTLY: {NEGATIVE_PROMPTS}
         response = client.models.generate_images(
             model=MODEL_ID,
             prompt=full_prompt,
-            config=types.GenerateImagesConfig(
-                image_size="3840x3840",   # 4K square (~14.7MP)
-                aspect_ratio="1:1"
-            )
+            image_size="3840x3840"  # 4K square (~14.7MP)
         )
 
         if response.generated_images:
-            image_bytes = response.generated_images[0].image.image_bytes
-            return image_bytes, None
+            return response.generated_images[0].image.image_bytes, None
 
         return None, "Nessuna immagine generata."
 
@@ -76,8 +69,8 @@ AVOID STRICTLY: {NEGATIVE_PROMPTS}
 bot = telebot.TeleBot(TOKEN)
 
 @bot.message_handler(content_types=['text', 'photo'])
-def handle(m):
-    wait = bot.reply_to(m, "⏳ Generazione 4K in corso...")
+def handle_message(m):
+    wait_msg = bot.reply_to(m, "⏳ Generazione 4K in corso...")
 
     prompt = m.caption if m.content_type == 'photo' else m.text
     img_data = None
@@ -94,12 +87,12 @@ def handle(m):
             io.BytesIO(risultato),
             visible_file_name="generazione_4K.png"
         )
-        bot.delete_message(m.chat.id, wait.message_id)
+        bot.delete_message(m.chat.id, wait_msg.message_id)
     else:
         bot.edit_message_text(
             f"❌ ERRORE:\n{errore}",
             m.chat.id,
-            wait.message_id
+            wait_msg.message_id
         )
 
 
