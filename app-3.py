@@ -3,6 +3,7 @@ from telebot import types
 from google import genai
 from google.genai import types as genai_types
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -15,8 +16,12 @@ client = genai.Client(api_key=API_KEY)
 
 MODEL_ID = "nano-banana-pro-preview"
 
-# Preferenze utenti (default 16:9)
-user_ar = defaultdict(lambda: "16:9")
+# Preferenze utenti
+user_ar = defaultdict(lambda: "16:9")    # Default Formato
+user_qty = defaultdict(lambda: 1)         # Default Quantità
+
+# Executor per il parallelismo (max 2 worker per evitare Rate Limit aggressivi)
+executor = ThreadPoolExecutor(max_workers=2)
 
 # --- CARICAMENTO MASTER FACE ---
 def get_face_part():
@@ -29,12 +34,12 @@ def get_face_part():
 
 MASTER_PART = get_face_part()
 
-# --- GENERAZIONE ---
-def generate_valeria(prompt_utente, ar_scelto, img_rif_bytes=None):
+# --- GENERAZIONE SINGOLA ---
+def generate_single_task(prompt_utente, ar_scelto, img_rif_bytes=None):
     try:
-        if not MASTER_PART: return None, "File master_face.png mancante sul server."
+        if not MASTER_PART: return None, "File master_face.png mancante."
 
-        # Identità, Corpo e Capelli [cite: 2026-02-08, 2025-11-21, 2025-12-01]
+        # Identità Valeria Cross [cite: 2026-02-08, 2025-11-21]
         system_instructions = f"""
         ROLE: Expert Vogue Photographer.
         SUBJECT: Nameless Italian transmasculine avatar named Valeria Cross.
@@ -48,7 +53,6 @@ def generate_valeria(prompt_utente, ar_scelto, img_rif_bytes=None):
         WATERMARK: Mandatory text "feat. Valeria Cross 👠" in elegant cursive champagne color at bottom center/left.
         """
 
-        # Rendering e Negativi [cite: 2026-02-08, 2025-11-23]
         negatives = "NEGATIVE: masculine body shape, flat chest, body hair, peli, long hair, female face, 1:1 format."
 
         contents = [
@@ -72,9 +76,9 @@ def generate_valeria(prompt_utente, ar_scelto, img_rif_bytes=None):
             for part in response.candidates[0].content.parts:
                 if part.inline_data:
                     return part.inline_data.data, None
-        return None, "Generazione bloccata dai filtri."
+        return None, "Generazione bloccata."
     except Exception as e:
-        logger.error(f"❌ Errore Generazione: {e}")
+        logger.error(f"❌ Errore Thread: {e}")
         return None, str(e)
 
 # --- BOT TELEGRAM ---
@@ -83,42 +87,68 @@ bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 @bot.message_handler(commands=['start', 'settings'])
 def settings(m):
     markup = types.InlineKeyboardMarkup()
-    # Nuova riga con i formati richiesti
-    markup.row(types.InlineKeyboardButton("3:2 (Classico)", callback_data="ar_3:2"),
-               types.InlineKeyboardButton("2:3 (Artistico)", callback_data="ar_2:3"))
-    markup.row(types.InlineKeyboardButton("16:9 (Cinema)", callback_data="ar_16:9"),
-               types.InlineKeyboardButton("4:3 (Vogue)", callback_data="ar_4:3"))
-    markup.row(types.InlineKeyboardButton("3:4 (Portrait)", callback_data="ar_3:4"),
-               types.InlineKeyboardButton("9:16 (Story)", callback_data="ar_9:16"))
-    bot.send_message(m.chat.id, "<b>Configurazione Valeria Cross</b>\nScegli il formato desiderato:", reply_markup=markup)
+    
+    # Riga Formati
+    markup.row(types.InlineKeyboardButton("3:2 📷", callback_data="ar_3:2"),
+               types.InlineKeyboardButton("2:3 🖼️", callback_data="ar_2:3"))
+    markup.row(types.InlineKeyboardButton("16:9 🎬", callback_data="ar_16:9"),
+               types.InlineKeyboardButton("4:3 📰", callback_data="ar_4:3"))
+    markup.row(types.InlineKeyboardButton("3:4 📱", callback_data="ar_3:4"),
+               types.InlineKeyboardButton("9:16 📲", callback_data="ar_9:16"))
+    
+    # Riga Quantità
+    markup.row(types.InlineKeyboardButton("1 Foto", callback_data="qty_1"),
+               types.InlineKeyboardButton("2 Foto", callback_data="qty_2"),
+               types.InlineKeyboardButton("4 Foto", callback_data="qty_4"))
+               
+    bot.send_message(m.chat.id, "<b>Configurazione Valeria Cross</b>\nScegli Formato e Quantità:", reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('ar_'))
-def set_ar(call):
-    user_ar[call.from_user.id] = call.data.replace('ar_', '')
-    bot.answer_callback_query(call.id, f"Formato impostato a {user_ar[call.from_user.id]}")
-    bot.edit_message_text(f"✅ Formato attuale: <b>{user_ar[call.from_user.id]}</b>\nOra puoi inviare il tuo prompt.", call.message.chat.id, call.message.message_id)
+@bot.callback_query_handler(func=lambda call: call.data.startswith('ar_') or call.data.startswith('qty_'))
+def handle_callbacks(call):
+    uid = call.from_user.id
+    if call.data.startswith('ar_'):
+        user_ar[uid] = call.data.replace('ar_', '')
+        msg = f"✅ Formato: <b>{user_ar[uid]}</b>"
+    elif call.data.startswith('qty_'):
+        user_qty[uid] = int(call.data.replace('qty_', ''))
+        msg = f"✅ Quantità batch: <b>{user_qty[uid]}</b>"
+    
+    bot.answer_callback_query(call.id, msg)
+    bot.edit_message_text(f"⚙️ Impostazioni Attuali:\n📐 Formato: <b>{user_ar[uid]}</b>\n🔢 Quantità: <b>{user_qty[uid]}</b>\n\nInvia un prompt!", call.message.chat.id, call.message.message_id)
 
 @bot.message_handler(content_types=['text', 'photo'])
 def handle(m):
-    wait = bot.reply_to(m, "⏳ <b>Valeria Cross</b> sta posando...")
+    uid = m.from_user.id
+    qty = user_qty[uid]
+    fmt = user_ar[uid]
+    
+    wait = bot.reply_to(m, f"⏳ <b>Valeria Cross</b> in posa...\nGenerazione di <b>{qty}</b> scatti ({fmt}).")
+    
     prompt = m.caption if m.content_type == 'photo' else m.text
     img_data = None
     if m.content_type == 'photo':
         file_info = bot.get_file(m.photo[-1].file_id)
         img_data = bot.download_file(file_info.file_path)
 
-    res, err = generate_valeria(prompt, user_ar[m.from_user.id], img_data)
-    
-    if res:
-        bot.send_document(m.chat.id, io.BytesIO(res), visible_file_name="valeria_cross.jpg")
-        bot.delete_message(m.chat.id, wait.message_id)
-    else:
-        bot.edit_message_text(f"❌ <b>Errore:</b>\n{err}", m.chat.id, wait.message_id)
+    # Funzione helper per inviare risultati man mano che arrivano
+    def task(index):
+        res, err = generate_single_task(prompt, fmt, img_data)
+        if res:
+            try:
+                bot.send_document(m.chat.id, io.BytesIO(res), visible_file_name=f"valeria_{index+1}.jpg", caption=f"Scatto {index+1}/{qty}")
+            except Exception as e:
+                logger.error(f"Errore invio Telegram: {e}")
+        else:
+            bot.send_message(m.chat.id, f"❌ Errore scatto {index+1}: {err}")
+
+    # Lancio parallelo dei task
+    for i in range(qty):
+        executor.submit(task, i)
 
 # --- SERVER ---
 app = flask.Flask(__name__)
 @app.route('/')
-def h(): return "Valeria Bot Online"
+def h(): return "Valeria Bot Turbo Online"
 
 if __name__ == "__main__":
     threading.Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000))), daemon=True).start()
