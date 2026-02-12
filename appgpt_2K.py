@@ -18,15 +18,17 @@ client = genai.Client(api_key=API_KEY)
 MODEL_ID = "gemini-2.0-flash-exp-image-generation"
 
 # ==============================
-# MASTER FACE (OBBLIGATORIA)
+# MASTER FACE
 # ==============================
 
 def load_master_face():
     try:
         with open("master_face.png", "rb") as f:
-            return types.Part.from_bytes(
-                data=f.read(),
-                mime_type="image/png"
+            return types.Part(
+                inline_data=types.Blob(
+                    mime_type="image/png",
+                    data=f.read()
+                )
             )
     except Exception:
         print("ERRORE: master_face.png non trovato")
@@ -68,7 +70,6 @@ BODY RULES:
 - Completely hairless body
 - Smooth feminine skin
 
-Do not alter the face under any circumstance.
 Face consistency has absolute priority.
 """
 
@@ -90,7 +91,7 @@ High detail.
                 types.Content(
                     role="user",
                     parts=[
-                        types.Part.from_text(full_prompt),
+                        types.Part(text=full_prompt),
                         MASTER_FACE
                     ]
                 )
@@ -104,7 +105,7 @@ High detail.
 
         for candidate in response.candidates:
             for part in candidate.content.parts:
-                if part.inline_data:
+                if hasattr(part, "inline_data") and part.inline_data:
                     return part.inline_data.data, None
 
         return None, "Nessuna immagine generata"
@@ -122,7 +123,7 @@ bot = telebot.TeleBot(TOKEN)
 @bot.message_handler(content_types=['text'])
 def handle_message(m):
 
-    wait_msg = bot.reply_to(m, "Generazione con Face Lock prioritario in corso...")
+    wait_msg = bot.reply_to(m, "Generazione Face Lock in corso...")
 
     result, error = generate_image(m.text)
 
