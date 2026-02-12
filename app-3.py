@@ -17,10 +17,10 @@ client = genai.Client(api_key=API_KEY)
 MODEL_ID = "nano-banana-pro-preview"
 
 # Preferenze utenti
-user_ar = defaultdict(lambda: "16:9")    # Default Formato
-user_qty = defaultdict(lambda: 1)         # Default Quantità
+user_ar = defaultdict(lambda: "16:9")    
+user_qty = defaultdict(lambda: 1)         
 
-# Executor per il parallelismo (max 2 worker per evitare Rate Limit aggressivi)
+# Executor (max 2 worker)
 executor = ThreadPoolExecutor(max_workers=2)
 
 # --- CARICAMENTO MASTER FACE ---
@@ -34,12 +34,12 @@ def get_face_part():
 
 MASTER_PART = get_face_part()
 
-# --- GENERAZIONE SINGOLA ---
+# --- GENERAZIONE CON DIAGNOSTICA ---
 def generate_single_task(prompt_utente, ar_scelto, img_rif_bytes=None):
     try:
         if not MASTER_PART: return None, "File master_face.png mancante."
 
-        # Identità Valeria Cross [cite: 2026-02-08, 2025-11-21]
+        # Identità Valeria Cross
         system_instructions = f"""
         ROLE: Expert Vogue Photographer.
         SUBJECT: Nameless Italian transmasculine avatar named Valeria Cross.
@@ -63,23 +63,56 @@ def generate_single_task(prompt_utente, ar_scelto, img_rif_bytes=None):
         if img_rif_bytes:
             contents.append(genai_types.Part.from_bytes(data=img_rif_bytes, mime_type="image/jpeg"))
 
+        # Chiamata API
         response = client.models.generate_content(
             model=MODEL_ID,
             contents=contents,
             config=genai_types.GenerateContentConfig(
                 response_modalities=["IMAGE"],
-                safety_settings=[{"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"}]
+                # Disabilita i blocchi preventivi, ma il server può ancora bloccare l'output
+                safety_settings=[
+                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+                ]
             )
         )
 
-        if response.candidates and response.candidates[0].content.parts:
-            for part in response.candidates[0].content.parts:
+        # --- DIAGNOSTICA ERRORI ---
+        # 1. Controllo se il prompt è stato bloccato in ingresso
+        if response.prompt_feedback and response.prompt_feedback.block_reason:
+            return None, f"⛔ Prompt Illegale: {response.prompt_feedback.block_reason}"
+
+        # 2. Controllo candidati
+        if not response.candidates:
+            return None, "❌ Errore API: Nessun candidato ritornato."
+
+        candidate = response.candidates[0]
+
+        # 3. Controllo Safety Ratings (Motivo del blocco immagine)
+        if candidate.finish_reason != "STOP":
+            reasons = []
+            if candidate.safety_ratings:
+                for rating in candidate.safety_ratings:
+                    # Elenca solo le categorie che hanno superato la soglia "NEGLIGIBLE"
+                    if rating.probability not in ["NEGLIGIBLE", "LOW"]: 
+                        reasons.append(f"{rating.category.name.replace('HARM_CATEGORY_', '')}: {rating.probability.name}")
+            
+            reason_str = ", ".join(reasons) if reasons else "Filtro sconosciuto"
+            return None, f"🛡️ Blocco Sicurezza: {candidate.finish_reason}\nDettagli: {reason_str}"
+
+        # 4. Estrazione Immagine (Successo)
+        if candidate.content and candidate.content.parts:
+            for part in candidate.content.parts:
                 if part.inline_data:
                     return part.inline_data.data, None
-        return None, "Generazione bloccata."
+
+        return None, "Generazione fallita (No Data)."
+
     except Exception as e:
         logger.error(f"❌ Errore Thread: {e}")
-        return None, str(e)
+        return None, f"Crash Tecnico: {str(e)}"
 
 # --- BOT TELEGRAM ---
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
@@ -87,21 +120,16 @@ bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 @bot.message_handler(commands=['start', 'settings'])
 def settings(m):
     markup = types.InlineKeyboardMarkup()
-    
-    # Riga Formati
     markup.row(types.InlineKeyboardButton("3:2 📷", callback_data="ar_3:2"),
                types.InlineKeyboardButton("2:3 🖼️", callback_data="ar_2:3"))
     markup.row(types.InlineKeyboardButton("16:9 🎬", callback_data="ar_16:9"),
                types.InlineKeyboardButton("4:3 📰", callback_data="ar_4:3"))
     markup.row(types.InlineKeyboardButton("3:4 📱", callback_data="ar_3:4"),
                types.InlineKeyboardButton("9:16 📲", callback_data="ar_9:16"))
-    
-    # Riga Quantità
     markup.row(types.InlineKeyboardButton("1 Foto", callback_data="qty_1"),
                types.InlineKeyboardButton("2 Foto", callback_data="qty_2"),
                types.InlineKeyboardButton("4 Foto", callback_data="qty_4"))
-               
-    bot.send_message(m.chat.id, "<b>Configurazione Valeria Cross</b>\nScegli Formato e Quantità:", reply_markup=markup)
+    bot.send_message(m.chat.id, "<b>Configurazione Valeria Cross</b>\nScegli:", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('ar_') or call.data.startswith('qty_'))
 def handle_callbacks(call):
@@ -111,10 +139,9 @@ def handle_callbacks(call):
         msg = f"✅ Formato: <b>{user_ar[uid]}</b>"
     elif call.data.startswith('qty_'):
         user_qty[uid] = int(call.data.replace('qty_', ''))
-        msg = f"✅ Quantità batch: <b>{user_qty[uid]}</b>"
-    
+        msg = f"✅ Quantità: <b>{user_qty[uid]}</b>"
     bot.answer_callback_query(call.id, msg)
-    bot.edit_message_text(f"⚙️ Impostazioni Attuali:\n📐 Formato: <b>{user_ar[uid]}</b>\n🔢 Quantità: <b>{user_qty[uid]}</b>\n\nInvia un prompt!", call.message.chat.id, call.message.message_id)
+    bot.edit_message_text(f"⚙️ Setup:\n📐 <b>{user_ar[uid]}</b> | 🔢 <b>{user_qty[uid]}</b>", call.message.chat.id, call.message.message_id)
 
 @bot.message_handler(content_types=['text', 'photo'])
 def handle(m):
@@ -130,27 +157,26 @@ def handle(m):
         file_info = bot.get_file(m.photo[-1].file_id)
         img_data = bot.download_file(file_info.file_path)
 
-    # Funzione helper per inviare risultati man mano che arrivano
     def task(index):
         res, err = generate_single_task(prompt, fmt, img_data)
         if res:
             try:
                 bot.send_document(m.chat.id, io.BytesIO(res), visible_file_name=f"valeria_{index+1}.jpg", caption=f"Scatto {index+1}/{qty}")
             except Exception as e:
-                logger.error(f"Errore invio Telegram: {e}")
+                logger.error(f"Errore invio: {e}")
         else:
-            bot.send_message(m.chat.id, f"❌ Errore scatto {index+1}: {err}")
+            # Qui inviamo l'errore specifico all'utente
+            bot.send_message(m.chat.id, f"❌ <b>Scatto {index+1} fallito:</b>\n{err}")
 
-    # Lancio parallelo dei task
     for i in range(qty):
         executor.submit(task, i)
 
 # --- SERVER ---
 app = flask.Flask(__name__)
 @app.route('/')
-def h(): return "Valeria Bot Turbo Online"
+def h(): return "Valeria Debug Online"
 
 if __name__ == "__main__":
     threading.Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000))), daemon=True).start()
     bot.infinity_polling()
-    
+        
