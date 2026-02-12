@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
-# render-build.sh - Script di build per Render.com
+set -e
 
-set -e  # Exit on error
+echo "🚀 Build MoltBot..."
 
-echo "🚀 Inizio build MoltBot 4K..."
+# Aggiorna pip PRIMA di apt-get
+pip install --upgrade pip setuptools wheel
 
-# Aggiorna lista pacchetti
-echo "📦 Aggiornamento apt..."
-apt-get update -qq
-
-# Installa dipendenze di sistema per Pillow
-echo "🔧 Installazione dipendenze sistema..."
+# Installa dipendenze sistema (senza aggiornare liste)
 apt-get install -y --no-install-recommends \
     libjpeg-dev \
     zlib1g-dev \
@@ -19,18 +15,9 @@ apt-get install -y --no-install-recommends \
     liblcms2-dev \
     libwebp-dev \
     gcc \
-    g++
-
-# Pulisci cache apt
-apt-get clean
-rm -rf /var/lib/apt/lists/*
-
-# Aggiorna pip
-echo "⬆️ Aggiornamento pip..."
-pip install --upgrade pip setuptools wheel
+    g++ 2>/dev/null || echo "Alcune dipendenze già installate"
 
 # Installa dipendenze Python
-echo "🐍 Installazione dipendenze Python..."
 pip install --no-cache-dir -r requirements.txt
 
-echo "✅ Build completato con successo!"
+echo "✅ Build completato!"
