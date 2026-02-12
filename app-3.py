@@ -34,25 +34,23 @@ def generate_valeria(prompt_utente, ar_scelto, img_rif_bytes=None):
     try:
         if not MASTER_PART: return None, "File master_face.png mancante sul server."
 
-        # BLOCCO 1, 2, 3: Identità, Corpo e Capelli (Dettagliato e Prolisso)
-        # [cite: 2026-02-08, 2025-11-21, 2025-12-01]
+        # Identità, Corpo e Capelli [cite: 2026-02-08, 2025-11-21, 2025-12-01]
         system_instructions = f"""
         ROLE: Expert Vogue Photographer.
         SUBJECT: Nameless Italian transmasculine avatar named Valeria Cross.
         BODY: Soft feminine harmonious hourglass body, prosperous full breasts (Cup D), 180cm, 85kg. 
-        SKIN: Completely hairless (arms, legs, chest, breasts - peli NO!).
-        FACE: Male Italian face, ~60 years old. Oval-rectangular. Detailed skin with pores and wrinkles. 
+        SKIN: Completely hairless (arms, legs, chest, breasts - hair NO!).
+        FACE: Male Italian face, ~60 years old. Oval-rectangular. Detailed skin. 
         BEARD: Light grey/silver, groomed, 6-7 cm. 
         GLASSES: Mandatory thin octagonal Vogue, Havana dark frame.
         HAIR: Light grey/silver. Short elegant Italian style, volume. Nape exposed. Never touching neck/shoulders.
-        TECHNICAL: Cinematic realism, 85mm, f/2.8, natural bokeh. Resolution 8K style (rendered at 1MP).
+        TECHNICAL: Cinematic realism, 85mm, f/2.8.
         WATERMARK: Mandatory text "feat. Valeria Cross 👠" in elegant cursive champagne color at bottom center/left.
         """
 
-        # BLOCCO 4: Rendering e Negativi
+        # Rendering e Negativi [cite: 2026-02-08, 2025-11-23]
         negatives = "NEGATIVE: masculine body shape, flat chest, body hair, peli, long hair, female face, 1:1 format."
 
-        # Costruzione contenuti per Nanobanana
         contents = [
             f"{system_instructions}\n\nSCENE: {prompt_utente}\n\nFORMAT: {ar_scelto}\n\n{negatives}",
             MASTER_PART
@@ -85,21 +83,24 @@ bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 @bot.message_handler(commands=['start', 'settings'])
 def settings(m):
     markup = types.InlineKeyboardMarkup()
+    # Nuova riga con i formati richiesti
+    markup.row(types.InlineKeyboardButton("3:2 (Classico)", callback_data="ar_3:2"),
+               types.InlineKeyboardButton("2:3 (Artistico)", callback_data="ar_2:3"))
     markup.row(types.InlineKeyboardButton("16:9 (Cinema)", callback_data="ar_16:9"),
                types.InlineKeyboardButton("4:3 (Vogue)", callback_data="ar_4:3"))
     markup.row(types.InlineKeyboardButton("3:4 (Portrait)", callback_data="ar_3:4"),
                types.InlineKeyboardButton("9:16 (Story)", callback_data="ar_9:16"))
-    bot.send_message(m.chat.id, "<b>Configurazione Valeria Cross</b>\nScegli il formato:", reply_markup=markup)
+    bot.send_message(m.chat.id, "<b>Configurazione Valeria Cross</b>\nScegli il formato desiderato:", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('ar_'))
 def set_ar(call):
     user_ar[call.from_user.id] = call.data.replace('ar_', '')
     bot.answer_callback_query(call.id, f"Formato impostato a {user_ar[call.from_user.id]}")
-    bot.edit_message_text(f"✅ Formato attuale: <b>{user_ar[call.from_user.id]}</b>\nInvia un prompt!", call.message.chat.id, call.message.message_id)
+    bot.edit_message_text(f"✅ Formato attuale: <b>{user_ar[call.from_user.id]}</b>\nOra puoi inviare il tuo prompt.", call.message.chat.id, call.message.message_id)
 
 @bot.message_handler(content_types=['text', 'photo'])
 def handle(m):
-    wait = bot.reply_to(m, "⏳ <b>Valeria Cross</b> sta posando per te...")
+    wait = bot.reply_to(m, "⏳ <b>Valeria Cross</b> sta posando...")
     prompt = m.caption if m.content_type == 'photo' else m.text
     img_data = None
     if m.content_type == 'photo':
@@ -122,4 +123,4 @@ def h(): return "Valeria Bot Online"
 if __name__ == "__main__":
     threading.Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000))), daemon=True).start()
     bot.infinity_polling()
-      
+    
