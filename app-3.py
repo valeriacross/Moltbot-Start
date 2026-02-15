@@ -48,7 +48,7 @@ def generate_single_task(prompt_utente, ar_scelto, img_rif_bytes=None):
         FACE: Male Italian face, ~60 years old. Oval-rectangular. Detailed skin. 
         BEARD: Light grey/silver, groomed, 6-7 cm. 
         GLASSES: Mandatory thin octagonal Vogue, Havana dark frame.
-        HAIR: Light grey/silver. Short elegant Italian style, volume. Nape exposed. Never touching neck/shoulders.
+        HAIR: Light grey/silver. elegant Italian style, 10-15cm on top, 1-2cm on sides. Nape exposed. Never touching neck/shoulders.
         TECHNICAL: Cinematic realism, 85mm, f/2.8.
         WATERMARK: Mandatory text "feat. Valeria Cross 👠" in elegant very small scale, cursive champagne color at bottom center/left, 80% opacity.
         """
