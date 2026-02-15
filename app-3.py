@@ -50,7 +50,7 @@ def generate_single_task(prompt_utente, ar_scelto, img_rif_bytes=None):
         GLASSES: Mandatory thin octagonal Vogue, Havana dark frame.
         HAIR: Light grey/silver. Short elegant Italian style, volume. Nape exposed. Never touching neck/shoulders.
         TECHNICAL: Cinematic realism, 85mm, f/2.8.
-        WATERMARK: Mandatory text "feat. Valeria Cross 👠" in elegant very small cursive champagne color at bottom center/left.
+        WATERMARK: Mandatory text "feat. Valeria Cross 👠" in elegant very small scale, cursive champagne color at bottom center/left, 80% opacity.
         """
 
         negatives = "NEGATIVE: masculine body shape, flat chest, body hair, peli, long hair, female face, 1:1 format."
