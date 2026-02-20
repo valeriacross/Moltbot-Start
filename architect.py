@@ -19,65 +19,104 @@ BLOCK 4 (Rendering & Output): RENDERING: Subsurface Scattering, Global Illuminat
 NEGATIVE PROMPTS: [Face] female/young face, smooth skin, distortion. [Hair] long/medium hair, ponytail, bun, braid, touching neck/shoulders. [Body] body/chest/leg hair (peli NO!).
 """
 
-user_state = {} 
+# Memoria della sessione: {chat_id: {'engine': str, 'last_idea': str}}
+user_session = {} 
 
-def get_main_keyboard():
+def get_engine_keyboard(show_fine=False):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.row("Gemini 🍌", "Grok 𝕏")
     markup.row("ChatGPT 🤖", "MetaAI 🌀", "Qwen 🏮")
+    if show_fine:
+        markup.row("🏁 FINE / NUOVA IDEA")
     return markup
 
 @bot.message_handler(commands=['start', 'reset'])
 def start(m):
-    user_state[m.chat.id] = None
+    user_session[m.chat.id] = {'engine': None, 'last_idea': None}
     bot.send_message(m.chat.id, 
-        "<b>🏛️ Moltbot Architect v1.2</b>\nScegli il motore di destinazione:", 
-        reply_markup=get_main_keyboard())
+        "<b>🏛️ Moltbot Architect v2.0</b>\n"
+        "Configurato per ottimizzazione multi-motore.\n\n"
+        "<b>Scegli il motore di partenza:</b>", 
+        reply_markup=get_engine_keyboard())
+
+@bot.message_handler(func=lambda m: m.text == "🏁 FINE / NUOVA IDEA")
+def reset_session(m):
+    user_session[m.chat.id] = {'engine': None, 'last_idea': None}
+    bot.send_message(m.chat.id, "✅ Sessione chiusa. Scegli un motore per una nuova idea:", 
+                     reply_markup=get_engine_keyboard())
 
 @bot.message_handler(func=lambda m: m.text in ["Gemini 🍌", "Grok 𝕏", "ChatGPT 🤖", "MetaAI 🌀", "Qwen 🏮"])
-def set_engine(m):
+def handle_engine_selection(m):
     engine_clean = m.text.split()[0]
-    user_state[m.chat.id] = engine_clean
-    bot.send_message(m.chat.id, f"🎯 Target: <b>{engine_clean}</b>\nInviami l'idea per lo scatto.")
+    cid = m.chat.id
+    
+    # Se non c'è una sessione, creala
+    if cid not in user_session:
+        user_session[cid] = {'engine': None, 'last_idea': None}
+    
+    user_session[cid]['engine'] = engine_clean
+    
+    # Se abbiamo già un'idea in memoria, generiamo subito per il nuovo motore
+    if user_session[cid]['last_idea']:
+        generate_optimized_prompt(m, cid)
+    else:
+        bot.send_message(cid, f"🎯 Target: <b>{engine_clean}</b>\nScrivi la tua idea per lo scatto:")
 
 @bot.message_handler(func=lambda m: True)
-def process_optimization(m):
-    if m.chat.id not in user_state or user_state[m.chat.id] is None:
-        bot.send_message(m.chat.id, "⚠️ Scegli un motore:", reply_markup=get_main_keyboard())
+def process_text_input(m):
+    cid = m.chat.id
+    
+    # Verifica che sia stato scelto un motore
+    if cid not in user_session or user_session[cid]['engine'] is None:
+        bot.send_message(cid, "⚠️ Scegli prima un motore:", reply_markup=get_engine_keyboard())
         return
 
-    engine = user_state[m.chat.id]
-    wait = bot.reply_to(m, f"🏗️ <b>Architetto al lavoro per {engine}...</b>")
+    # Salva l'idea in memoria per poterla riutilizzare con altri motori
+    user_session[cid]['last_idea'] = m.text
+    generate_optimized_prompt(m, cid)
 
-    prompt_logic = (
-        f"Professional Prompt Engineer. Expand user idea into a detailed image prompt in English. "
-        f"STRICTLY include: {MASTER_DIRECTIVES}. "
-        f"ADAPT FOR {engine}: "
-        f"- Gemini: Artistic/editorial style. "
-        f"- Grok: Raw realism and high contrast. "
-        f"Output ONLY the optimized prompt text."
+def generate_optimized_prompt(m, cid):
+    engine = user_session[cid]['engine']
+    idea = user_session[cid]['last_idea']
+    
+    wait = bot.send_message(cid, f"🏗️ <b>Generazione per {engine}...</b>")
+
+    instructions = (
+        f"You are a professional Prompt Engineer. Expand this idea into a verbose, detailed, "
+        f"and didactic image prompt in English. Strictly include: {MASTER_DIRECTIVES}. "
+        f"Specific tuning for {engine}: "
+        f"- Gemini: Use artistic/editorial safe language. "
+        f"- Grok: Use raw realism and extreme technical detail. "
+        f"- ChatGPT/MetaAI/Qwen: Focus on technical weights and lighting tags. "
+        f"Output ONLY the final optimized text."
     )
 
     try:
         response = client.models.generate_content(
             model=MODEL_ID,
-            contents=[f"{prompt_logic}\n\nUSER INPUT: {m.text}"]
+            contents=[f"{instructions}\n\nUSER IDEA: {idea}"]
         )
-        final_msg = f"✨ <b>Prompt per {engine}</b>\n\n<code>{html.escape(response.text)}</code>"
-        bot.delete_message(m.chat.id, wait.message_id)
-        bot.send_message(m.chat.id, final_msg)
+        
+        final_msg = (
+            f"✨ <b>Prompt Ottimizzato per {engine}</b>\n\n"
+            f"<code>{html.escape(response.text)}</code>\n\n"
+            f"🔄 <b>Vuoi lo stesso prompt per un altro motore?</b>\n"
+            f"Seleziona un tasto o premi Fine per cambiare idea."
+        )
+        
+        bot.delete_message(cid, wait.message_id)
+        bot.send_message(cid, final_msg, reply_markup=get_engine_keyboard(show_fine=True))
+        
     except Exception as e:
-        bot.send_message(m.chat.id, f"❌ Errore: {str(e)}")
+        bot.send_message(cid, f"❌ Errore: {str(e)}")
 
-# --- SERVER FLASK PER KOYEB (IL FIX) ---
+# --- SERVER FLASK PER KOYEB ---
 app = flask.Flask(__name__)
 @app.route('/')
 def h(): return "Architect Online"
 
 if __name__ == "__main__":
-    # Avvia Flask in un thread separato
     port = int(os.environ.get("PORT", 10000))
     threading.Thread(target=lambda: app.run(host='0.0.0.0', port=port), daemon=True).start()
-    # Avvia il bot
     bot.infinity_polling()
     
