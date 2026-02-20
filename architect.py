@@ -10,15 +10,12 @@ MODEL_ID = "gemini-2.0-flash"
 
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
-# Dati di base di Valeria (non più chiamati 'BLOCKS' per non confondere l'AI)
-VALERIA_DNA = """
-SUBJECT: Valeria Cross, Italian transmasculine avatar. 
-APPEARANCE: 60yo male face, ultra-detailed skin (pores, wrinkles), light grey/silver 6cm groomed beard, thin octagonal Vogue Havana dark glasses.
-BODY: Soft feminine hourglass, prosperous Cup D breasts, 180cm, 85kg, hairless skin.
-HAIR: Short silver elegant Italian style, volume, nape exposed.
-TECHNICAL: 85mm lens, f/2.8, ISO 200, 1/160s, shallow depth of field, 8K resolution, SSS rendering.
-WATERMARK: 'feat. Valeria Cross 👠' cursive champagne bottom center/left.
-"""
+# --- I 4 BLOCCHI RIGIDI (SORGENTE DELLA VERITÀ) ---
+B1 = "BLOCK 1 (Activation & Priority): Reference image has ABSOLUTE PRIORITY. ZERO face drift allowed. Male Italian face identity."
+B2 = "BLOCK 2 (Subject & Face): Nameless Italian transmasculine avatar (Valeria Cross). Body: soft feminine, harmonious hourglass, prosperous full breasts (cup D), 180cm, 85kg. Body completely hairless. FACE: Male Italian face, ~60 years old, ultra-detailed skin (pores, wrinkles, bags). Expression: calm, half-smile, NO teeth. Beard: light grey/silver, groomed, 6–7 cm. Glasses MANDATORY: thin octagonal Vogue, Havana dark."
+B3 = "BLOCK 3 (Hair & Technique): HAIR: Light grey/silver. Short elegant Italian style, volume. Nape exposed. Top <15 cm. IMAGE CONCEPT: High-fashion Vogue cover, 8K, cinematic realism. CAMERA: 85mm, f/2.8, ISO 200, 1/160s. Focus on face/torso. Shallow depth of field, natural bokeh."
+B4 = "BLOCK 4 (Rendering & Output): RENDERING: Subsurface Scattering, Global Illumination, Fresnel, Frequency separation on skin. Watermark: 'feat. Valeria Cross 👠' (elegant cursive, champagne, bottom center/left, opacity 90%)."
+NEG = "NEGATIVE PROMPTS: [Face] female/young face, smooth skin, distortion. [Hair] long/medium hair, ponytail, bun, braid, touching neck/shoulders. [Body] body/chest/leg hair (peli NO!)."
 
 user_session = {} 
 
@@ -32,12 +29,12 @@ def get_engine_keyboard(show_fine=False):
 @bot.message_handler(commands=['start', 'reset'])
 def start(m):
     user_session[m.chat.id] = {'engine': None, 'last_idea': None}
-    bot.send_message(m.chat.id, "<b>🏛️ Moltbot Architect v2.2</b>\nScegli il motore:", reply_markup=get_engine_keyboard())
+    bot.send_message(m.chat.id, "<b>🏛️ Architect v2.5 (Result Oriented)</b>\nScegli il motore target:", reply_markup=get_engine_keyboard())
 
 @bot.message_handler(func=lambda m: m.text == "🏁 FINE / NUOVA IDEA")
 def reset_session(m):
     user_session[m.chat.id] = {'engine': None, 'last_idea': None}
-    bot.send_message(m.chat.id, "✅ Inserisci una nuova idea:", reply_markup=get_engine_keyboard())
+    bot.send_message(m.chat.id, "✅ Pronto per una nuova idea:", reply_markup=get_engine_keyboard())
 
 @bot.message_handler(func=lambda m: m.text in ["Gemini 🍌", "Grok 𝕏", "ChatGPT 🤖", "MetaAI 🌀", "Qwen 🏮"])
 def handle_engine(m):
@@ -45,8 +42,8 @@ def handle_engine(m):
     cid = m.chat.id
     if cid not in user_session: user_session[cid] = {'engine': None, 'last_idea': None}
     user_session[cid]['engine'] = engine_clean
-    if user_session[cid]['last_idea']: generate_optimized_prompt(m, cid)
-    else: bot.send_message(cid, f"🎯 Target: <b>{engine_clean}</b>\nScrivi la tua idea:")
+    if user_session[cid]['last_idea']: generate_result_prompt(m, cid)
+    else: bot.send_message(cid, f"🎯 Target: <b>{engine_clean}</b>\nScrivi l'idea:")
 
 @bot.message_handler(func=lambda m: True)
 def process_text(m):
@@ -55,45 +52,41 @@ def process_text(m):
         bot.send_message(cid, "⚠️ Scegli un motore:", reply_markup=get_engine_keyboard())
         return
     user_session[cid]['last_idea'] = m.text
-    generate_optimized_prompt(m, cid)
+    generate_result_prompt(m, cid)
 
-def generate_optimized_prompt(m, cid):
+def generate_result_prompt(m, cid):
     engine = user_session[cid]['engine']
     idea = user_session[cid]['last_idea']
-    wait = bot.send_message(cid, f"🏗️ <b>Architetto al lavoro per {engine}...</b>")
+    wait = bot.send_message(cid, f"🏗️ <b>Ottimizzazione per {engine}...</b>")
 
-    # ESEMPIO DI COSA VOGLIAMO (Few-Shot)
-    example = (
-        "EXAMPLE OF OUTPUT:\n"
-        "Idea: 'Valeria in a cafe'\n"
-        "Output: 'A cinematic high-fashion Vogue cover shot of Valeria Cross sitting at a marble cafe table in Lisbon. "
-        "The soft morning light hits her 60-year-old Italian male face, highlighting the deep textures of her silver 6cm beard "
-        "and her octagonal Havana Vogue glasses. She wears a form-fitting black silk blouse that accentuates her feminine "
-        "hourglass figure and prominent Cup D breasts. 85mm lens, f/2.8, shallow bokeh, SSS rendering, 8K. "
-        "Watermark: feat. Valeria Cross 👠 bottom left.'\n\n"
-    )
-
+    # Istruzioni per espandere la scena ignorando altre identità
     instructions = (
-        f"You are a professional Prompt Engineer. Task: Expand the 'USER IDEA' into a long, detailed, narrative prompt in English.\n"
-        f"MANDATORY SUBJECT DETAILS: {VALERIA_DNA}\n"
-        f"{example}"
-        f"RULES:\n"
-        f"1. Never mention 'BLOCK' or 'DNA'.\n"
-        f"2. Integrate the idea into a rich scene with lighting and clothes.\n"
-        f"3. Engine Style ({engine}): Grok=Raw/Gritty, Gemini=Elegant/Artistic.\n"
-        f"4. Be very prolix and descriptive.\n\n"
+        f"You are a professional photographer. Expand the user's idea into a detailed SCENE description. "
+        f"Focus ONLY on environment, lighting, and clothing (elegant, tight-fitting). "
+        f"IGNORE any other characters or people mentioned. Use ONLY English. "
+        f"Engine target: {engine}.\n\n"
         f"USER IDEA: {idea}"
     )
 
     try:
         response = client.models.generate_content(model=MODEL_ID, contents=[instructions])
-        # Rimuove eventuali scorie di testo
-        text = response.text.replace("Output:", "").replace("Prompt:", "").strip()
+        scene = response.text.strip()
+        
+        # --- LOGICA DI ASSEMBLAGGIO VARIABILE ---
+        if engine == "Grok" or engine == "Qwen":
+            # Grok e Qwen amano la scena all'inizio per impostare il "mood"
+            final_prompt = f"SCENE: {scene}\n\n{B1}\n\n{B2}\n\n{B3}\n\n{B4}\n\n{NEG}"
+        elif engine == "Gemini":
+            # Gemini ha bisogno delle istruzioni di priorità SUBITO per SynthID
+            final_prompt = f"{B1}\n\n{B2}\n\n{B3}\n\nSCENE: {scene}\n\n{B4}\n\n{NEG}"
+        else:
+            # Standard per gli altri
+            final_prompt = f"{B1}\n\n{B2}\n\n{B3}\n\nSCENE: {scene}\n\n{B4}\n\n{NEG}"
         
         final_msg = (
-            f"✨ <b>Prompt Ottimizzato per {engine}</b>\n\n"
-            f"<code>{html.escape(text)}</code>\n\n"
-            f"🔄 <b>Vuoi lo stesso per un altro motore?</b>"
+            f"✨ <b>Prompt per {engine}</b>\n\n"
+            f"<code>{html.escape(final_prompt)}</code>\n\n"
+            f"🔄 <b>Vuoi testare un altro motore?</b>"
         )
         bot.delete_message(cid, wait.message_id)
         bot.send_message(cid, final_msg, reply_markup=get_engine_keyboard(show_fine=True))
