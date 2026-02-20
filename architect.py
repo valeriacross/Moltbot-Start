@@ -7,11 +7,13 @@ TOKEN = os.environ.get("TELEGRAM_TOKEN_ARCHITECT")
 API_KEY = os.environ.get("GOOGLE_API_KEY")
 client = genai.Client(api_key=API_KEY)
 
+# Gemini 2.0 Flash risolve l'errore 404 riscontrato nei log
+MODEL_ID = "gemini-2.0-flash" 
+
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
 # --- I 4 BLOCCHI ORIGINALI (IL MASTER PROMPT) ---
-# Questi blocchi sono immutabili e verranno sempre iniettati nel prompt finale.
-MASTER_BLOCKS = """
+MASTER_DIRECTIVES = """
 BLOCK 1 (Activation & Priority): Reference image has ABSOLUTE PRIORITY. ZERO face drift allowed. Male Italian face identity.
 BLOCK 2 (Subject & Face): Nameless Italian transmasculine avatar (Valeria Cross). Body: soft feminine, harmonious hourglass, prosperous full breasts (cup D), 180cm, 85kg. Body completely hairless. FACE: Male Italian face, ~60 years old, ultra-detailed skin (pores, wrinkles, bags). Expression: calm, half-smile, NO teeth. Beard: light grey/silver, groomed, 6–7 cm. Glasses MANDATORY: thin octagonal Vogue, Havana dark.
 BLOCK 3 (Hair & Technique): HAIR: Light grey/silver. Short elegant Italian style, volume. Nape exposed. Top <15 cm. IMAGE CONCEPT: High-fashion Vogue cover, 8K, cinematic realism. CAMERA: 85mm, f/2.8, ISO 200, 1/160s. Focus on face/torso. Shallow depth of field, natural bokeh.
@@ -19,54 +21,75 @@ BLOCK 4 (Rendering & Output): RENDERING: Subsurface Scattering, Global Illuminat
 NEGATIVE PROMPTS: [Face] female/young face, smooth skin, distortion. [Hair] long/medium hair, ponytail, bun, braid, touching neck/shoulders. [Body] body/chest/leg hair (peli NO!).
 """
 
-user_engine = {}
+# Dizionario per gestire lo stato dell'utente
+user_state = {} 
 
-@bot.message_handler(commands=['start'])
+def get_main_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+    markup.row("Gemini 🍌", "Grok 𝕏")
+    markup.row("ChatGPT 🤖", "MetaAI 🌀", "Qwen 🏮")
+    return markup
+
+@bot.message_handler(commands=['start', 'reset'])
 def start(m):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("Gemini 🍌", "Grok 𝕏", "ChatGPT/Meta/Qwen 🌀")
-    bot.send_message(m.chat.id, "<b>Moltbot Architect v1</b>\nCostruisco il prompt perfetto per Valeria Cross.\n\nScegli il motore di destinazione:", reply_markup=markup)
+    user_state[m.chat.id] = None # Reset stato
+    bot.send_message(m.chat.id, 
+        "<b>🏛️ Moltbot Architect v1.2</b>\n"
+        "Benvenuto nel centro di comando creativo di Valeria Cross.\n\n"
+        "<b>Per favore, scegli il motore di generazione:</b>", 
+        reply_markup=get_main_keyboard())
 
-@bot.message_handler(func=lambda m: m.text in ["Gemini 🍌", "Grok 𝕏", "ChatGPT/Meta/Qwen 🌀"])
+# Gestione della selezione del motore
+@bot.message_handler(func=lambda m: m.text in ["Gemini 🍌", "Grok 𝕏", "ChatGPT 🤖", "MetaAI 🌀", "Qwen 🏮"])
 def set_engine(m):
-    user_engine[m.chat.id] = m.text
-    bot.reply_to(m, f"🎯 Motore impostato: <b>{m.text}</b>\nOra scrivi la tua idea (anche in italiano o emoji).")
+    engine_clean = m.text.split()[0] # Toglie l'emoji
+    user_state[m.chat.id] = engine_clean
+    bot.send_message(m.chat.id, 
+        f"🎯 Motore impostato su: <b>{engine_clean}</b>\n\n"
+        "Ora inviami la tua idea per lo scatto. Può essere una descrizione in italiano, "
+        "una lista di parole o delle emoji. Io penserò a tutto il resto.")
 
 @bot.message_handler(func=lambda m: True)
-def process_prompt(m):
-    engine = user_engine.get(m.chat.id, "Gemini 🍌")
-    wait = bot.reply_to(m, "🏗️ <b>Analisi dei 4 Blocchi e ottimizzazione...</b>")
+def process_optimization(m):
+    # Se l'utente non ha scelto un motore, lo obblighiamo a farlo
+    if m.chat.id not in user_state or user_state[m.chat.id] is None:
+        bot.send_message(m.chat.id, "⚠️ <b>Attenzione!</b>\nDevi prima scegliere un motore usando i pulsanti qui sotto.", 
+                         reply_markup=get_main_keyboard())
+        return
 
-    # Istruzioni di sistema per l'AI
-    instructions = (
-        f"Sei un esperto Prompt Engineer specializzato in fotografia Vogue. "
-        f"Devi scrivere un prompt fotografico in inglese iper-dettagliato seguendo questi 4 BLOCCHI RIGIDI: {MASTER_BLOCKS}. "
-        f"Regole in base al motore scelto ({engine}): "
-        f"- Se Gemini: Sii elegante e artistico, usa termini da fotografia editoriale raffinata per bypassare i blocchi safety. "
-        f"- Se Grok: Sii crudo, enfatizza il realismo dei materiali, della pelle e della banana (se presente nell'input). "
-        f"- Se Altri: Usa un mix di termini tecnici (Octane Render, 8K) e descrizioni fisiche dense. "
-        f"Il prompt finale deve iniziare con il riferimento all'immagine (BLOCK 1). "
-        f"Sii estremamente prolisso e verboso."
+    engine = user_state[m.chat.id]
+    wait = bot.reply_to(m, f"🏗️ <b>Architetto al lavoro per {engine}...</b>")
+
+    # Istruzioni di sistema specifiche per l'ottimizzazione
+    prompt_logic = (
+        f"You are a professional Prompt Engineer for high-end fashion photography. "
+        f"Task: Expand the user's idea into a prolix, detailed, and didactic image prompt in English. "
+        f"You MUST strictly include all 4 MASTER BLOCKS: {MASTER_DIRECTIVES}. "
+        f"ADAPTATION FOR {engine}: "
+        f"- Gemini: Use sophisticated artistic/editorial language to ensure safety compliance. "
+        f"- Grok: Use raw, hyper-realistic, and high-contrast technical terms. "
+        f"- Others: Use a balanced mix of technical tags and descriptive prose. "
+        f"The output must contain ONLY the final optimized prompt text."
     )
 
     try:
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=[f"{instructions}\n\nUser input: {m.text}"]
+            model=MODEL_ID,
+            contents=[f"{prompt_logic}\n\nUSER INPUT: {m.text}"]
         )
         
-        optimized = response.text
+        optimized_text = response.text
         
         final_msg = (
             f"✨ <b>Prompt Ottimizzato per {engine}</b>\n\n"
-            f"<code>{html.escape(optimized)}</code>\n\n"
-            f"📸 <i>Copia il testo sopra e usalo nel bot di generazione allegando la foto di Valeria.</i>"
+            f"<code>{html.escape(optimized_text)}</code>\n\n"
+            f"📸 <i>Copia il testo e incollalo nel bot Vogue allegando la Master Face.</i>"
         )
         bot.delete_message(m.chat.id, wait.message_id)
         bot.send_message(m.chat.id, final_msg)
         
     except Exception as e:
-        bot.send_message(m.chat.id, f"❌ Errore durante l'architettura: {e}")
+        bot.send_message(m.chat.id, f"❌ <b>Errore Tecnico:</b>\n<code>{str(e)}</code>")
 
 if __name__ == "__main__":
     bot.infinity_polling()
