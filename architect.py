@@ -1,97 +1,82 @@
-import os, telebot, html, json, threading, flask
+import os, telebot, html, threading, flask
 from telebot import types
 from google import genai
 from datetime import datetime
 import pytz
 
-# --- CONFIGURAZIONE ---
+# --- CONFIG ---
 TOKEN = os.environ.get("TELEGRAM_TOKEN_ARCHITECT")
-API_KEY = os.environ.get("GOOGLE_API_KEY")
-client = genai.Client(api_key=API_KEY)
-MODEL_ID = "gemini-2.0-flash" 
-
+client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
-# --- CLOSET VERSIONING LOG ---
-VERSION = "2.8"
-LAST_UPDATE = "2026-02-20"
-
-# --- BLOCCHI RIGIDI (DNA VALERIA CROSS) ---
+# --- I 4 BLOCCHI (TESTO FISSO, L'AI NON LI VEDE MAI) ---
 B1 = "BLOCK 1 (Activation & Priority): Reference image has ABSOLUTE PRIORITY. ZERO face drift allowed. Male Italian face identity."
-B2 = "BLOCK 2 (Subject & Face): Nameless Italian transmasculine avatar (Valeria Cross). Body: soft feminine, harmonious hourglass, prosperous full breasts (cup D), 180cm, 85kg. Body completely hairless. FACE: Male Italian face, ~60 years old, ultra-detailed skin (pores, wrinkles, bags). Expression: calm, half-smile, NO teeth. Beard: light grey/silver, groomed, 6–7 cm. Glasses MANDATORY: thin octagonal Vogue, Havana dark."
+B2 = "BLOCK 2 (Subject & Face): Nameless Italian transmasculine avatar (Valeria Cross). Body: soft feminine, harmonious hourglass, prosperous full breasts (cup D), 180cm, 85kg. Body hairless. FACE: Male Italian face, ~60 years old, ultra-detailed skin (pores, wrinkles, bags). Expression: calm, half-smile, NO teeth. Beard: light grey/silver, groomed, 6–7 cm. Glasses MANDATORY: thin octagonal Vogue, Havana dark."
 B3 = "BLOCK 3 (Hair & Technique): HAIR: Light grey/silver. Short elegant Italian style, volume. Nape exposed. Top <15 cm. IMAGE CONCEPT: High-fashion Vogue cover, 8K, cinematic realism. CAMERA: 85mm, f/2.8, ISO 200, 1/160s. Focus on face/torso. Shallow depth of field, natural bokeh."
 B4 = "BLOCK 4 (Rendering & Output): RENDERING: Subsurface Scattering, Global Illumination, Fresnel, Frequency separation on skin. Watermark: 'feat. Valeria Cross 👠' (elegant cursive, champagne, bottom center/left, opacity 90%)."
-NEG = "NEGATIVE PROMPTS: [Face] female/young face, smooth skin, distortion. [Hair] long/medium hair, ponytail, bun, braid, touching neck/shoulders. [Body] body/chest/leg hair (peli NO!)."
+NEG = "NEGATIVE PROMPTS: [Face] female/young face, smooth skin, distortion. [Hair] long/medium hair, ponytail, bun, braid. [Body] body/chest/leg hair (peli NO!)."
 
-user_session = {} 
+user_session = {}
 
-def get_engine_keyboard(show_fine=False):
+def get_kb(show_fine=False):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.row("Gemini 🍌", "Grok 𝕏")
-    markup.row("ChatGPT 🤖", "MetaAI 🌀", "Qwen 🏮")
-    if show_fine: markup.row("🏁 FINE / NUOVA IDEA")
+    markup.row("Gemini 🍌", "Grok 𝕏", "Qwen 🏮")
+    if show_fine: markup.row("🏁 NUOVA IDEA")
     return markup
 
-@bot.message_handler(commands=['start', 'reset'])
+@bot.message_handler(commands=['start'])
 def start(m):
-    user_session[m.chat.id] = {'engine': None, 'last_idea': None}
-    bot.send_message(m.chat.id, f"<b>🏛️ Architect v{VERSION}</b>\nScegli il motore target:", reply_markup=get_engine_keyboard())
+    user_session[m.chat.id] = {'e': None, 'i': None}
+    bot.send_message(m.chat.id, "<b>🏛️ Architect v3.0</b>\nScegli il motore:", reply_markup=get_kb())
 
-@bot.message_handler(func=lambda m: m.text == "🏁 FINE / NUOVA IDEA")
-def reset_session(m):
-    user_session[m.chat.id] = {'engine': None, 'last_idea': None}
-    bot.send_message(m.chat.id, "✅ Inserisci una nuova idea:", reply_markup=get_engine_keyboard())
+@bot.message_handler(func=lambda m: m.text == "🏁 NUOVA IDEA")
+def reset(m):
+    user_session[m.chat.id] = {'e': None, 'i': None}
+    bot.send_message(m.chat.id, "✅ Inserisci una nuova idea:", reply_markup=get_kb())
 
-@bot.message_handler(func=lambda m: m.text in ["Gemini 🍌", "Grok 𝕏", "ChatGPT 🤖", "MetaAI 🌀", "Qwen 🏮"])
-def handle_engine(m):
-    engine_clean = m.text.split()[0]
-    cid = m.chat.id
-    if cid not in user_session: user_session[cid] = {'engine': None, 'last_idea': None}
-    user_session[cid]['engine'] = engine_clean
-    if user_session[cid]['last_idea']: generate_prompt(m, cid)
-    else: bot.send_message(cid, f"🎯 Target: <b>{engine_clean}</b>\nInviami l'idea:")
+@bot.message_handler(func=lambda m: m.text in ["Gemini 🍌", "Grok 𝕏", "Qwen 🏮"])
+def set_e(m):
+    user_session[m.chat.id]['e'] = m.text.split()[0]
+    if user_session[m.chat.id]['i']: generate(m)
+    else: bot.send_message(m.chat.id, f"🎯 Target: {m.text}\nScrivi l'idea:")
 
 @bot.message_handler(func=lambda m: True)
-def process_text(m):
+def handle_msg(m):
     cid = m.chat.id
-    if cid not in user_session or user_session[cid]['engine'] is None:
-        bot.send_message(cid, "⚠️ Scegli un motore:", reply_markup=get_engine_keyboard())
+    if cid not in user_session or not user_session[cid]['e']:
+        bot.send_message(cid, "⚠️ Scegli un motore:", reply_markup=get_kb())
         return
-    user_session[cid]['last_idea'] = m.text
-    generate_prompt(m, cid)
+    user_session[cid]['i'] = m.text
+    generate(m)
 
-def generate_prompt(m, cid):
-    engine = user_session[cid]['engine']
-    idea = user_session[cid]['last_idea']
-    wait = bot.send_message(cid, f"🏗️ <b>Generazione per {engine}...</b>")
+def generate(m):
+    cid = m.chat.id
+    engine = user_session[cid]['e']
+    idea = user_session[cid]['i']
+    wait = bot.send_message(cid, "🏗️ <b>Espansione scena in corso...</b>")
     
-    tz = pytz.timezone('Europe/Lisbon')
-    now = datetime.now(tz).strftime("%H:%M:%S")
-
-    # Istruzione: Espandi SOLO la scena. Ignora identità.
-    instructions = (
-        f"Expand the following idea into a detailed, cinematic scene description in English. "
-        f"Focus only on lighting, environment, and clothes. Do not describe the person's face. "
-        f"Target Engine: {engine}.\n\nIdea: {idea}"
+    # L'AI riceve SOLO l'idea. Non sa nulla di blocchi o Valeria.
+    prompt_ai = (
+        f"Act as a fashion copywriter. Describe this scene in English for a photo shoot: '{idea}'. "
+        f"Focus on environment, luxury details, and clothing. Be extremely descriptive and poetic. "
+        f"Output ONLY the description. No intro, no names."
     )
 
     try:
-        response = client.models.generate_content(model=MODEL_ID, contents=[instructions])
-        scene = response.text.strip()
+        response = client.models.generate_content(model="gemini-2.0-flash", contents=[prompt_ai])
+        scena_espansa = response.text.strip()
         
-        # Assemblaggio (Scene-First per motori tecnici)
-        if engine in ["Grok", "Qwen"]:
-            final_prompt = f"SCENE: {scene}\n\n{B1}\n\n{B2}\n\n{B3}\n\n{B4}\n\n{NEG}"
-        else:
-            final_prompt = f"{B1}\n\n{B2}\n\n{B3}\n\nSCENE: {scene}\n\n{B4}\n\n{NEG}"
+        # Assemblaggio meccanico finale
+        final = f"{B1}\n\n{B2}\n\n{B3}\n\nSCENE: {scena_espansa}\n\n{B4}\n\n{NEG}"
         
-        header = f"📂 <b>CLOSET LOG</b>\nv: <code>{VERSION}</code> | e: <code>{engine}</code> | t: <code>{now}</code>\n--------------------------"
+        now = datetime.now(pytz.timezone('Europe/Lisbon')).strftime("%H:%M")
+        header = f"📂 <b>CLOSET v3.0</b> | {engine} | {now}\n--------------------------"
+        
         bot.delete_message(cid, wait.message_id)
-        bot.send_message(cid, f"{header}\n\n<code>{html.escape(final_prompt)}</code>", reply_markup=get_engine_keyboard(show_fine=True))
+        bot.send_message(cid, f"{header}\n\n<code>{html.escape(final)}</code>", reply_markup=get_kb(True))
     except Exception as e:
         bot.send_message(cid, f"❌ Errore: {str(e)}")
 
-# Server per Koyeb
 app = flask.Flask(__name__)
 @app.route('/')
 def h(): return "OK"
