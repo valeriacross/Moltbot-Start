@@ -16,7 +16,7 @@ B3 = "BLOCK 3 (Hair & Technique): HAIR: Light grey/silver. Short elegant Italian
 B4 = "BLOCK 4 (Rendering & Output): RENDERING: Subsurface Scattering, Global Illumination, Fresnel, Frequency separation on skin. Watermark: 'feat. Valeria Cross 👠' (elegant cursive, champagne, bottom center/left, opacity 90%)."
 NEG = "NEGATIVE PROMPTS: [Face] female/young face, smooth skin, distortion. [Hair] long/medium hair, ponytail, bun, braid. [Body] body/chest/leg hair (peli NO!)."
 
-user_session = {} # {chat_id: {'e': engine, 'i': idea}}
+user_session = {} 
 
 def get_kb(show_fine=False):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -28,7 +28,7 @@ def get_kb(show_fine=False):
 @bot.message_handler(commands=['start', 'reset'])
 def start(m):
     user_session[m.chat.id] = {'e': None, 'i': None}
-    bot.send_message(m.chat.id, "<b>🏛️ Architect v3.2 Online</b>\nScegli il motore:", reply_markup=get_kb())
+    bot.send_message(m.chat.id, "<b>🏛️ Architect v3.2 + Ping</b>\nScegli il motore:", reply_markup=get_kb())
 
 @bot.message_handler(func=lambda m: m.text == "🏁 NUOVA IDEA")
 def reset_idea(m):
@@ -38,15 +38,10 @@ def reset_idea(m):
 @bot.message_handler(func=lambda m: any(x in m.text for x in ["Gemini", "Grok", "ChatGPT", "MetaAI", "Qwen"]))
 def set_engine(m):
     cid = m.chat.id
-    # Auto-inizializzazione se la sessione è persa
     if cid not in user_session: user_session[cid] = {'e': None, 'i': None}
-    
     user_session[cid]['e'] = m.text.split()[0]
-    
-    if user_session[cid]['i']:
-        generate_final_prompt(m)
-    else:
-        bot.send_message(cid, f"🎯 Target: <b>{user_session[cid]['e']}</b>\nScrivi la tua idea:")
+    if user_session[cid]['i']: generate_final_prompt(m)
+    else: bot.send_message(cid, f"🎯 Target: <b>{user_session[cid]['e']}</b>\nScrivi la tua idea:")
 
 @bot.message_handler(func=lambda m: True)
 def collect_idea(m):
@@ -55,7 +50,6 @@ def collect_idea(m):
         user_session[cid] = {'e': None, 'i': None}
         bot.send_message(cid, "⚠️ Scegli prima un motore:", reply_markup=get_kb())
         return
-    
     user_session[cid]['i'] = m.text
     generate_final_prompt(m)
 
@@ -73,18 +67,14 @@ def generate_final_prompt(m):
     try:
         response = client.models.generate_content(model="gemini-2.0-flash", contents=[instruction])
         scena = response.text.strip()
-        
-        # Assemblaggio rigoroso
         final = f"{B1}\n\n{B2}\n\n{B3}\n\nSCENE: {scena}\n\n{B4}\n\n{NEG}"
         
-        # Header di Closet
         now = datetime.now(pytz.timezone('Europe/Lisbon')).strftime("%H:%M")
         header = f"📂 <b>CLOSET v3.2</b> | {engine} | {now}\n--------------------------\n\n"
         full_msg = header + final
         
         bot.delete_message(cid, wait.message_id)
 
-        # FIX: Gestione messaggi lunghi (>4090 caratteri)
         if len(full_msg) > 4090:
             for x in range(0, len(full_msg), 4090):
                 bot.send_message(cid, f"<code>{html.escape(full_msg[x:x+4090])}</code>")
@@ -94,10 +84,13 @@ def generate_final_prompt(m):
     except Exception as e:
         bot.send_message(cid, f"❌ Errore: {str(e)}")
 
+# --- FLASK PING PER KOYEB ---
 app = flask.Flask(__name__)
 @app.route('/')
-def h(): return "OK"
+def health(): return "OK"
+
 if __name__ == "__main__":
-    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000))), daemon=True).start()
+    # Avvio Flask su porta 10000
+    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=10000), daemon=True).start()
     bot.infinity_polling()
     
