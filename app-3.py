@@ -55,7 +55,7 @@ MASTER_PART = get_face_part()
 # --- COSTRUZIONE PROMPT ---
 def build_master_prompt(user_text, ar_scelto):
     identity = (
-        "IDENTITY: Nameless Italian transmasculine avatar named Valeria Cross. "
+        "IDENTITY: Nameless Italian transmasculine avatar. "
         "BODY: Soft feminine harmonious hourglass body, prosperous full breasts (Cup D), 180cm, 85kg. "
         "SKIN: Completely hairless (arms, legs, chest, breasts - hair NO!). "
         "FACE: Male Italian face, ~60 years old. Oval-rectangular. Ultra-detailed skin (pores, wrinkles, bags). "
@@ -66,7 +66,7 @@ def build_master_prompt(user_text, ar_scelto):
     technical = (
         "HAIR: Light grey/silver, short elegant Italian style, volume. Sides 1–2 cm, nape exposed. Top less than 15 cm. "
         "Hair NEVER touching neck, shoulders, or clavicles. "
-        "IMAGE CONCEPT: High-fashion Vogue cover, 8K, cinematic realism. "
+        "IMAGE CONCEPT: High-fashion photoshoot, 8K, cinematic realism. "
         "CAMERA: 85mm, f/2.8, ISO 200, 1/160s. Focus on face/torso. Shallow depth of field, natural bokeh."
     )
     rendering = (
