@@ -19,7 +19,7 @@ MODEL_ID = "nano-banana-pro-preview"
 LISBON_TZ = pytz.timezone('Europe/Lisbon') # <--- Impostato su Lisbona/Londra
 
 # --- VARIABILI DI STATO ---
-user_ar = defaultdict(lambda: "16:9")    
+user_ar = defaultdict(lambda: "2:3")    
 user_qty = defaultdict(lambda: 1)
 pending_prompts = {}  
 daily_counter = 0     
@@ -71,12 +71,12 @@ def build_master_prompt(user_text, ar_scelto):
     )
     rendering = (
         "RENDERING: Subsurface Scattering, Global Illumination, Fresnel, Frequency separation on skin. "
-        "WATERMARK: 'feat. Valeria Cross 👠' (elegant cursive, champagne, bottom center/left, opacity 90%)."
+        "WATERMARK: 'feat. Valeria Cross 👠' (elegant cursive, champagne, bottom center/left, very small size, opacity 90%)."
     )
     negatives = (
         "NEGATIVE PROMPTS: [Face] female/young face, smooth skin, distortion. "
         "[Hair] long/medium hair, ponytail, bun, braid, touching neck/shoulders, buzz cut, military. "
-        "[Body] body/chest/leg hair (peli NO!). masculine body shape, flat chest, 1:1 format."
+        "[Body] body/chest/leg hair (HAIR NO!). masculine body shape, flat chest, 1:1 format."
     )
     return f"--- MASTER PROMPT ---\n{identity}\n\n{technical}\n\nSCENE: {user_text}\nFORMAT: {ar_scelto}\n\n{rendering}\n\n{negatives}"
 
