@@ -28,7 +28,7 @@ def get_kb(show_fine=False):
 @bot.message_handler(commands=['start', 'reset'])
 def start(m):
     user_session[m.chat.id] = {'e': None, 'i': None}
-    bot.send_message(m.chat.id, "<b>🏛️ Architect v3.2 + Ping</b>\nScegli il motore:", reply_markup=get_kb())
+    bot.send_message(m.chat.id, "<b>🏛️ Architect v3.4 + Post-Prod</b>\nScegli il motore:", reply_markup=get_kb())
 
 @bot.message_handler(func=lambda m: m.text == "🏁 NUOVA IDEA")
 def reset_idea(m):
@@ -41,7 +41,7 @@ def set_engine(m):
     if cid not in user_session: user_session[cid] = {'e': None, 'i': None}
     user_session[cid]['e'] = m.text.split()[0]
     if user_session[cid]['i']: generate_final_prompt(m)
-    else: bot.send_message(cid, f"🎯 Target: <b>{user_session[cid]['e']}</b>\nScrivi la tua idea:")
+    else: bot.send_message(cid, f"🎯 Target: <b>{user_session[cid]['e']}</b>\nInvia idea o Rispondi a un prompt:")
 
 @bot.message_handler(func=lambda m: True)
 def collect_idea(m):
@@ -50,6 +50,15 @@ def collect_idea(m):
         user_session[cid] = {'e': None, 'i': None}
         bot.send_message(cid, "⚠️ Scegli prima un motore:", reply_markup=get_kb())
         return
+    
+    # Se il messaggio è una risposta, memorizziamo il contesto del padre
+    if m.reply_to_message:
+        # Recuperiamo il testo del messaggio a cui si risponde (se esiste)
+        orig_text = m.reply_to_message.caption if m.reply_to_message.caption else m.reply_to_message.text
+        user_session[cid]['post_prod'] = orig_text
+    else:
+        user_session[cid]['post_prod'] = None
+
     user_session[cid]['i'] = m.text
     generate_final_prompt(m)
 
@@ -57,12 +66,22 @@ def generate_final_prompt(m):
     cid = m.chat.id
     engine = user_session[cid]['e']
     idea = user_session[cid]['i']
-    wait = bot.send_message(cid, f"🏗️ <b>Espansione scena ({engine})...</b>")
+    post_prod_context = user_session[cid].get('post_prod')
     
-    instruction = (
-        f"You are a professional Vogue copywriter. Expand this idea into a detailed SCENE: '{idea}'. "
-        f"Focus only on setting, lighting, and clothes. Do not describe the person's face. English only."
-    )
+    wait = bot.send_message(cid, f"🏗️ <b>{'Post-Produzione' if post_prod_context else 'Espansione'} ({engine})...</b>")
+    
+    if post_prod_context:
+        instruction = (
+            f"You are a post-production expert. Original context: '{post_prod_context}'. "
+            f"Apply these filters or changes: '{idea}'. Rewrite the SCENE in English, "
+            f"incorporating the new details while maintaining the original mood. "
+            f"Output ONLY the new scene description. No blocks, no intro."
+        )
+    else:
+        instruction = (
+            f"Expand this idea into a detailed SCENE: '{idea}'. "
+            f"Focus on setting, lighting, and clothes. Do not describe the face. English only."
+        )
 
     try:
         response = client.models.generate_content(model="gemini-2.0-flash", contents=[instruction])
@@ -70,7 +89,7 @@ def generate_final_prompt(m):
         final = f"{B1}\n\n{B2}\n\n{B3}\n\nSCENE: {scena}\n\n{B4}\n\n{NEG}"
         
         now = datetime.now(pytz.timezone('Europe/Lisbon')).strftime("%H:%M")
-        header = f"📂 <b>CLOSET v3.2</b> | {engine} | {now}\n--------------------------\n\n"
+        header = f"📂 <b>CLOSET v3.4</b> | {engine} | {now}\n--------------------------\n\n"
         full_msg = header + final
         
         bot.delete_message(cid, wait.message_id)
@@ -84,13 +103,12 @@ def generate_final_prompt(m):
     except Exception as e:
         bot.send_message(cid, f"❌ Errore: {str(e)}")
 
-# --- FLASK PING PER KOYEB ---
+# --- FLASK PING ---
 app = flask.Flask(__name__)
 @app.route('/')
 def health(): return "OK"
 
 if __name__ == "__main__":
-    # Avvio Flask su porta 10000
     threading.Thread(target=lambda: app.run(host='0.0.0.0', port=10000), daemon=True).start()
     bot.infinity_polling()
     
