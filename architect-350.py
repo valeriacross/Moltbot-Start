@@ -6,7 +6,7 @@ import pytz
 
 # --- CONFIGURAZIONE E VERSIONAMENTO ---
 # La v3.5 introduce il Reset Totale della sessione per evitare loop di generazione
-VERSION = "3.5"
+VERSION = "3.51"
 TOKEN = os.environ.get("TELEGRAM_TOKEN_ARCHITECT")
 client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
