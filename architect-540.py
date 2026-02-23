@@ -13,7 +13,7 @@ bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 # --- FIRMA MANDATORIA ---
 WATERMARK_SPECS = """
 Include a subtle watermark signature reading: "feat. Valeria Cross 👠"
-Style: elegant handwritten cursive, champagne color, opacity 90%, bottom left/center.
+Style: elegant handwritten cursive, champagne color, very small font size, opacity 90%, bottom left/center.
 """
 
 # --- DNA VALERIA CROSS (UPGRADED v5.4) ---
