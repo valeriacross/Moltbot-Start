@@ -1,4 +1,4 @@
-import os, io, threading, logging, flask, telebot, json, html
+import os, io, threading, logging, flask, telebot, html
 from datetime import datetime
 import pytz
 from telebot import types
@@ -74,8 +74,9 @@ def build_master_prompt(user_text, ar_scelto):
         "[Hair] long/medium hair, ponytail, bun, braid, touching neck/shoulders, buzz cut, military. "
         "[Body] body/chest/leg hair (HAIR NO!). masculine body shape, flat chest, 1:1 format."
     )
+
     return (
-        f"--- MASTER PROMPT ---
+        "--- MASTER PROMPT ---
 "
         f"{identity}
 
