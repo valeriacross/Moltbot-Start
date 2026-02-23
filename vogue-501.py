@@ -4,7 +4,7 @@ from google import genai
 
 # --- CONFIGURAZIONE ---
 VERSION = "5.0 (Closet - The Stylist)"
-TOKEN = os.environ.get("TELEGRAM_TOKEN_CLOSET")
+TOKEN = os.environ.get("TELEGRAM_TOKEN")
 API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 client = genai.Client(api_key=API_KEY)
