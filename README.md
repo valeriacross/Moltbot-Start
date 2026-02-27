@@ -1,6 +1,6 @@
 # 👠 Valeria Cross — Bot Suite
 
-Repository contenente due bot Telegram per la generazione di immagini AI di **Valeria Cross**.
+Repository contenente i bot Telegram per la generazione di immagini AI di **Valeria Cross**.
 
 ---
 
@@ -17,13 +17,13 @@ Repository contenente due bot Telegram per la generazione di immagini AI di **Va
 Bot Telegram per la generazione di immagini editoriali fashion di Valeria Cross, a partire da una descrizione testuale o da una foto di riferimento.
 
 ## Versione attuale
-`4.5.0`
+`5.0.2`
 
 ---
 
 ## Cosa fa
 
-Riceve una scena descritta in testo (o una foto con didascalia), ottimizza il prompt tramite Gemini, e genera un'immagine editoriale di Valeria Cross nella scena richiesta.
+Riceve una scena descritta in testo (o una foto con didascalia), ottimizza il prompt tramite Gemini Flash (modello testo), e genera un'immagine editoriale 2K di Valeria Cross nella scena richiesta.
 
 ---
 
@@ -33,7 +33,8 @@ Riceve una scena descritta in testo (o una foto con didascalia), ottimizza il pr
 |---|---|
 | Linguaggio | Python 3.x |
 | Framework bot | pyTelegramBotAPI (`telebot`) |
-| AI generativa | Google Gemini API (`nano-banana-pro-preview`) |
+| AI generazione immagini | Google Gemini API (`gemini-3-pro-image-preview`) |
+| AI ottimizzazione prompt | Google Gemini API (`gemini-3-flash-preview`) |
 | Web server | Flask (per health check su Koyeb) |
 | Deployment | Koyeb |
 | Threading | `ThreadPoolExecutor` (max 4 worker) |
@@ -85,9 +86,9 @@ Quantità: `1` o `2` foto per generazione.
 ## Come si usa
 
 1. Invia una **descrizione testuale** della scena desiderata, oppure una **foto** con didascalia opzionale come riferimento visivo
-2. Il bot ottimizza il prompt tramite Gemini (fase di ~5s)
-3. Mostra il **prompt ottimizzato** con i pulsanti CONFERMA / ANNULLA
-4. Alla conferma, genera le foto e le invia come documenti `.jpg`
+2. Il bot ottimizza il prompt tramite `gemini-3-flash-preview` (fase di ~5s)
+3. Mostra il **prompt ottimizzato completo** con i pulsanti CONFERMA / ANNULLA
+4. Alla conferma, genera le foto in **risoluzione 2K** e le invia come documenti `.jpg`
 
 ---
 
@@ -96,28 +97,32 @@ Quantità: `1` o `2` foto per generazione.
 Il prompt finale è costruito in due fasi:
 
 ### Fase 1 — Ottimizzazione testuale
-Il testo utente viene passato a `nano-banana-pro-preview` in modalità testo con un system prompt che:
+Il testo utente viene passato a `gemini-3-flash-preview` in modalità testo con un system prompt che:
 - Estrae solo gli elementi visivi (scena, ambiente, luce, posa, outfit, mood)
-- Integra il **Master Identity** di Valeria Cross
+- Integra **integralmente** il Master Identity di Valeria Cross in forma narrativa fluida
+- **Traduce sempre in inglese** (regola 9 del system prompt)
+- Produce un prompt **completo e autosufficiente** — utilizzabile su qualsiasi motore esterno senza modifiche
 - Riscrive tutto in linguaggio editoriale fashion neutro (niente termini anatomici espliciti)
 - Forza il formato (AR) richiesto
-- Vieta frasi tipo "FILTER BYPASS" o "SAFETY OVERRIDE" che causano MALFORMED_FUNCTION_CALL
+- Vieta frasi tipo "FILTER BYPASS" o "SAFETY OVERRIDE"
+- `max_output_tokens`: 2500
 
 ### Fase 2 — Generazione immagine
-Il prompt ottimizzato viene passato allo stesso modello in modalità `IMAGE` con:
+Il prompt ottimizzato viene passato a `gemini-3-pro-image-preview` in modalità `IMAGE` con:
 - `master_face.png` come riferimento identità
 - Foto allegata dall'utente come riferimento visivo (se presente)
+- Risoluzione: `image_size="2K"`
 - Safety settings: `BLOCK_NONE` su tutte le categorie
 - `response_modalities: ["IMAGE"]`
 
 ### Fallback
-Se l'ottimizzazione fallisce (timeout 30s o errore API), il bot usa direttamente `MASTER_IDENTITY + testo utente` come prompt grezzo.
+Se l'ottimizzazione fallisce (timeout 30s o errore API), il bot usa direttamente `MASTER_IDENTITY + testo utente` come prompt grezzo e avvisa l'utente con "⚠️ Ottimizzazione non disponibile".
 
 ---
 
 ## Master Identity
 
-Il blocco identità fisso di Valeria Cross usato in ogni generazione:
+Il blocco identità fisso di Valeria Cross integrato in ogni prompt:
 
 ```
 IDENTITY: Nameless Italian transmasculine editorial figure.
@@ -139,7 +144,7 @@ NEGATIVE: female/young face, long hair, ponytail, hair touching neck/shoulders.
 
 Prima della generazione, il prompt viene sanitizzato:
 - Rimozione righe contenenti: `FILTER BYPASS`, `BYPASS ACTIVATED`, `NO OBSCURED FEATURES`, `SAFETY OVERRIDE`, `IGNORE SAFETY`, `DISABLE FILTER`
-- Sostituzione di `{` `}` `[` `]` con parentesi tonde (previene MALFORMED_FUNCTION_CALL)
+- Sostituzione di `{` `}` `[` `]` con parentesi tonde
 
 ---
 
@@ -148,15 +153,18 @@ Prima della generazione, il prompt viene sanitizzato:
 ### Ottimizzazione prompt in thread
 L'ottimizzazione gira in un thread separato con timeout di 30 secondi — il bot rimane reattivo.
 
+### Due modelli separati
+`gemini-3-flash-preview` per ottimizzazione testo (veloce, economico), `gemini-3-pro-image-preview` per generazione immagini. Il modello immagini non viene mai usato per testo.
+
 ### /lastprompt
-Salva l'ultimo prompt inviato all'API per ogni utente. Utile per debug in caso di blocchi (`IMAGE_OTHER`, `MALFORMED_FUNCTION_CALL`, ecc.).
+Salva l'ultimo prompt inviato all'API per ogni utente. Utile per debug in caso di blocchi (`IMAGE_OTHER`, `IMAGE_SAFETY`, ecc.).
 
 ### Logging
 ```
 🟢  Avvio bot
 📋  /settings
 ✏️  Input utente
-✅  Prompt ottimizzato
+✅  Prompt ottimizzato (con chars)
 🚀  Generazione avviata
 🎨  Singolo scatto in corso
 ✅  Scatto inviato (con tempo)
@@ -170,7 +178,8 @@ Salva l'ultimo prompt inviato all'API per ogni utente. Utile per debug in caso d
 
 - **Una sola istanza attiva** — due istanze causano errore 409. In caso di redeploy, attendere che la vecchia istanza sia terminata.
 - Il bot usa `uid` (user ID) per lo stato per-utente.
-- Blocchi comuni: `IMAGE_OTHER` (falso positivo del modello, riprovare), `MALFORMED_FUNCTION_CALL` (prompt con caratteri problematici o scena troppo complessa).
+- Blocchi comuni: `IMAGE_OTHER` (falso positivo del modello, cambiare immagine), `IMAGE_SAFETY` (combinazione scena/outfit giudicata borderline, riprovare o modificare la scena).
+- Generazione tipica: 20–35s per immagine a 2K.
 
 ---
 
@@ -181,8 +190,11 @@ Salva l'ultimo prompt inviato all'API per ogni utente. Utile per debug in caso d
 | 4.0.1 | Base funzionante, error handling iniziale |
 | 4.1–4.2 | Fix IMAGE_SAFETY, fix MALFORMED_FUNCTION_CALL |
 | 4.3.0 | Smart Prompt: ottimizzazione testuale prima della generazione |
-| 4.4.x | Selettore modello multi-engine (poi rimosso — solo NanoBanana funziona) |
-| 4.5.0 | Codice ripulito, rimosso selettore modello, aggiunto /lastprompt |
+| 4.4.x | Selettore modello multi-engine (poi rimosso) |
+| 4.5.0 | Codice ripulito, aggiunto /lastprompt |
+| 5.0.0 | Migrazione a `gemini-3-pro-image-preview`, risoluzione 2K |
+| 5.0.1 | Modello ottimizzazione separato (`gemini-3-flash-preview`), regola traduzione in inglese (regola 8) |
+| 5.0.2 | System prompt ottimizzazione riscritto: prompt completo e autosufficiente, NON abbreviare MASTER IDENTITY, `max_output_tokens` → 2500 |
 
 ---
 ---
@@ -192,13 +204,13 @@ Salva l'ultimo prompt inviato all'API per ogni utente. Utile per debug in caso d
 Bot Telegram per la generazione di **Master Prompt** ottimizzati per diversi motori AI di generazione immagini, a partire da testo o da una foto di riferimento.
 
 ## Versione attuale
-`6.21 (Vision)`
+`7.0.0`
 
 ---
 
 ## Cosa fa
 
-Riceve un testo descrittivo o una foto, e genera un Master Prompt professionale ottimizzato per il motore AI scelto (ChatGPT, Gemini, Grok, Qwen, Meta). Il prompt integra il DNA di Valeria Cross e viene adattato al livello di restrizioni del motore target.
+Riceve un testo descrittivo o una foto, e genera un Master Prompt professionale ottimizzato per il motore AI scelto (ChatGPT, Gemini, Grok, Qwen, Meta). Il prompt integra il DNA di Valeria Cross espanso inline (mai il nome "Valeria Cross" nell'output) e viene adattato al livello di restrizioni del motore target.
 
 Il prompt generato è **esportabile** — può essere copiato e usato direttamente su qualsiasi piattaforma di generazione immagini.
 
@@ -210,7 +222,7 @@ Il prompt generato è **esportabile** — può essere copiato e usato direttamen
 |---|---|
 | Linguaggio | Python 3.x |
 | Framework bot | pyTelegramBotAPI (`telebot`) |
-| AI generativa | Google Gemini API (`gemini-2.0-flash`) |
+| AI generativa | Google Gemini API (`gemini-3-flash-preview`) |
 | Web server | Flask (per health check su Koyeb) |
 | Deployment | Koyeb |
 | Threading | `ThreadPoolExecutor` (max 4 worker) |
@@ -272,9 +284,13 @@ Ogni Master Prompt contiene:
    "EXACTLY matching the face, head, hair, beard and glasses
     from the provided reference image."
 
-2. Integrazione scena utente + DNA Valeria Cross
+2. Integrazione scena utente + DNA Valeria Cross espanso inline
+   (MAI scrivere "Valeria Cross" o "DNA of Valeria Cross" nell'output)
 
-3. Negative prompts:
+3. Auto-review: secondo passaggio API che corregge contraddizioni
+   (hair bleed, negative conflicts, ecc.)
+
+4. Negative prompts:
    "young female face, long dark hair, no beard,
     obscured face, low quality, 1:1 ratio"
 ```
@@ -335,7 +351,7 @@ Dopo ogni generazione, il bot offre i pulsanti per riadattare lo stesso prompt p
 - **Una sola istanza attiva** — due istanze causano errore 409.
 - Il bot usa `uid` per lo stato per-utente.
 - Le generazioni girano in thread separati — il polling non si blocca mai.
-- Il modello usato per la generazione è sempre `gemini-2.0-flash` (testo), non NanoBanana.
+- Il modello usato è `gemini-3-flash-preview` (testo), mai il modello immagini.
 
 ---
 
@@ -345,17 +361,19 @@ Dopo ogni generazione, il bot offre i pulsanti per riadattare lo stesso prompt p
 |---|---|
 | 5.4 | Base funzionante, generazione prompt testo |
 | 5.5 | Fix bug uid/cid, fix html.escape |
-| 6.0 | ENGINE_PROFILES: adattamento per motore con sostituzioni e forbidden |
+| 6.0 | ENGINE_PROFILES: adattamento per motore |
 | 6.1 | Vision mode: generazione prompt da immagine |
 | 6.20 | Fix critico: execute_generation in ThreadPoolExecutor |
 | 6.21 | Fix execute_generation orfana, logging dettagliato |
+| 7.0.0 | Migrazione a `gemini-3-flash-preview`, DNA expansion inline, auto-review secondo passaggio |
 
+---
 ---
 
 ## Infrastruttura comune
 
 ### Deployment — Koyeb
-Entrambi i bot girano su Koyeb come servizi separati. Ogni bot espone un endpoint Flask su `/` che risponde con la versione — usato da Koyeb come health check.
+Tutti i bot girano su Koyeb come servizi separati. Ogni bot espone un endpoint Flask su `/` che risponde con la stringa versione — usato da Koyeb come health check.
 
 ### Errore 409 — Conflict
 Se appare `Error code: 409: Conflict: terminated by other getUpdates request`, significa che ci sono due istanze dello stesso bot in polling simultaneo. Soluzione: verificare su Koyeb che sia attiva una sola istanza per bot. In alternativa, forzare la pulizia del webhook:
@@ -363,5 +381,16 @@ Se appare `Error code: 409: Conflict: terminated by other getUpdates request`, s
 https://api.telegram.org/botTOKEN/deleteWebhook?drop_pending_updates=true
 ```
 
-### Modello AI — nano-banana-pro-preview
-Il modello usato da VogueBot e ClosetBot per la generazione immagini. È l'unico modello testato che funziona correttamente con `response_modalities=["IMAGE"]` nell'ambiente attuale. Altri modelli testati e scartati: `gemini-2.0-flash-exp-image-generation` (404), `gemini-3-pro-image-preview` (MALFORMED_FUNCTION_CALL), `imagen-4.0-generate-001` (API diversa, aspect ratio limitati).
+### Model ID corretti (aggiornati febbraio 2026)
+
+| Uso | Model ID |
+|---|---|
+| Generazione immagini (alta qualità) | `gemini-3-pro-image-preview` |
+| Generazione immagini (veloce) | `gemini-2.5-flash-image` |
+| Testo avanzato | `gemini-3-pro-preview` |
+| Testo veloce / ottimizzazione | `gemini-3-flash-preview` |
+
+### Risoluzione immagini
+Parametro supportato: `image_config=genai_types.ImageConfig(image_size="2K")`
+Valori: `"1K"` (default), `"2K"`, `"4K"`. La K maiuscola è obbligatoria.
+VogueBot, ClosetBot e ValeriaFX usano tutti `"2K"`.
