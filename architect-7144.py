@@ -902,7 +902,10 @@ def execute_generation(cid, text, engine, img_bytes=None):
     certified = f"{ARCH_TAG}\n{adapted}"
 
     logger.info(f"✅ Prompt generato, revisionato e adattato per {engine} ({len(adapted)} chars)")
-    bot.send_message(cid, f"✅ <b>Master Prompt → {engine}:</b>\n\n<code>{html.escape(certified)}</code>")
+    chunks = [certified[i:i+3800] for i in range(0, len(certified), 3800)]
+    for idx, chunk in enumerate(chunks):
+        header = f"✅ <b>Master Prompt → {engine}:</b>\n\n" if idx == 0 else f"<i>(continua {idx+1}/{len(chunks)})</i>\n\n"
+        bot.send_message(cid, f"{header}<code>{html.escape(chunk)}</code>")
 
     # Caption social — immagine se disponibile, altrimenti dal testo del prompt
     caption = generate_caption(img_bytes=img_bytes, text=adapted if not img_bytes else None)
