@@ -1,5 +1,5 @@
 # README — Ecosistema Bot Valeria Cross
-**Aggiornato:** 31 Marzo 2026
+**Aggiornato:** 4 Aprile 2026
 
 ---
 
@@ -20,11 +20,11 @@ SURPRISE (F)  = 🎲 Gemini sceglie tutto → {Immagine} (T2I libero)
 
 | Bot | Versione | File | Stato |
 |-----|----------|------|-------|
-| SURPRISE | 1.4.1 | `surprise-141.py` | ✅ |
-| CabinaBot | 2.3.1 | `cabina-231.py` | ✅ |
-| Filtro | 4.8.0 | `filtro-480.py` | ✅ |
-| VogueBot | 6.6.3 | `vogue-663.py` | ✅ |
-| ArchitectBot | 8.2.1 | `architect-821.py` | ✅ |
+| SURPRISE | 1.4.4 | `surprise-144.py` | ✅ |
+| CabinaBot | 2.3.3 | `cabina-233.py` | ✅ |
+| Filtro | 4.8.1 | `filtro-481.py` | ✅ |
+| VogueBot | 6.7.1 | `vogue-671.py` | ✅ |
+| ArchitectBot | 8.2.2 | `architect-822.py` | ✅ |
 | ~~SorpresaBot~~ | 2.4.0 | `sorpresa-240.py` | ⏸️ sospesa |
 
 **Token env:**
@@ -33,6 +33,11 @@ SURPRISE (F)  = 🎲 Gemini sceglie tutto → {Immagine} (T2I libero)
 - `TELEGRAM_TOKEN_SORPRESA` — Sorpresa + Surprise
 - `TELEGRAM_TOKEN_CLOSET` — Cabina
 - `TELEGRAM_TOKEN_FX` — Filtro
+
+---
+
+## COMPORTAMENTO /start (tutti i bot)
+Reset completo: cancella tutti i dizionari di stato + timer attivi. Mostra `✅ Reset completo.` + menu principale.
 
 ---
 
@@ -64,57 +69,50 @@ SURPRISE (F)  = 🎲 Gemini sceglie tutto → {Immagine} (T2I libero)
 - Ogni modifica = bump versione; file precedente resta vivo
 - NON applicare modifiche senza ok di Walter ("Vai" = ok)
 - Nomenclatura: Major=`X00`, Minor=`X10`, Patch=`X01`
-- Filtro: `filtro-XYZ.py`
+- UPDATE = HANDOFF + README + XLSX + memorie + tabella versioni
 
 ---
 
-## VOGUE BOT v6.6.3
-**Flow:** foto → Faceswap / Batch → prompt → generazione + caption
-
-**Caption:** `/caption` chiede sempre foto · pulsante `📝 Solo Caption` · auto post-gen
-**Comandi:** `/lastprompt` `/caption` `/help` `/info` `/settings`
+## VOGUE BOT v6.7.1
+**Flusso faceswap:** Flash descrive → prompt + masterface → genera da zero (NO img originale)
+**Caption:** `/caption` chiede sempre foto · `📝 Solo Caption` · auto post-gen
+**Comandi:** `/start` `/lastprompt` `/caption` `/help` `/info` `/settings`
 
 ---
 
-## FILTRO v4.8.0
-**Flow:** foto → categoria → filtro → conferma (con prompt) → immagine
-
+## FILTRO v4.8.1
 **Categorie:** Stilistici · Fantasy & Art · Scenografici · Collage · Altri
-
-**Nuovo:** `🎨 Stile Artistico` in Fantasy — estrae casualmente Magritte/Dalì/De Chirico/Mondrian/Banksy
-
+**Stile Artistico:** Magritte/Dalì/De Chirico/Mondrian/Banksy casuale in Fantasy
 **Comandi:** `/start` `/reset` `/filtro` `/help` `/info` `/lastprompt` `/mosaic`
 
 ---
 
-## CABINA BOT v2.3.1
-**Flow:** foto outfit → analisi → prompt → conferma → generazione
+## CABINA BOT v2.3.3
+**Flow:** foto outfit → analisi → prompt (con preview dual) → conferma → generazione
+**Fix:** v_text NameError · execute_generation ritorna sempre tupla
 **Comandi:** `/start` `/reset` `/formato` `/settings` `/info` `/help` `/lastprompt`
 
 ---
 
-## ARCHITECT BOT v8.2.1
+## ARCHITECT BOT v8.2.2
 **Flow:** testo/immagini → motore → ottimizzazione → caption → prompt
 **Motori:** Gemini · Grok · Qwen · ChatGPT · Meta
 **Comandi:** `/start` `/reset` `/motore` `/movie` `/stop` `/lastprompt` `/help` `/info`
 
 ---
 
-## SURPRISE v1.4.1
-**Flow:** "Surprise me!" → scenario Gemini → conferma → generazione
-
-**Assi:** location · cielo · outfit VS/alta moda · stile fotografo · posa · mood
-**Nuovo asse:** stile artistico casuale — Magritte, Dalì, De Chirico, Mondrian, Banksy (o nessuno)
-
+## SURPRISE v1.4.4
+**Assi:** location (categorie iconiche) · cielo · outfit · stile fotografo · posa · mood · stile artistico
+**Temperature:** 1.2 · Location da 4 categorie esplicite · sfondo_ok con luoghi reali
 **Comandi:** `/start` `/info` `/lastprompt`
 
 ---
 
 ## NOTE TECNICHE
+- **execute_generation:** sempre `return None, str(e)` nel except — mai None implicito
+- **Faceswap Vogue:** `img: None` — `caption_img` separato per caption
 - **Gemini 2.0 Flash:** shutdown 1 giugno 2026 — tutti i bot già su 3.x ✅
-- **Caption Vogue:** usa img_data originale, non il prompt ottimizzato
-- **MODEL_TEXT_ID (Flash):** non consuma quota immagini (50/giorno)
-- **pending_artistic_style:** preserva lo stile tra _send_confirmation e _run_generation
+- **MODEL_TEXT_ID (Flash):** non consuma quota immagini
 
 ---
 
