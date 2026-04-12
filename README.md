@@ -1,123 +1,78 @@
-# README — Ecosistema Bot Valeria Cross
-**Aggiornato:** 4 Aprile 2026
+# README — Valeria Cross AI · Ecosistema Bot Telegram
+**Aggiornato:** 12/04/2026
 
 ---
 
-## ECOSISTEMA BOT
+## Versioni attive
 
-```
-ARCHITECT (A) = 🖼️/T → Prompt ottimizzato (T2T)
-VOGUE (B)     = T/Prompt + A → {Immagine} (T2I) + Batch + /caption
-FILTRO (D)    = {Immagine} + Filtro → {Immagine filtrata} (I2I)
-CABINA (C)    = 🖼️ costume → {Valeria in costume}
-SURPRISE (F)  = 🎲 Gemini sceglie tutto → {Immagine} (T2I libero)
-~~SORPRESA~~  = ⏸️ sospesa
-```
-
----
-
-## VERSIONI CORRENTI
-
-| Bot | Versione | File | Stato |
-|-----|----------|------|-------|
-| SURPRISE | 1.4.4 | `surprise-144.py` | ✅ |
-| CabinaBot | 2.3.3 | `cabina-233.py` | ✅ |
-| Filtro | 4.8.1 | `filtro-481.py` | ✅ |
-| VogueBot | 6.7.1 | `vogue-671.py` | ✅ |
-| ArchitectBot | 8.2.2 | `architect-822.py` | ✅ |
-| ~~SorpresaBot~~ | 2.4.0 | `sorpresa-240.py` | ⏸️ sospesa |
-
-**Token env:**
-- `TELEGRAM_TOKEN` — Vogue
-- `TELEGRAM_TOKEN_ARCHITECT` — Architect
-- `TELEGRAM_TOKEN_SORPRESA` — Sorpresa + Surprise
-- `TELEGRAM_TOKEN_CLOSET` — Cabina
-- `TELEGRAM_TOKEN_FX` — Filtro
+| Bot | Versione | File | Deploy |
+|-----|----------|------|--------|
+| ATELIER (ex Cabina) | **3.0.1** | `atelier-301.py` | flexible-denna/cabina |
+| SURPRISE | **1.5.6** | `surprise-156.py` | near-damara/sorpresa |
+| Filtro | **4.8.5** | `filtro-485.py` | screeching-jobina/valeriafx |
+| VogueBot | **6.7.1** | `vogue-671.py` | colossal-giselle/vogue |
+| ArchitectBot | **8.2.2** | `architect-822.py` | homely-annabelle/thearchitect |
+| ~~SorpresaBot~~ | ~~2.4.0~~ | ~~sorpresa-240.py~~ | ⏸️ sospesa |
 
 ---
 
-## COMPORTAMENTO /start (tutti i bot)
-Reset completo: cancella tutti i dizionari di stato + timer attivi. Mostra `✅ Reset completo.` + menu principale.
+## ATELIER 3.0.1 (ex CabinaBot)
+Genera immagini editoriali da foto outfit di riferimento.
+
+**Filtri disponibili:**
+- 🎨 Canvas Swimsuit
+- 🤳 Selfie Spiaggia (☀️ / 🌅)
+- 🛌 Letto (☀️ / 🌙)
+- 🌅 Spiaggia Editoriale
+- 🍹 Beach Club
+- ⛵ Yacht (☀️ / 🌅)
+- 🏄 Surf
+- 🎞️ Riviera '60
+- 🌊 Pool Party
+- 🤿 Underwater
+- 🎬 Shooting Editorial (Mosaico 4 foto / Scatti separati)
+- ⚡ Generazione rapida
+
+**Comandi:**
+- `/start` — menu filtri
+- `/mosaic` — collage da 2 a 9 foto (layout automatico, timer 5 min)
+- `/done` — forza assemblaggio mosaic
+- `/formato` — cambia aspect ratio
+- `/settings` — numero foto
+- `/info` — stato bot
+- `/lastprompt` — ultimo prompt API
 
 ---
 
-## CAPTION — STATO ATTUALE
+## SURPRISE 1.5.6
+Genera scenari editoriali completamente random.
 
-| Bot | Caption |
-|-----|---------|
-| Sorpresa | ⏸️ Sospesa con bot |
-| Cabina | ❌ Rimossa — da ricreare |
-| Filtro | ❌ Rimossa — da ricreare |
-| Vogue | ✅ /caption + pulsante + auto post-gen |
-| Architect | ✅ Funziona |
-| SURPRISE | ❌ Rimossa — da ricreare |
+**Flusso:**
+1. `/start` → flag artista (🎨 Con stile artistico / 📷 Solo fotografico)
+2. 🎲 Surprise me! → scena estratta
+3. Caption generata dallo scenario
+4. Vuoi generare? ✅ Sì / 🏠 No
+5. Immagine
 
----
-
-## IDENTITÀ VALERIA CROSS
-- 60 anni, uomo italiano (Walter Caponi), viso ovale-rettangolare
-- Occhiali Vogue Havana tartaruga scura ottagonali (SEMPRE, mai toccati)
-- Barba argento 6-7cm, capelli corti argento
-- Corpo femminile: 180cm, 85kg, seno D-cup, hourglass, pelle liscia
-- Watermark: `feat. Valeria Cross 👠` — corsivo champagne, bottom center
-- Tutti i bot usano `masterface.png` · Architect non usa master face
-- Genera con Flow (Google Labs) + NanoBanana 2
+**Pool:** 65 location · 36 outfit · 20 stili fotografici · 5 artisti + None
 
 ---
 
-## REGOLE OPERATIVE
-- Ogni modifica = bump versione; file precedente resta vivo
-- NON applicare modifiche senza ok di Walter ("Vai" = ok)
-- Nomenclatura: Major=`X00`, Minor=`X10`, Patch=`X01`
-- UPDATE = HANDOFF + README + XLSX + memorie + tabella versioni
+## VogueBot 6.7.1
+Genera da prompt testuale o foto. Modalità: testo libero, faceswap, batch.
+
+## ArchitectBot 8.2.2
+Genera prompt ottimizzati per Flow/ChatGPT/Grok/Qwen/Meta. Non usa masterface.
+
+## Filtro 4.8.5
+Applica filtri stilistici a foto. Include `/mosaic` (2-9 foto).
 
 ---
 
-## VOGUE BOT v6.7.1
-**Flusso faceswap:** Flash descrive → prompt + masterface → genera da zero (NO img originale)
-**Caption:** `/caption` chiede sempre foto · `📝 Solo Caption` · auto post-gen
-**Comandi:** `/start` `/lastprompt` `/caption` `/help` `/info` `/settings`
-
----
-
-## FILTRO v4.8.1
-**Categorie:** Stilistici · Fantasy & Art · Scenografici · Collage · Altri
-**Stile Artistico:** Magritte/Dalì/De Chirico/Mondrian/Banksy casuale in Fantasy
-**Comandi:** `/start` `/reset` `/filtro` `/help` `/info` `/lastprompt` `/mosaic`
-
----
-
-## CABINA BOT v2.3.3
-**Flow:** foto outfit → analisi → prompt (con preview dual) → conferma → generazione
-**Fix:** v_text NameError · execute_generation ritorna sempre tupla
-**Comandi:** `/start` `/reset` `/formato` `/settings` `/info` `/help` `/lastprompt`
-
----
-
-## ARCHITECT BOT v8.2.2
-**Flow:** testo/immagini → motore → ottimizzazione → caption → prompt
-**Motori:** Gemini · Grok · Qwen · ChatGPT · Meta
-**Comandi:** `/start` `/reset` `/motore` `/movie` `/stop` `/lastprompt` `/help` `/info`
-
----
-
-## SURPRISE v1.4.4
-**Assi:** location (categorie iconiche) · cielo · outfit · stile fotografo · posa · mood · stile artistico
-**Temperature:** 1.2 · Location da 4 categorie esplicite · sfondo_ok con luoghi reali
-**Comandi:** `/start` `/info` `/lastprompt`
-
----
-
-## NOTE TECNICHE
-- **execute_generation:** sempre `return None, str(e)` nel except — mai None implicito
-- **Faceswap Vogue:** `img: None` — `caption_img` separato per caption
-- **Gemini 2.0 Flash:** shutdown 1 giugno 2026 — tutti i bot già su 3.x ✅
-- **MODEL_TEXT_ID (Flash):** non consuma quota immagini
-
----
-
-## TODO APERTI
-| Bot | Issue | Priorità |
-|-----|-------|----------|
-| Cabina, Filtro, SURPRISE | Caption da ricreare | 🔴 Alta |
-| SURPRISE | D-cup non sempre visibile | 🟡 Media |
+## Infrastruttura
+- **Deploy:** Koyeb · Flask health check porta 10000
+- **Modello immagini:** gemini-3-pro-image-preview
+- **Modello testo:** gemini-3-flash-preview
+- **Quota:** 50 immagini/giorno (piano gratuito)
+- **masterface.png:** SEMPRE primo elemento in contents Gemini
+- **Repository:** github.com/valeriacross/Moltbot-Start · github.com/valeriacross/il-mio-moltbot
