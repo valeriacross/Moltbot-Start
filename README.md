@@ -1,5 +1,5 @@
 # README — Valeria Cross AI · Ecosistema Bot Telegram
-**Aggiornato:** 21/04/2026
+**Aggiornato:** 25/04/2026
 
 ---
 
@@ -8,22 +8,23 @@
 | Bot | Versione | File | Deploy |
 |-----|----------|------|--------|
 | ATELIER | **3.4.2** | `atelier-342.py` | flexible-denna/cabina |
-| **SURPRISE** | **3.0.0** | `surprise-300.py` | near-damara/sorpresa |
+| **SURPRISE** | **3.1.0** | `surprise-310.py` | near-damara/sorpresa |
 | Filtro | **5.0.1** | `filtro-501.py` | screeching-jobina/filtro |
 | VogueBot | **6.7.1** | `vogue-671.py` | colossal-giselle/vogue |
 | ArchitectBot | **8.2.2** | `architect-822.py` | homely-annabelle/thearchitect |
-| ~~SorpresaBot~~ | ~~2.4.0~~ | ~~sorpresa-240.py~~ | ⏸️ sospesa |
 
 ---
 
-## SURPRISE 3.0.0
+## SURPRISE 3.1.0
 Genera scenari editoriali — automatici o manuali.
 
 **Modalità Automatica:** location dal pool, Gemini sceglie sky/pose/mood coerenti, caption automatica.
 
-**Modalità Manuale:** 6 menu paginati (8 voci/pagina, ◀️ ▶️) — Location → Outfit → Sky → Pose → Mood → Stile. Zero filtro coerenza, libertà totale.
+**Modalità Manuale:** 6 menu paginati (10 voci/pagina, ◀️ ▶️) — Location → Outfit → Sky → Pose → Mood → Stile. Zero filtro coerenza, libertà totale.
 
-**Pool:** 100 location (30 IT · 20 PT · 10 spiagge specifiche · 50 siti storici iconici) · 50 outfit con colori e calzature · 20 stili · 30 pose · 30 sky · 30 mood
+**Pool:** 100 location (30 IT · 20 PT · 10 spiagge specifiche · 50 siti storici iconici) · 50 outfit · 20 stili · 30 pose · 30 sky · 30 mood
+
+**Outfit 3.1.0:** Mini dress (12) · Beachwear (14) · Estivi (4) · Bodysuit/Avant-garde (5) · Futurista/Sci-Fi (4) · Retrò '20/Art Déco (3) · Retrò '70/Glam Rock/Disco (3) · Avanguardia (2) · Costumi/Film Iconici (3). Esclusi: abiti lunghi, maxi, midi, pantaloni, indumenti maschili.
 
 ---
 
