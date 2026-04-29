@@ -1,5 +1,5 @@
 # README — Valeria Cross AI · Ecosistema Bot Telegram
-**Aggiornato:** 25/04/2026
+**Aggiornato:** 28/04/2026
 
 ---
 
@@ -7,57 +7,54 @@
 
 | Bot | Versione | File | Deploy |
 |-----|----------|------|--------|
-| ATELIER | **3.4.2** | `atelier-342.py` | flexible-denna/cabina |
-| **SURPRISE** | **3.1.0** | `surprise-310.py` | near-damara/sorpresa |
+| ATELIER | **3.4.3** | `atelier-343.py` | flexible-denna/cabina |
+| **SURPRISE** | **4.2.1** | `surprise-421.py` | near-damara/sorpresa |
 | Filtro | **5.0.1** | `filtro-501.py` | screeching-jobina/filtro |
-| VogueBot | **6.7.1** | `vogue-671.py` | colossal-giselle/vogue |
+| VogueBot | **6.7.2** | `vogue-672.py` | colossal-giselle/vogue |
 | ArchitectBot | **8.2.2** | `architect-822.py` | homely-annabelle/thearchitect |
 
 ---
 
-## SURPRISE 3.1.0
-Genera scenari editoriali — automatici o manuali.
+## SURPRISE 4.2.1
+Genera scenari editoriali con o senza foto di riferimento.
 
-**Modalità Automatica:** location dal pool, Gemini sceglie sky/pose/mood coerenti, caption automatica.
+**Flow:**
+```
+/start → Hai una foto? [📷 Sì] [🎲 No]
+  Con foto → analisi Gemini → [Auto] [Manuale senza step location]
+  Senza foto → [Auto] [Manuale completo]
+→ Riepilogo + [📋 Prompt Flow] + [✅ Genera]
+→ [🎲 Nuova scena] [🔁 Riprova]
+```
 
-**Modalità Manuale:** 6 menu paginati (10 voci/pagina, ◀️ ▶️) — Location → Outfit → Sky → Pose → Mood → Stile. Zero filtro coerenza, libertà totale.
+**Pool:** 200 location · 100 outfit · 50 sky · 50 pose · 50 mood · 50 stili
+**No-repeat:** location e outfit non si ripetono per sessione (reset `/start`)
+**Prompt Flow:** prompt dettagliato stile Architect, disponibile prima della generazione
+**Comandi:** `/start` `/info` `/lastprompt`
 
-**Pool:** 100 location (30 IT · 20 PT · 10 spiagge specifiche · 50 siti storici iconici) · 50 outfit · 20 stili · 30 pose · 30 sky · 30 mood
-
-**Outfit 3.1.0:** Mini dress (12) · Beachwear (14) · Estivi (4) · Bodysuit/Avant-garde (5) · Futurista/Sci-Fi (4) · Retrò '20/Art Déco (3) · Retrò '70/Glam Rock/Disco (3) · Avanguardia (2) · Costumi/Film Iconici (3). Esclusi: abiti lunghi, maxi, midi, pantaloni, indumenti maschili.
-
----
-
-## ATELIER 3.4.2
-Genera immagini editoriali da foto outfit di riferimento.
-
-**Filtri:** Canvas Swimsuit · Selfie Spiaggia (2v) · Letto (2v) · Spiaggia Editoriale · Beach Club · Yacht (2v) · Surf · Riviera '60 · Pool Party · Underwater · Shooting Editorial
-
-**Novità 3.4.x:** Caption da outfit_desc (no riferimenti alla persona) · COLOR LOCK con HEX · Annulla → loop keyboard · Shooting Editorial salta formato
-
----
+## ATELIER 3.4.3
+⚠️ BEARD MANDATORY + COEXISTENCE RULE. Caption da `outfit_desc` · COLOR LOCK HEX · Shooting Editorial + Mosaico 4 foto.
 
 ## Filtro 5.0.1
-Stilistici: 💧 Dissolvence · 👻 Ghost Temporal · 📸 Long Exposure · + scenografici e collage · `/mosaic` 2-9 foto
+💧 Dissolvence · 👻 Ghost Temporal · 📸 Long Exposure · scenografici · `/mosaic` 2-9 foto
 
----
-
-## VogueBot 6.7.1
-Genera da prompt testuale o foto. Modalità: testo libero, faceswap, batch.
+## VogueBot 6.7.2
+⚠️ BEARD MANDATORY + COEXISTENCE RULE. Genera da testo o foto. Faceswap, batch.
 
 ## ArchitectBot 8.2.2
-Genera prompt ottimizzati per Flow/ChatGPT/Grok/Qwen/Meta. Non usa masterface.
+Prompt ottimizzati per Flow/ChatGPT/Grok/Qwen/Meta. Non usa masterface.
 
 ---
 
 ## Infrastruttura
-- **Deploy:** Koyeb · Flask health check porta 10000
+- **Deploy:** Koyeb · Flask porta 10000
 - **Modello immagini:** `gemini-3-pro-image-preview`
 - **Modello testo:** `gemini-3-flash-preview`
-- **masterface.png:** sempre primo elemento in `contents` Gemini
+- **masterface.png:** sempre primo in `contents` Gemini (tranne ArchitectBot)
 - **Repository:** `github.com/valeriacross/Moltbot-Start` · `github.com/valeriacross/il-mio-moltbot`
+- ⚠️ **Gemini 2.0 Flash shutdown 1/6/2026** — tutti già su 3.x
 
 ---
 
 ## Workflow UPDATE
-Quando viene scritto **UPDATE**: handoff + README + XLSX aggiornati, pronti da salvare.
+`UPDATE` → handoff + README + XLSX pronti da salvare. Base: `Telegram_Bot_27-04-26.xlsx`
