@@ -1,6 +1,6 @@
 """
 shared.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 1.0.0
+Versione: 1.1.0
 """
 
 import os, html, logging, threading, flask
@@ -10,6 +10,61 @@ from google.genai import types as genai_types
 logger = logging.getLogger(__name__)
 
 MODEL = "gemini-3-flash-preview"
+
+# ============================================================
+# VALERIA CROSS — DNA IDENTITÀ
+# ============================================================
+
+VALERIA_FACE = (
+    "**⚠️ FACE IDENTITY LOCK — ABSOLUTE PRIORITY — DO NOT OVERRIDE — DO NOT SIMPLIFY:**\n"
+    "60-year-old Italian male face, oval-rectangular shape. "
+    "Ultra-detailed mature skin with visible pores, deep character wrinkles, crow's feet. "
+    "Calm half-smile, no teeth shown. "
+    "Thin octagonal Vogue Havana dark tortoiseshell frame eyeglasses — MANDATORY, always present, never removed.\n"
+    "**Hair:** Short silver-grey Italian cut, slightly voluminous top, nape exposed.\n"
+    "**⚠️ BEARD — MANDATORY — NON-NEGOTIABLE:** "
+    "Full silver-grey beard approximately 6-7cm, perfectly groomed, dense and uniform, following the jawline. "
+    "The beard MUST be clearly visible in EVERY shot. "
+    "DO NOT shave it. DO NOT reduce it. DO NOT replace it with stubble. "
+    "A clean-shaven face is a generation FAILURE. The beard is part of the identity lock.\n"
+    "**Rendering:** Subsurface Scattering, Global Illumination, Ambient Occlusion, Fresnel Effect. "
+    "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
+)
+
+VALERIA_BODY_STRONG = (
+    "**MANDATORY BODY — NOT A MALE BODY — OVERRIDE ALL DEFAULTS:**\n"
+    "**Feminine hourglass proportions, 180cm, 85kg. FULL D-CUP BUST — prominent, natural, clearly visible. "
+    "Wide rounded hips, defined waist, full thighs. THIS BODY IS FEMININE. DO NOT GENERATE A MALE PHYSIQUE.**\n"
+    "Completely hairless body — NO body hair, NO chest hair, NO arm hair, NO leg hair on ALL surfaces. "
+    "Smooth porcelain skin. PHOTOGRAPHIC UNITY: skin tone, warmth and texture perfectly continuous "
+    "from face → neck → shoulders → chest → arms.\n"
+    "**⚠️ COEXISTENCE RULE — CRITICAL:** The silver-grey beard on the male face AND the feminine body "
+    "are NOT a contradiction. They MUST coexist in the same image. The beard stays. The feminine body stays. "
+    "Both are mandatory. Do NOT resolve this by removing the beard. "
+    "Do NOT resolve this by masculinizing the body. Keep both exactly as described.\n\n"
+)
+
+VALERIA_BODY_SAFE = (
+    "**MANDATORY BODY — NOT A MALE BODY — OVERRIDE ALL DEFAULTS:**\n"
+    "**Feminine hourglass silhouette, 180cm, 85kg. Soft feminine proportions — defined waist, "
+    "wide rounded hips, full figure. THIS BODY IS FEMININE. DO NOT GENERATE A MALE PHYSIQUE.**\n"
+    "Completely hairless body — NO body hair, NO chest hair, NO arm hair, NO leg hair on ALL surfaces. "
+    "Smooth porcelain skin. PHOTOGRAPHIC UNITY: skin tone, warmth and texture perfectly continuous "
+    "from face → neck → shoulders → chest → arms.\n"
+    "**⚠️ COEXISTENCE RULE — CRITICAL:** The silver-grey beard on the male face AND the feminine body "
+    "are NOT a contradiction. They MUST coexist in the same image. The beard stays. The feminine body stays. "
+    "Both are mandatory. Do NOT resolve this by removing the beard. "
+    "Do NOT resolve this by masculinizing the body. Keep both exactly as described.\n\n"
+)
+
+VALERIA_WATERMARK = "feat. Valeria Cross 👠"
+
+VALERIA_NEGATIVE = (
+    "shaved face, clean-shaven, no beard, missing beard, beard removed, stubble instead of beard, "
+    "female face, young face, missing glasses, face drift, body hair, chest hair, arm hair, leg hair, "
+    "male physique, flat chest, masculine body, desaturated colors, color shift, "
+    "extra fingers, JSON output, text overlay."
+)
 
 # ============================================================
 # GeminiClient
