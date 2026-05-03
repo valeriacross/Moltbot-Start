@@ -1,5 +1,5 @@
 # README — Valeria Cross AI · Ecosistema Bot Telegram
-**Aggiornato:** 29/04/2026
+**Aggiornato:** 03/05/2026
 
 ---
 
@@ -7,58 +7,64 @@
 
 | Bot | Versione | File | Deploy |
 |-----|----------|------|--------|
-| ATELIER | **3.4.3** | `atelier-343.py` | flexible-denna/cabina |
-| **SURPRISE** | **4.2.5** | `surprise-425.py` | near-damara/sorpresa |
-| Filtro | **5.0.1** | `filtro-501.py` | screeching-jobina/filtro |
-| VogueBot | **6.7.2** | `vogue-672.py` | colossal-giselle/vogue |
-| ArchitectBot | **8.2.2** | `architect-822.py` | homely-annabelle/thearchitect |
+| VogueBot | **7.1.3** | `vogue-713.py` | colossal-giselle/vogue |
+| ArchitectBot | **9.0.0** | `architect-900.py` | homely-annabelle/thearchitect |
+| ATELIER | **4.0.1** | `atelier-401.py` | flexible-denna/cabina |
+| Filtro | **6.0.0** | `filtro-600.py` | screeching-jobina/valeriafx |
+| SURPRISE | **5.0.7** | `surprise-507.py` | near-damara/sorpresa |
+| ~~SorpresaBot~~ | DISMESSA | — | — |
+
+> **Nota:** Nessun bot genera immagini direttamente. Tutti producono prompt da copiare su Flow (Google Labs).
 
 ---
 
-## SURPRISE 4.2.5
-Genera scenari editoriali con o senza foto di riferimento.
+## VogueBot 7.1.3
+Analizza foto o testo e genera prompt Flow-ready con DNA Valeria Cross.
 
-**Flow:**
-```
-/start → Hai una foto? [📷 Sì] [🎲 No]
-  Con foto → analisi Gemini (7 elementi, 60-80 parole)
-           → [Auto usa foto] [Manuale senza step location]
-  Senza foto → [Auto] [Manuale completo]
-→ Riepilogo + [📋 Prompt Flow] + [✅ Genera]
-→ [🎲 Nuova scena] [🔁 Riprova]
-```
-
-**Prompt Flow:** descrizione estesa Gemini Vision (con foto) o value pool (senza foto). Include identity lock completo, beard MANDATORY, body PRIORITY 1.
-
-**Pool:** 200 location · 100 outfit · 50 sky · 50 pose · 50 mood · 50 stili
-**No-repeat:** location e outfit non si ripetono per sessione
-**Comandi:** `/start` `/info` `/lastprompt`
+**Modello:** `gemini-3-flash-preview` (Google AI Studio, tier gratuito)
+**Comandi:** `/start` · `/info` · `/dna`
+**Flusso:** foto o testo → analisi Gemini → prompt Flow-ready → keyboard (Nuova foto · Riusa prompt · Home)
+**Note:** Formato AR rimosso — la scelta viene fatta direttamente su Flow.
 
 ---
 
-## ATELIER 3.4.3
-⚠️ BEARD MANDATORY + COEXISTENCE RULE. Caption da `outfit_desc` · COLOR LOCK HEX · Shooting Editorial + Mosaico 4 foto.
+## ArchitectBot 9.0.0
+Genera prompt ottimizzati per Flow/ChatGPT/Grok/Qwen/Meta. Analisi foto con Google AI (solo testo).
 
-## Filtro 5.0.1
-💧 Dissolvence · 👻 Ghost Temporal · 📸 Long Exposure · scenografici · `/mosaic` 2-9 foto
+**Modello:** `gemini-3-flash-preview` (solo analisi testo/foto — nessuna generazione immagini)
 
-## VogueBot 6.7.2
-⚠️ BEARD MANDATORY + COEXISTENCE RULE. Genera da testo o foto. Faceswap, batch.
+---
 
-## ArchitectBot 8.2.2
-Prompt ottimizzati per Flow/ChatGPT/Grok/Qwen/Meta. Non usa masterface.
+## ATELIER 4.0.1
+Genera prompt editoriali da foto outfit di riferimento.
+
+**Modello:** `gemini-3-flash-preview`
+**Filtri:** Canvas Swimsuit · Selfie Spiaggia · Letto · Spiaggia Editoriale · Beach Club · Yacht · Surf · Riviera '60 · Pool Party · Underwater · Shooting Editorial
+**Comandi:** `/start` · `/mosaic` · `/done` · `/formato` · `/settings` · `/info` · `/lastprompt`
+**Fix 4.0.1:** Aggiunti import mancanti `google-genai`, `client`, `API_KEY` (erano stati rimossi per errore).
+
+---
+
+## Filtro 6.0.0
+Applica filtri stilistici a foto. Include `/mosaic` (2-9 foto).
+
+---
+
+## SURPRISE 5.0.7
+Genera scenari editoriali random con pool fissi.
+
+**Modello:** `gemini-3-flash-preview` (caption via Gemini)
+**Pool:** 200 location (🇮🇹 IT → 🇵🇹 PT → EU → Mondo, con bandiere) · 100 outfit · 50 stili · 50 pose · 50 sky · 50 mood
+**Flusso:** scelta modalità (Auto/Manuale) → scena → caption Gemini → keyboard (📋 Prompt Flow · 🏠 Home) → prompt → keyboard (🎲 Nuova scena)
+**5.0.3:** Keyboard semplificata. "Annulla" → "🏠 Home". Rimosso handler ridondante.
+**5.0.4–5.0.6:** Versioning incrementale, caption locale migliorata.
+**5.0.7:** Caption generata da Gemini (come Atelier). Aggiunti `google-genai`, `client`, `API_KEY`.
 
 ---
 
 ## Infrastruttura
-- **Deploy:** Koyeb · Flask porta 10000
-- **Modello immagini:** `gemini-3-pro-image-preview`
-- **Modello testo:** `gemini-3-flash-preview`
-- **masterface.png:** sempre primo in `contents` Gemini (tranne ArchitectBot)
-- **Repository:** `github.com/valeriacross/Moltbot-Start` · `github.com/valeriacross/il-mio-moltbot`
-- ⚠️ **Gemini 2.0 Flash shutdown 1/6/2026** — tutti già su 3.x
-
----
-
-## Workflow UPDATE
-`UPDATE` → handoff + README + XLSX pronti da salvare. Base: `Telegram_Bot_27-04-26.xlsx`
+- **Deploy:** Koyeb · Flask health check porta 10000
+- **Generazione immagini:** Flow (Google Labs) + NanoBanana 2
+- **Modello AI:** `gemini-3-flash-preview` su Vogue, Atelier e Surprise
+- **masterface.png:** SEMPRE primo elemento in contents Gemini (dove applicabile)
+- **Repository GitHub:** github.com/valeriacross/Moltbot-Start (deploy Koyeb)
