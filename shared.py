@@ -86,14 +86,14 @@ class GeminiClient:
     def generate(self, prompt: str, contents: list = None, model: str = MODEL) -> str | None:
         """
         Genera testo con Gemini.
-        contents: lista di Part aggiuntivi (immagini, ecc.) — opzionale.
+        contents: lista di Part aggiuntivi (immagini, ecc.) — vengono messi PRIMA del testo.
         Ritorna il testo generato o None in caso di errore.
         """
         if not self._client:
             logger.error("❌ GeminiClient non disponibile.")
             return None
         try:
-            payload = [prompt] + (contents or [])
+            payload = (contents or []) + [prompt]
             response = self._client.models.generate_content(
                 model=model,
                 contents=payload
