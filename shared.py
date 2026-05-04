@@ -7,6 +7,14 @@ import os, html, logging, threading, flask
 from google import genai
 from google.genai import types as genai_types
 
+# Esportati per uso nei bot
+__all__ = [
+    'GeminiClient', 'CaptionGenerator', 'HealthServer',
+    'VALERIA_FACE', 'VALERIA_BODY_STRONG', 'VALERIA_BODY_SAFE',
+    'VALERIA_WATERMARK', 'VALERIA_NEGATIVE',
+    'genai_types', 'MODEL',
+]
+
 logger = logging.getLogger(__name__)
 
 MODEL = "gemini-3-flash-preview"
