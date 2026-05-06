@@ -5,6 +5,12 @@ Versione: 1.7.0
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
 
+CHANGELOG 1.8.0:
+  - Aggiunta analyze_scene(): funzione centralizzata di analisi immagine
+    usata da Vogue, Architect e Atelier. Prompt focalizzato su ambiente,
+    indumenti e accessori — zero menzione di persona/corpo/viso.
+    Fallback automatico con prompt neutro se il primo viene bloccato.
+
 CHANGELOG 1.7.0:
   - Aggiunto log avvio con versione (visibile su Koyeb).
   - Allineamento docstring versione (era rimasta a 1.5.0 per errore).
@@ -38,7 +44,7 @@ __all__ = [
     'GeminiClient', 'CaptionGenerator', 'HealthServer', 'is_allowed',
     'VALERIA_FACE', 'VALERIA_BODY_STRONG', 'VALERIA_BODY_SAFE',
     'VALERIA_WATERMARK', 'VALERIA_NEGATIVE',
-    'genai_types', 'MODEL',
+    'genai_types', 'MODEL', 'analyze_scene',
 ]
 
 logger = logging.getLogger(__name__)
@@ -46,7 +52,7 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "1.7.0"
+VERSION = "1.8.0"
 
 logger.info(f"📦 C_shared100.py v{VERSION} caricato — MODEL={MODEL}")
 
@@ -127,6 +133,90 @@ VALERIA_NEGATIVE = (
     "male physique, flat chest, masculine body, desaturated colors, color shift, "
     "extra fingers, JSON output, text overlay."
 )
+
+# ============================================================
+# ANALYZE_SCENE — ANALISI IMMAGINE CENTRALIZZATA
+# ============================================================
+
+# Prompt principale: focalizzato su ambiente/indumenti/accessori/luce
+# Zero menzione di persona, corpo, viso, età, genere
+_ANALYZE_SCENE_PROMPT = (
+    "Analyze this fashion editorial image. "
+    "Return a structured description with these exact sections:\n\n"
+    "OUTFIT: [Every garment as a standalone object — exact name, color with HEX code, fabric, "
+    "cut, fit, coverage, embellishments, details. "
+    "E.g. 'strapless ribbed tube top in lavender-purple (#A291D4), wet fabric clinging, "
+    "vertical ribbing texture visible'. "
+    "Describe the garment as if it exists independently — no wearer mentioned.]\n\n"
+    "ACCESSORIES: [Every accessory as a standalone object — jewelry, footwear, headwear, bags, "
+    "with color+HEX. E.g. 'triple-strand pearl necklace with teardrop ruby pendant (#8B0000) in gold setting'.]\n\n"
+    "COLOR PALETTE: [Dominant HEX codes with label — e.g. '#A291D4 lavender-purple, #FDFDFD ivory-white']\n\n"
+    "BACKGROUND: [Exact location, architecture, surfaces, props, environment — be specific. "
+    "E.g. 'white marble bathroom walls, freestanding white porcelain bathtub, "
+    "gold-finished wall-mounted faucet, frosted window left, warm wall sconce background'.]\n\n"
+    "LIGHTING: [Light source, direction, quality, color temperature, mood — 1-2 sentences.]\n\n"
+    "CAMERA: [Framing — full body / three-quarter / medium / portrait. Angle. "
+    "Describe how the garments are positioned in frame — "
+    "e.g. 'the skirt fills the lower frame', 'the top is centered at mid-frame'.]\n\n"
+    "MOOD: [Overall atmosphere, color grade, cinematic style — 1 sentence.]\n\n"
+    "Rules:\n"
+    "— Do NOT describe any person, face, body, skin, age, gender or physical traits\n"
+    "— Describe garments and accessories as standalone objects\n"
+    "— Describe the camera framing in terms of what garments are visible, not body parts\n"
+    "— Be precise and detailed on fabrics, colors and environment"
+)
+
+# Prompt fallback: ancora più neutro, usato se il primo viene bloccato
+_ANALYZE_SCENE_FALLBACK_PROMPT = (
+    "This is a fashion editorial image. "
+    "Describe only the following elements — nothing else:\n\n"
+    "OUTFIT: [Garments visible — name, color, fabric, cut. No person described.]\n"
+    "ACCESSORIES: [Jewelry, shoes, headwear visible — color, material.]\n"
+    "COLOR PALETTE: [Main HEX codes.]\n"
+    "BACKGROUND: [Setting and environment — surfaces, architecture, props.]\n"
+    "LIGHTING: [Light quality and mood.]\n"
+    "CAMERA: [Framing of the garments in frame.]\n"
+    "MOOD: [Atmosphere.]\n\n"
+    "Do NOT mention any person, body, face, skin, age or gender."
+)
+
+
+def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None, str | None]:
+    """
+    Analisi immagine centralizzata per Vogue, Architect e Atelier.
+    Focalizzata su ambiente, indumenti e accessori — zero riferimenti a persona/corpo/viso.
+    Tenta prima con prompt completo, poi con fallback neutro se bloccato.
+
+    Returns:
+        (result, error) — result è la descrizione strutturata, error è un messaggio leggibile.
+    """
+    if not client.available:
+        return None, "⚠️ API key non configurata."
+
+    try:
+        img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg")
+
+        # Tentativo 1: prompt completo
+        logger.info("🔍 analyze_scene: tentativo 1 (prompt completo)")
+        result = client.generate(_ANALYZE_SCENE_PROMPT, contents=[img_part])
+        if result:
+            logger.info(f"✅ analyze_scene: completato ({len(result)} chars)")
+            return result, None
+
+        # Tentativo 2: prompt fallback
+        logger.warning("⚠️ analyze_scene: tentativo 1 vuoto — provo fallback")
+        result = client.generate(_ANALYZE_SCENE_FALLBACK_PROMPT, contents=[img_part])
+        if result:
+            logger.info(f"✅ analyze_scene: fallback completato ({len(result)} chars)")
+            return result, None
+
+        logger.error("❌ analyze_scene: entrambi i tentativi vuoti")
+        return None, "⚠️ Analisi immagine non disponibile — Gemini non ha risposto."
+
+    except Exception as e:
+        logger.error(f"❌ analyze_scene: eccezione: {e}", exc_info=True)
+        return None, f"❌ Errore analisi: {e}"
+
 
 # ============================================================
 # GeminiClient

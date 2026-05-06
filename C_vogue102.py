@@ -1,6 +1,6 @@
 import os, logging, telebot, html, time
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from C_shared100 import GeminiClient, HealthServer, is_allowed, genai_types
+from C_shared100 import GeminiClient, HealthServer, is_allowed, genai_types, analyze_scene
 from C_shared100 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_WATERMARK, VALERIA_NEGATIVE
 
 # --- VERSIONE ---
@@ -32,32 +32,13 @@ VALERIA_DNA = (
     f"NEGATIVE: {VALERIA_NEGATIVE}"
 )
 
-# --- ANALISI FOTO ---
+# --- ANALISI FOTO — usa analyze_scene() centralizzata da C_shared100 ---
 def analyze_photo(img_bytes):
-    """Analizza foto con Gemini e restituisce descrizione strutturata della scena."""
-    if not gemini.available:
-        return None, "⚠️ API key non configurata."
-    try:
-        img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg")
-        prompt = (
-            "Analyze this image for editorial photo recreation. "
-            "Return a structured description with these exact sections:\n\n"
-            "SCENE: [exact location, environment, architecture, background elements — be specific]\n"
-            "OUTFIT: [every garment with color, fabric, cut, fit, details, footwear, accessories]\n"
-            "LIGHTING: [light source, direction, quality, color temperature, shadows, mood]\n"
-            "POSE: [body position, weight distribution, hands, energy, framing]\n"
-            "CAMERA: [full body / medium / portrait, angle, depth of field]\n"
-            "MOOD: [overall atmosphere, color grade, cinematic style]\n\n"
-            "Be precise and visual. Do NOT describe the person's face, age, gender or identity. "
-            "Focus only on scene, outfit, light, pose and technical elements."
-        )
-        result = gemini.generate(prompt, contents=[img_part])
-        if result:
-            return result, None
-        return None, "⚠️ Nessuna risposta da Gemini."
-    except Exception as e:
-        logger.error(f"❌ Analisi foto fallita: {e}")
-        return None, f"❌ Errore analisi: {html.escape(str(e))}"
+    """Wrapper su analyze_scene() — interfaccia invariata per il resto del bot."""
+    result, err = analyze_scene(img_bytes, client=gemini)
+    if result:
+        return result, None
+    return None, err or "⚠️ Analisi immagine non disponibile."
 
 # --- GENERA CAPTION ---
 def generate_caption(img_bytes):

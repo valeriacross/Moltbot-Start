@@ -3,7 +3,7 @@ from PIL import Image
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from C_shared100 import GeminiClient, CaptionGenerator, HealthServer, is_allowed, genai_types
+from C_shared100 import GeminiClient, CaptionGenerator, HealthServer, is_allowed, genai_types, analyze_scene
 from C_shared100 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_BODY_SAFE, VALERIA_WATERMARK, VALERIA_NEGATIVE
 
 # --- LOGGING ---
@@ -397,49 +397,20 @@ def _to_jpeg(img_bytes: bytes) -> bytes:
         return img_bytes
 
 def describe_outfit_from_image(img_bytes):
-    """Analisi strutturata: sfondo/location separato da outfit, per mantenere entrambi nel prompt.
-    Se il primo tentativo viene bloccato dai safety filter di Gemini, riprova con un prompt
-    più neutro focalizzato esclusivamente su materiali e struttura del capo."""
+    """
+    Analisi immagine centralizzata — usa analyze_scene() da C_shared100.
+    Prompt unico per tutti i bot: focalizzato su ambiente/indumenti/accessori/luce.
+    Zero menzione di persona, corpo, viso, età, genere.
+    Fallback automatico se il primo tentativo viene bloccato.
+    """
     try:
         jpeg_bytes = _to_jpeg(img_bytes)
-        logger.info(f"🔍 describe_outfit: {len(jpeg_bytes)} bytes JPEG → Gemini")
-        img_part = genai_types.Part.from_bytes(data=jpeg_bytes, mime_type="image/jpeg")
-
-        # Tentativo 1 — prompt completo strutturato
-        prompt_v1 = (
-            "Analyze this image. Return EXACTLY this structure in this order:\n"
-            "OUTFIT: [PRIORITY — describe every garment in full detail: name, exact color+HEX code, fabric, cut, fit, coverage, details, embellishments, crystals, feathers, structured elements. e.g. 'lime yellow-green (#C8F500) crystal-encrusted sequin bodice with deep V-neckline']\n"
-            "ACCESSORIES: [PRIORITY — every accessory in full detail: headdress, crown, feathers, jewelry, footwear, gloves, wristbands — with color+HEX. If there is a large feather headdress or crown, describe it exhaustively.]\n"
-            "COLOR PALETTE: [Dominant HEX codes — e.g. '#C8F500 neon lime-green, #C0C0C0 silver']\n"
-            "BACKGROUND: [Location, setting, architecture — max 2 sentences]\n"
-            "LIGHTING: [Light source, quality, mood — max 1 sentence]\n"
-            "Do NOT describe any person, face, body, age or gender."
-        )
-        result = gemini.generate(prompt_v1, contents=[img_part])
+        logger.info(f"🔍 describe_outfit: {len(jpeg_bytes)} bytes JPEG → analyze_scene()")
+        result, err = analyze_scene(jpeg_bytes, gemini)
         if result:
-            logger.info(f"👗 Outfit descritto v1 ({len(result)} chars)")
+            logger.info(f"👗 Outfit descritto ({len(result)} chars)")
             return result
-
-        # Tentativo 2 — prompt neutro solo su materiali e struttura
-        logger.warning("⚠️ describe_outfit v1: risposta vuota — riprovo con prompt neutro")
-        prompt_v2 = (
-            "This is a fashion industry image. Focus exclusively on the clothing and accessories. "
-            "Describe only the garments and materials visible:\n"
-            "OUTFIT: [fabric type, construction technique, structural elements, embellishments, "
-            "color with HEX code, silhouette, cut details — e.g. 'ivory pearl-chain net construction "
-            "in diamond lattice pattern (#F5F0E8), halter neckline attachment, floor-length']\n"
-            "ACCESSORIES: [jewelry, footwear, headwear — material, color+HEX]\n"
-            "COLOR PALETTE: [dominant HEX codes]\n"
-            "BACKGROUND: [setting, location — max 1 sentence]\n"
-            "LIGHTING: [light quality — max 1 sentence]\n"
-            "Respond with garment and material details only."
-        )
-        result2 = gemini.generate(prompt_v2, contents=[img_part])
-        if result2:
-            logger.info(f"👗 Outfit descritto v2/neutro ({len(result2)} chars)")
-            return result2
-
-        logger.warning("⚠️ describe_outfit: entrambi i tentativi hanno restituito None")
+        logger.warning(f"⚠️ describe_outfit: {err}")
         return None
     except Exception as e:
         logger.error(f"❌ describe_outfit_from_image ECCEZIONE: {e}", exc_info=True)
