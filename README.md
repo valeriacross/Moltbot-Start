@@ -1,172 +1,168 @@
-# Valeria Cross AI — Ecosistema Bot Telegram
+# Valeria Cross AI — Moltbot
 
-> Ecosistema di bot Telegram per la generazione di prompt editoriali per **Valeria Cross AI** — alter ego femminile di Walter Caponi, generato interamente con AI.
-> I bot non generano immagini direttamente: producono prompt ottimizzati da incollare su **Flow (Google Labs)**.
-
----
-
-## Struttura del repository
-
-```
-Moltbot-Start/
-├── C_shared100.py        # Libreria comune — importata da tutti i bot
-├── C_vogue100.py         # VogueBot — analisi foto → prompt Flow-ready
-├── C_architect100.py     # ArchitectBot — prompt avanzati + Director's Cut
-├── C_atelier100.py       # Atelier — prompt da outfit di riferimento
-├── C_filtro100.py        # Filtro — effetti stilistici su foto
-├── C_surprise100.py      # Surprise — scenari editoriali random
-└── masterface.png        # Foto DNA Valeria (richiesta da Atelier e Filtro)
-```
+Ecosistema di bot Telegram per il personaggio **Valeria Cross AI** — alter ego femminile generato interamente con AI.
 
 ---
 
 ## Bot attivi
 
-| Bot | File | Token env | Deploy Koyeb |
-|-----|------|-----------|--------------|
-| VogueBot | `C_vogue100.py` | `TELEGRAM_TOKEN` | colossal-giselle/vogue |
-| ArchitectBot | `C_architect100.py` | `TELEGRAM_TOKEN_ARCHITECT` | homely-annabelle/thearchitect |
-| Atelier | `C_atelier100.py` | `TELEGRAM_TOKEN_CLOSET` | flexible-denna/atelier |
-| Filtro | `C_filtro100.py` | `TELEGRAM_TOKEN_FX` | screeching-jobina/filtro |
-| Surprise | `C_surprise100.py` | `TELEGRAM_TOKEN_SORPRESA` | near-damara/sorpresa |
+| Bot | File | Versione | Koyeb service | Run command |
+|-----|------|---------|---------------|-------------|
+| 👠 Vogue | `C_vogue110.py` | 1.1.0 | colossal-giselle/vogue | `python C_vogue110.py` |
+| 📐 Architect | `C_architect110.py` | 1.1.0 | homely-annabelle/thearchitect | `python C_architect110.py` |
+| ✦ Atelier | `C_atelier110.py` | 1.1.0 | flexible-denna/atelier | `python C_atelier110.py` |
+| 🎨 Filtro | `C_filtro110.py` | 1.1.0 | screeching-jobina/filtro | `python C_filtro110.py` |
+| 🎲 Surprise | `C_surprise110.py` | 1.1.0 | near-damara/sorpresa | `python C_surprise110.py` |
+| 📦 Shared | `C_shared100.py` | 1.0.0 | (comune a tutti) | — |
 
 ---
 
-## Variabili d'ambiente (Koyeb)
+## Architettura
 
-```
-TELEGRAM_TOKEN_*    Token del bot specifico (vedi tabella sopra)
-GOOGLE_API_KEY      Chiave API Google AI Studio (gemini-3-flash-preview)
-ALLOWED_USERS       Whitelist user ID Telegram, separati da virgola (es. 273003890)
-PORT                10000 (default Koyeb)
-```
+Tutti i bot importano da `C_shared100.py` che espone:
 
-> `GOOGLE_API_KEY` e `ALLOWED_USERS` vanno impostate su ogni servizio.
-> Filtro non usa `GOOGLE_API_KEY`.
-
----
-
-## Requisiti Python
-
-```
-pyTelegramBotAPI==4.14.0
-flask==3.0.0
-Pillow>=10.0.0
-google-genai>=1.16.0
-python-dotenv>=1.0.0
-requests>=2.31.0
-pytz
-```
+- `GeminiClient` — wrapper Singleton su Google Gemini API
+- `CaptionGenerator` — caption da scenario (usata da Surprise)
+- `HealthServer` — Flask health check su porta 10000 (Koyeb)
+- `is_allowed()` — whitelist utenti via env `ALLOWED_USERS`
+- `analyze_scene()` — analisi immagine centralizzata (Vogue, Architect, Atelier)
+- `generate_caption()` — caption social da immagine (Vogue, Architect, Atelier, Filtro)
+- `VALERIA_DNA` — identità completa assemblatada FACE + BODY + WATERMARK + NEGATIVE
+- `EDITORIAL_WRAPPER` — testo di apertura prompt editoriale
+- `build_valeria_identity(safe=False)` — assembla identità con body strong o safe
 
 ---
 
-## C_shared100.py — Libreria comune
+## Comandi per bot
 
-Tutti i bot importano da questo file:
+### 👠 Vogue
+| Comando | Funzione |
+|---------|---------|
+| `/start` | Avvia il bot |
+| `/info` | Versione e stato API |
+| `/dna` | Mostra DNA Valeria Cross |
+| `/caption` | Genera caption social da foto (5 emoji + 5/10 parole EN) |
+| `[foto]` | Analizza la scena e genera prompt Flow-ready |
+| `[testo]` | Genera prompt Flow-ready da descrizione testuale |
 
-```python
-from C_shared100 import GeminiClient, CaptionGenerator, HealthServer, is_allowed, genai_types
-from C_shared100 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_WATERMARK, VALERIA_NEGATIVE
-```
+### 📐 Architect
+| Comando | Funzione |
+|---------|---------|
+| `/start` `/reset` | Avvia / resetta |
+| `/help` | Lista comandi |
+| `/info` | Versione e stato API |
+| `/lastprompt` | Reinvia l'ultimo prompt generato |
+| `/stop` | Ferma sessione corrente |
+| `/movie` | Modalità album multi-foto |
+| `[foto]` | Genera Master Prompt certificato |
+| `[testo]` | Genera prompt da descrizione |
 
-**Componenti:**
+### ✦ Atelier
+| Comando | Funzione |
+|---------|---------|
+| `/start` `/reset` | Avvia / resetta |
+| `/help` | Lista comandi |
+| `/info` | Versione e stato API |
+| `[foto]` | Analizza outfit e genera prompt shooting (mosaico 4 foto o scatti separati) |
 
-- `GeminiClient` — Singleton thread-safe che wrappa `genai.Client`. Il prompt testuale viene wrappato come `Part.from_text()` nei payload misti immagine+testo.
-- `CaptionGenerator` — Genera caption social in stile Valeria Cross. Tre modalità: `from_scenario()`, `from_image()`, `from_filter()`.
-- `HealthServer` — Flask health check su porta 10000. Avvia in thread daemon con `use_reloader=False`.
-- `is_allowed(uid)` — Whitelist utenti via env `ALLOWED_USERS`, fallback `273003890`.
-- Costanti DNA: `VALERIA_FACE`, `VALERIA_BODY_STRONG`, `VALERIA_BODY_SAFE`, `VALERIA_WATERMARK`, `VALERIA_NEGATIVE`.
+### 🎨 Filtro
+| Comando | Funzione |
+|---------|---------|
+| `/start` `/reset` | Avvia / resetta |
+| `/filtro` `/filter` | Selezione filtro artistico |
+| `/help` | Lista comandi |
+| `/info` | Versione e stato API |
+| `/lastprompt` | Reinvia l'ultimo prompt |
+| `/caption` | Genera caption da foto |
+| `/mosaic` | Modalità mosaico |
+| `/done` | Conferma selezione |
+| `[foto]` | Applica filtro e genera prompt Flow-ready |
 
----
-
-## C_vogue100.py — VogueBot
-
-Analizza foto o testo e genera un prompt Flow-ready con il DNA di Valeria Cross.
-
-**Flusso:** foto o testo → analisi Gemini → prompt → keyboard (Nuova foto / Riusa prompt / Home)
-
-**Comandi:** `/start` · `/info` · `/dna`
-
----
-
-## C_architect100.py — ArchitectBot
-
-Genera prompt avanzati. Supporta foto singola, album multi-foto e Director's Cut (collage 2×2).
-
-**Flusso:** scegli modalità → foto o testo → VisionStruct parallelo + generazione → review → prompt certificato
-
-**Comandi:** `/start` · `/reset` · `/movie` · `/caption` · `/lastprompt` · `/info` · `/help`
-
-**Director's Cut — 15 registi:**
-Sergio Leone · Alfred Hitchcock · Stanley Kubrick · Akira Kurosawa · David Lynch · Christopher Nolan · Wes Anderson · Martin Scorsese · Francis Ford Coppola · Ridley Scott · Darren Aronofsky · Quentin Tarantino · Guillermo del Toro · Joel & Ethan Coen · Wong Kar-wai
-
----
-
-## C_atelier100.py — Atelier
-
-Genera prompt editoriali da una foto outfit di riferimento.
-
-**Flusso:** scegli filtro → formato → quantità → foto outfit → prompt + caption
-
-**Filtri:** 🎨 Canvas Swimsuit · 🤳 Selfie Spiaggia · 🛌 Letto · 🌅 Spiaggia Editoriale · 🍹 Beach Club · ⛵ Yacht · 🏄 Surf · 🎞️ Riviera '60 · 🌊 Pool Party · 🤿 Underwater · 🎬 Shooting Editorial
-
-**Comandi:** `/start` · `/reset` · `/caption` · `/lastprompt` · `/settings` · `/info` · `/help`
-
----
-
-## C_filtro100.py — Filtro
-
-Applica filtri stilistici a foto. Supporta foto singola e mosaico fino a 9 foto.
-
-**Categorie:** Cinematografico · Glam & Shine · Decorativo · 3D & Synthetic · Street Art · Effetti temporali · Scale & Fantasy · Stile Artistico (Magritte, Dalì, De Chirico, Mondrian, Banksy — casuale)
-
-**Comandi:** `/start` · `/filtro` · `/caption` · `/mosaic` · `/lastprompt` · `/info` · `/help`
+### 🎲 Surprise
+| Comando | Funzione |
+|---------|---------|
+| `/start` | Avvia e sceglie formato (singolo / mosaico) |
+| `/help` | Lista comandi |
+| `/info` | Versione e stato API |
+| `/lastprompt` | Reinvia l'ultimo scenario generato |
+| `[bottoni]` | Flusso guidato: formato → auto/manuale → prompt |
 
 ---
 
-## C_surprise100.py — Surprise
+## Variabili d'ambiente Koyeb
 
-Genera scenari editoriali da pool fissi. Modalità automatica o manuale passo-passo (6 passi).
+| Variabile | Dove |
+|-----------|------|
+| `GOOGLE_API_KEY` | Ogni bot ha la sua chiave separata |
+| `ALLOWED_USERS` | `273003890` — tutti i bot |
+| `PORT` | `10000` — tutti i bot |
+| `TELEGRAM_TOKEN` | Vogue |
+| `TELEGRAM_TOKEN_ARCHITECT` | Architect |
+| `TELEGRAM_TOKEN_CLOSET` | Atelier |
+| `TELEGRAM_TOKEN_FX` | Filtro |
+| `TELEGRAM_TOKEN_SORPRESA` | Surprise |
 
-**Pool — 481 voci totali:**
-
-| Pool | Voci |
-|------|------|
-| Location | 197 |
-| Outfit | 100 |
-| Sky / Lighting | 41 |
-| Pose | 43 |
-| Mood | 50 |
-| Stile fotografico | 50 |
-
-**Comandi:** `/start` · `/lastprompt` · `/info` · `/help`
+> ⚠️ **Non scrivere mai chiavi API in file di testo nel repo.**
 
 ---
 
-## Identità Valeria Cross
+## Quota Gemini
 
-- **Viso:** maschile italiano 60 anni, barba argento 6-7 cm — obbligatoria
-- **Occhiali:** Vogue Havana ottagonali — sempre presenti
-- **Capelli:** taglio corto argento, nuca scoperta
-- **Corpo:** femminile hourglass, 180 cm, 85 kg, D-cup, pelle liscia
-- **Watermark:** `feat. Valeria Cross 👠` — corsivo champagne, bottom center
-- **Regola coesistenza:** barba maschile + corpo femminile coesistono obbligatoriamente
+- Modello: `gemini-3-flash-preview` (free tier)
+- 20 richieste/giorno per chiave — reset alle 08:00 ora Lisbona
+- 5 chiavi separate = **100 richieste/giorno totali**
 
 ---
 
 ## Infrastruttura
 
-- **Deploy:** Koyeb — un servizio per bot, branch `main`
-- **AI:** `gemini-3-flash-preview` — Google AI Studio, tier gratuito
-- **Generazione immagini:** Flow (Google Labs) + NanoBanana 2
-- **Health check:** `GET /` e `GET /health` su porta 10000
+- **Deploy:** Koyeb (un servizio per bot)
+- **Health check:** Flask su porta 10000 — endpoint `/` e `/health`
+- **Polling:** `infinity_polling` con gestione automatica errore 409 Conflict
+
+> ⚠️ **409 Conflict:** se un bot non riceve comandi, verificare su Koyeb che ci sia un solo deployment attivo per quel servizio. Stoppare tutti i deployment vecchi e lasciare solo l'ultimo.
 
 ---
 
-## Regole operative
+## File nel repo
 
-1. Mai modificare file senza conferma esplicita
-2. Ogni modifica = nuovo file con versione incrementata (es. `C_vogue100.py` → `C_vogue101.py`)
-3. Testare sempre prima di consegnare
-4. Mai produrre versioni multiple senza test intermedi
-5. Presentare sempre il file dopo averlo prodotto
+### Attivi
+```
+C_shared100.py
+C_vogue110.py
+C_architect110.py
+C_atelier110.py
+C_filtro110.py
+C_surprise110.py
+masterface.png
+requirements.txt
+README.md
+```
+
+### Da eliminare (obsoleti)
+```
+architect-902.py
+filtro-602.py
+shared.py
+surprise-508.py
+vogue-713.py
+```
+
+---
+
+## Convenzione versioni
+
+- `C_shared100.py` — nome fisso, versione interna scala (1.0.0, 1.0.1, ...)
+- Tutti gli altri bot — nome file rispecchia la versione: `C_vogue110.py` = v1.1.0
+- Ogni modifica incrementa la versione: 1.1.0 → 1.1.1 → 1.1.2 → 1.2.0 ...
+- **Mai due file con lo stesso numero di versione**
+
+---
+
+## masterface.png
+
+Usata da:
+- `C_atelier110.py` ✅
+- `C_filtro110.py` ✅
+
+Non usata da Vogue, Architect, Surprise.
