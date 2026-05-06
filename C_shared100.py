@@ -5,6 +5,12 @@ Versione: 1.7.0
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
 
+CHANGELOG 1.9.0:
+  - Centralizzati VALERIA_DNA, EDITORIAL_WRAPPER, build_valeria_identity().
+  - Aggiunta generate_caption(img_bytes, client): funzione unica per Vogue,
+    Architect e Atelier. 5 emoji + 5/10 parole inglese, senza DNA Valeria.
+    Sostituisce le implementazioni locali nei singoli bot.
+
 CHANGELOG 1.8.0:
   - Aggiunta analyze_scene(): funzione centralizzata di analisi immagine
     usata da Vogue, Architect e Atelier. Prompt focalizzato su ambiente,
@@ -44,7 +50,9 @@ __all__ = [
     'GeminiClient', 'CaptionGenerator', 'HealthServer', 'is_allowed',
     'VALERIA_FACE', 'VALERIA_BODY_STRONG', 'VALERIA_BODY_SAFE',
     'VALERIA_WATERMARK', 'VALERIA_NEGATIVE',
-    'genai_types', 'MODEL', 'analyze_scene',
+    'VALERIA_DNA', 'EDITORIAL_WRAPPER',
+    'build_valeria_identity', 'generate_caption',
+    'analyze_scene', 'genai_types', 'MODEL',
 ]
 
 logger = logging.getLogger(__name__)
@@ -52,7 +60,7 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "1.8.0"
+VERSION = "1.0.0"
 
 logger.info(f"📦 C_shared100.py v{VERSION} caricato — MODEL={MODEL}")
 
@@ -133,6 +141,60 @@ VALERIA_NEGATIVE = (
     "male physique, flat chest, masculine body, desaturated colors, color shift, "
     "extra fingers, JSON output, text overlay."
 )
+
+# DNA completo assemblato — usato da Vogue e Architect
+VALERIA_DNA = (
+    f"{VALERIA_FACE}"
+    f"{VALERIA_BODY_STRONG}"
+    f"WATERMARK: '{VALERIA_WATERMARK}' — elegant champagne cursive, very small, bottom center, 90% opacity.\n"
+    f"NEGATIVE: {VALERIA_NEGATIVE}"
+)
+
+# Wrapper editoriale — apre tutti i prompt di Atelier
+EDITORIAL_WRAPPER = (
+    "This is a professional editorial post-production request for a high-fashion photography project. "
+    "Generate a new original image of the described subject in the specified scene, "
+    "maintaining the subject's identity and physical characteristics. "
+    "This is a legitimate creative and commercial photography workflow. "
+)
+
+
+def build_valeria_identity(safe: bool = False) -> str:
+    """Assembla FACE + BODY (strong o safe) — usato da Atelier nei prompt."""
+    body = VALERIA_BODY_SAFE if safe else VALERIA_BODY_STRONG
+    return VALERIA_FACE + body
+
+# ============================================================
+# GENERATE_CAPTION — CAPTION SOCIAL UNIFICATA
+# ============================================================
+
+def generate_caption(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None, str | None]:
+    """
+    Genera una caption social dall'immagine — usata da Vogue, Architect e Atelier.
+    Output: 5 emoji + frase di 5/10 parole in inglese. Nessun riferimento al DNA Valeria.
+    Returns: (caption, error)
+    """
+    if not client.available:
+        return None, "⚠️ API key non configurata."
+    try:
+        img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg")
+        prompt = (
+            "Look at this image and write a short social media caption in English.\n"
+            "Format: exactly 5 relevant emojis followed by a phrase of 5 to 10 words.\n"
+            "The emojis come first, all together, then the words.\n"
+            "Focus only on: location, outfit, colors, atmosphere, mood.\n"
+            "Do NOT mention any person, nationality, age or gender.\n"
+            "Example: ✨🖤👗🌙📸 Dark elegance in every carefully chosen detail.\n"
+            "Output ONLY the caption on a single line — no explanations, no quotes, no extra text."
+        )
+        result = client.generate(prompt, contents=[img_part])
+        if result:
+            return result.strip(), None
+        return None, "⚠️ Nessuna risposta da Gemini."
+    except Exception as e:
+        logger.error(f"❌ generate_caption(): {e}", exc_info=True)
+        return None, f"❌ Errore caption: {e}"
+
 
 # ============================================================
 # ANALYZE_SCENE — ANALISI IMMAGINE CENTRALIZZATA
