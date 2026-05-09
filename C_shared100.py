@@ -200,7 +200,7 @@ def generate_caption(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | No
 # ANALYZE_SCENE — ANALISI IMMAGINE CENTRALIZZATA
 # ============================================================
 
-# 5 prompt progressivamente più neutri — usati in sequenza fino a ottenere risposta
+# 2 prompt progressivamente più neutri — usati in sequenza fino a ottenere risposta
 _ANALYZE_PROMPTS = [
     # Tentativo 1: completo e strutturato
     (
@@ -234,32 +234,13 @@ _ANALYZE_PROMPTS = [
         "MOOD: [Atmosphere.]\n\n"
         "Do NOT mention any person, body, face, skin, age or gender."
     ),
-    # Tentativo 3: solo oggetti
-    (
-        "List every clothing item and accessory visible in this image. "
-        "For each item describe: name, color (with HEX if possible), fabric, cut or style. "
-        "Then describe the background setting and lighting. "
-        "Do not mention any person, body part, face or skin."
-    ),
-    # Tentativo 4: minimalista
-    (
-        "What clothes and accessories are visible in this image? "
-        "Describe each item: color, fabric, style. "
-        "Also describe the background and lighting. "
-        "Focus only on objects — not on people."
-    ),
-    # Tentativo 5: ultrasemplice
-    (
-        "Describe the garments, accessories, background and lighting in this image. "
-        "Items only — no people, no bodies, no faces."
-    ),
 ]
 
 
 def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None, str | None]:
     """
     Analisi immagine centralizzata per Vogue, Architect e Atelier.
-    Tenta fino a 5 volte con prompt progressivamente più neutri.
+    Tenta fino a 2 volte con prompt progressivamente più neutri.
     Se tutti i tentativi falliscono, ritorna (None, error) — il bot si ferma
     senza generare alcun prompt.
 
@@ -273,16 +254,16 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
         img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg")
 
         for i, prompt in enumerate(_ANALYZE_PROMPTS, 1):
-            logger.info(f"🔍 analyze_scene: tentativo {i}/5")
+            logger.info(f"🔍 analyze_scene: tentativo {i}/2")
             result = client.generate(prompt, contents=[img_part])
             if result:
                 logger.info(f"✅ analyze_scene: completato al tentativo {i} ({len(result)} chars)")
                 return result, None
             logger.warning(f"⚠️ analyze_scene: tentativo {i} vuoto — riprovo")
 
-        logger.error("❌ analyze_scene: tutti i 5 tentativi falliti")
+        logger.error("❌ analyze_scene: tutti i 2 tentativi falliti")
         return None, (
-            "⚠️ Impossibile analizzare l'immagine dopo 5 tentativi.\n"
+            "⚠️ Impossibile analizzare l'immagine dopo 2 tentativi.\n"
             "Gemini ha bloccato l'analisi. Nessun prompt generato."
         )
 
