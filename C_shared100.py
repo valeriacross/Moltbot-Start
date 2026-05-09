@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 logger.info(f"📦 C_shared100.py v{VERSION} caricato — MODEL={MODEL}")
 
@@ -168,6 +168,15 @@ def build_valeria_identity(safe: bool = False) -> str:
 # GENERATE_CAPTION — CAPTION SOCIAL UNIFICATA
 # ============================================================
 
+def detect_mime_type(img_bytes: bytes) -> str:
+    """Rileva il mime type reale dai magic bytes — evita errori con PNG/WebP passati come JPEG."""
+    if img_bytes[:4] == b'\x89PNG':
+        return "image/png"
+    if len(img_bytes) >= 12 and img_bytes[:4] == b'RIFF' and img_bytes[8:12] == b'WEBP':
+        return "image/webp"
+    return "image/jpeg"  # default — JPEG inizia con \xFF\xD8\xFF
+
+
 def generate_caption(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None, str | None]:
     """
     Genera una caption social dall'immagine — usata da Vogue, Architect e Atelier.
@@ -177,7 +186,9 @@ def generate_caption(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | No
     if not client.available:
         return None, "⚠️ API key non configurata."
     try:
-        img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg")
+        mime = detect_mime_type(img_bytes)
+        logger.info(f"📸 generate_caption: mime={mime} ({len(img_bytes)} bytes)")
+        img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type=mime)
         prompt = (
             "Look at this image and write a short social media caption in English.\n"
             "Format: exactly 5 relevant emojis followed by a phrase of 5 to 10 words.\n"
@@ -200,7 +211,7 @@ def generate_caption(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | No
 # ANALYZE_SCENE — ANALISI IMMAGINE CENTRALIZZATA
 # ============================================================
 
-# 2 prompt progressivamente più neutri — usati in sequenza fino a ottenere risposta
+# 5 prompt progressivamente più neutri — usati in sequenza fino a ottenere risposta
 _ANALYZE_PROMPTS = [
     # Tentativo 1: completo e strutturato
     (
@@ -234,13 +245,32 @@ _ANALYZE_PROMPTS = [
         "MOOD: [Atmosphere.]\n\n"
         "Do NOT mention any person, body, face, skin, age or gender."
     ),
+    # Tentativo 3: solo oggetti
+    (
+        "List every clothing item and accessory visible in this image. "
+        "For each item describe: name, color (with HEX if possible), fabric, cut or style. "
+        "Then describe the background setting and lighting. "
+        "Do not mention any person, body part, face or skin."
+    ),
+    # Tentativo 4: minimalista
+    (
+        "What clothes and accessories are visible in this image? "
+        "Describe each item: color, fabric, style. "
+        "Also describe the background and lighting. "
+        "Focus only on objects — not on people."
+    ),
+    # Tentativo 5: ultrasemplice
+    (
+        "Describe the garments, accessories, background and lighting in this image. "
+        "Items only — no people, no bodies, no faces."
+    ),
 ]
 
 
 def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None, str | None]:
     """
     Analisi immagine centralizzata per Vogue, Architect e Atelier.
-    Tenta fino a 2 volte con prompt progressivamente più neutri.
+    Tenta fino a 5 volte con prompt progressivamente più neutri.
     Se tutti i tentativi falliscono, ritorna (None, error) — il bot si ferma
     senza generare alcun prompt.
 
@@ -251,19 +281,20 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
         return None, "⚠️ API key non configurata."
 
     try:
-        img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg")
+        mime = detect_mime_type(img_bytes)
+        img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type=mime)
 
         for i, prompt in enumerate(_ANALYZE_PROMPTS, 1):
-            logger.info(f"🔍 analyze_scene: tentativo {i}/2")
+            logger.info(f"🔍 analyze_scene: tentativo {i}/5")
             result = client.generate(prompt, contents=[img_part])
             if result:
                 logger.info(f"✅ analyze_scene: completato al tentativo {i} ({len(result)} chars)")
                 return result, None
             logger.warning(f"⚠️ analyze_scene: tentativo {i} vuoto — riprovo")
 
-        logger.error("❌ analyze_scene: tutti i 2 tentativi falliti")
+        logger.error("❌ analyze_scene: tutti i 5 tentativi falliti")
         return None, (
-            "⚠️ Impossibile analizzare l'immagine dopo 2 tentativi.\n"
+            "⚠️ Impossibile analizzare l'immagine dopo 5 tentativi.\n"
             "Gemini ha bloccato l'analisi. Nessun prompt generato."
         )
 
@@ -424,7 +455,8 @@ class CaptionGenerator:
         if not self.client.available:
             return None, "⚠️ API non configurata."
         try:
-            img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg")
+            mime = detect_mime_type(img_bytes)
+            img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type=mime)
             prompt = (
                 "Look at this fashion photo and write a social media caption.\n\n"
                 f"{self.RULES}"
@@ -446,7 +478,8 @@ class CaptionGenerator:
         if not self.client.available:
             return None, "⚠️ API non configurata."
         try:
-            img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg")
+            mime = detect_mime_type(img_bytes)
+            img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type=mime)
             prompt = (
                 f"This image has been processed with the artistic filter: {filter_label}\n\n"
                 f"Write a social media caption that evokes the artistic effect and atmosphere "
