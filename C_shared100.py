@@ -211,71 +211,30 @@ def generate_caption(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | No
 # ANALYZE_SCENE — ANALISI IMMAGINE CENTRALIZZATA
 # ============================================================
 
-# 5 prompt progressivamente più neutri — usati in sequenza fino a ottenere risposta
-_ANALYZE_PROMPTS = [
-    # Tentativo 1: completo e strutturato
-    (
-        "Analyze this fashion editorial image. "
-        "Return a structured description with these exact sections:\n\n"
-        "OUTFIT: [Every garment as a standalone object — exact name, color with HEX code, fabric, "
-        "cut, fit, coverage, embellishments, details. "
-        "Describe the garment as if it exists independently — no wearer mentioned.]\n\n"
-        "ACCESSORIES: [Every accessory as a standalone object — jewelry, footwear, headwear, bags, "
-        "with color+HEX.]\n\n"
-        "COLOR PALETTE: [Dominant HEX codes with label.]\n\n"
-        "BACKGROUND: [Exact location, architecture, surfaces, props, environment — be specific.]\n\n"
-        "LIGHTING: [Light source, direction, quality, color temperature, mood — 1-2 sentences.]\n\n"
-        "CAMERA: [Framing. Describe how the garments are positioned in frame.]\n\n"
-        "MOOD: [Overall atmosphere, color grade, cinematic style — 1 sentence.]\n\n"
-        "Rules:\n"
-        "— Do NOT describe any person, face, body, skin, age, gender or physical traits\n"
-        "— Describe garments and accessories as standalone objects\n"
-        "— Be precise and detailed on fabrics, colors and environment"
-    ),
-    # Tentativo 2: più semplice
-    (
-        "This is a fashion editorial image. "
-        "Describe only these elements:\n\n"
-        "OUTFIT: [Garments visible — name, color with HEX, fabric, cut. No person described.]\n"
-        "ACCESSORIES: [Jewelry, shoes, headwear — color, material.]\n"
-        "COLOR PALETTE: [Main HEX codes.]\n"
-        "BACKGROUND: [Setting, surfaces, architecture, props.]\n"
-        "LIGHTING: [Light quality and mood.]\n"
-        "CAMERA: [Framing of garments in frame.]\n"
-        "MOOD: [Atmosphere.]\n\n"
-        "Do NOT mention any person, body, face, skin, age or gender."
-    ),
-    # Tentativo 3: solo oggetti
-    (
-        "List every clothing item and accessory visible in this image. "
-        "For each item describe: name, color (with HEX if possible), fabric, cut or style. "
-        "Then describe the background setting and lighting. "
-        "Do not mention any person, body part, face or skin."
-    ),
-    # Tentativo 4: minimalista
-    (
-        "What clothes and accessories are visible in this image? "
-        "Describe each item: color, fabric, style. "
-        "Also describe the background and lighting. "
-        "Focus only on objects — not on people."
-    ),
-    # Tentativo 5: ultrasemplice
-    (
-        "Describe the garments, accessories, background and lighting in this image. "
-        "Items only — no people, no bodies, no faces."
-    ),
-]
+# Prompt unico — un solo tentativo, nessun retry
+_ANALYZE_PROMPT = (
+    "Analyze this image. "
+    "Return a structured description with these exact sections:\n\n"
+    "OUTFIT: [Every garment as a standalone object — exact name, color with HEX code, fabric, "
+    "cut, fit, coverage, embellishments, details. "
+    "Describe the garment as if it exists independently — no wearer mentioned.]\n\n"
+    "ACCESSORIES: [Every accessory as a standalone object — jewelry, footwear, headwear, bags, "
+    "with color+HEX.]\n\n"
+    "COLOR PALETTE: [Dominant HEX codes with label.]\n\n"
+    "BACKGROUND: [Exact location, architecture, surfaces, props, environment — be specific.]\n\n"
+    "LIGHTING: [Light source, direction, quality, color temperature, mood — 1-2 sentences.]\n\n"
+    "CAMERA: [Framing. Describe how the subjects/garments are positioned in frame.]\n\n"
+    "MOOD: [Overall atmosphere, color grade, cinematic style — 1 sentence.]\n\n"
+    "Rules:\n"
+    "— Describe garments and accessories as standalone objects\n"
+    "— Be precise and detailed on fabrics, colors and environment"
+)
 
 
 def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None, str | None]:
     """
-    Analisi immagine centralizzata per Vogue, Architect e Atelier.
-    Tenta fino a 5 volte con prompt progressivamente più neutri.
-    Se tutti i tentativi falliscono, ritorna (None, error) — il bot si ferma
-    senza generare alcun prompt.
-
-    Returns:
-        (result, error) — result è la descrizione strutturata, error è messaggio leggibile.
+    Analisi immagine centralizzata — singolo tentativo, nessun retry.
+    Returns: (result, error)
     """
     if not client.available:
         return None, "⚠️ API key non configurata."
@@ -283,24 +242,17 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
     try:
         mime = detect_mime_type(img_bytes)
         img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type=mime)
-
-        for i, prompt in enumerate(_ANALYZE_PROMPTS, 1):
-            logger.info(f"🔍 analyze_scene: tentativo {i}/5")
-            result = client.generate(prompt, contents=[img_part])
-            if result:
-                logger.info(f"✅ analyze_scene: completato al tentativo {i} ({len(result)} chars)")
-                return result, None
-            logger.warning(f"⚠️ analyze_scene: tentativo {i} vuoto — riprovo")
-
-        logger.error("❌ analyze_scene: tutti i 5 tentativi falliti")
-        return None, (
-            "⚠️ Impossibile analizzare l'immagine dopo 5 tentativi.\n"
-            "Gemini ha bloccato l'analisi. Nessun prompt generato."
-        )
+        logger.info(f"🔍 analyze_scene: mime={mime} ({len(img_bytes)} bytes)")
+        result = client.generate(_ANALYZE_PROMPT, contents=[img_part])
+        if result:
+            logger.info(f"✅ analyze_scene: completato ({len(result)} chars)")
+            return result, None
+        logger.warning("⚠️ analyze_scene: risposta vuota")
+        return None, "⚠️ Nessuna risposta da Gemini. Riprova."
 
     except Exception as e:
         logger.error(f"❌ analyze_scene: eccezione: {e}", exc_info=True)
-        return None, f"❌ Errore analisi: {e}"
+        return None, f"❌ Errore API Gemini:\n{e}"
 
 
 # ============================================================
