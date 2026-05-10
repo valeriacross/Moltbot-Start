@@ -61,8 +61,8 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "1.1.0"
-SHARED_VERSION = "1.1.0"   # aggiornare ad ogni modifica
+VERSION = "1.2.0"
+SHARED_VERSION = "1.2.0"   # aggiornare ad ogni modifica
 SHARED_DATE    = "10/05/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -204,10 +204,18 @@ def generate_caption(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | No
         result = client.generate(prompt, contents=[img_part])
         if result:
             return result.strip(), None
-        return None, "⚠️ Nessuna risposta da Gemini."
+        return None, "⚠️ Nessuna risposta da Gemini (causa sconosciuta)."
     except Exception as e:
-        logger.error(f"❌ generate_caption(): {e}", exc_info=True)
-        return None, f"❌ Errore caption: {e}"
+        err_text = str(e)
+        logger.error(f"❌ generate_caption(): {err_text}", exc_info=True)
+        if "429" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower():
+            return None, "❌ <b>Quota API esaurita.</b> Reset alle 08:00 ora Lisbona."
+        elif "SAFETY" in err_text:
+            return None, "❌ <b>Safety block di Gemini.</b> Prova con un'immagine diversa."
+        elif "timeout" in err_text.lower() or "deadline" in err_text.lower():
+            return None, "❌ <b>Timeout Gemini.</b> Riprova tra qualche secondo."
+        else:
+            return None, f"❌ <b>Errore caption:</b>\n<code>{err_text}</code>"
 
 
 # ============================================================
@@ -250,12 +258,38 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
         if result:
             logger.info(f"✅ analyze_scene: completato ({len(result)} chars)")
             return result, None
-        logger.warning("⚠️ analyze_scene: risposta vuota")
-        return None, "⚠️ Nessuna risposta da Gemini. Riprova."
+        # Non dovrebbe mai arrivare qui — generate() ora rilancia invece di ritornare None
+        return None, "⚠️ Nessuna risposta da Gemini (causa sconosciuta)."
 
     except Exception as e:
-        logger.error(f"❌ analyze_scene: eccezione: {e}", exc_info=True)
-        return None, f"❌ Errore API Gemini:\n{e}"
+        err_text = str(e)
+        logger.error(f"❌ analyze_scene: {err_text}")
+        # Classifica l'errore per un messaggio utente chiaro
+        if "429" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower():
+            friendly = (
+                "❌ <b>Quota API esaurita.</b>\n"
+                "Le 20 richieste giornaliere di questa chiave sono finite.\n"
+                "Reset alle 08:00 ora Lisbona."
+            )
+        elif "SAFETY" in err_text:
+            friendly = (
+                "❌ <b>Safety block di Gemini.</b>\n"
+                "Gemini ha rifiutato l'analisi di questa immagine.\n"
+                "Prova con un'immagine diversa."
+            )
+        elif "API key" in err_text or "API_KEY" in err_text or "credentials" in err_text.lower():
+            friendly = (
+                "❌ <b>Errore chiave API.</b>\n"
+                "La chiave Google non è valida o non è configurata correttamente."
+            )
+        elif "timeout" in err_text.lower() or "deadline" in err_text.lower():
+            friendly = (
+                "❌ <b>Timeout Gemini.</b>\n"
+                "La risposta ha impiegato troppo tempo. Riprova tra qualche secondo."
+            )
+        else:
+            friendly = f"❌ <b>Errore API Gemini:</b>\n<code>{err_text}</code>"
+        return None, friendly
 
 
 # ============================================================
@@ -339,10 +373,30 @@ class GeminiClient:
                     max_output_tokens=3000,
                 )
             )
-            return response.text.strip() if response.text else None
+            if response.text:
+                return response.text.strip()
+            # Risposta vuota — estrai il motivo reale da finish_reason
+            reason = "sconosciuto"
+            try:
+                candidate = response.candidates[0] if response.candidates else None
+                if candidate:
+                    fr = str(candidate.finish_reason)
+                    if "SAFETY" in fr:
+                        reason = "SAFETY BLOCK — Gemini ha rifiutato il contenuto (finish_reason: SAFETY)"
+                    elif "RECITATION" in fr:
+                        reason = "RECITATION — Gemini ha bloccato per potenziale riproduzione di contenuto protetto"
+                    elif "MAX_TOKENS" in fr:
+                        reason = "MAX_TOKENS — risposta troncata, output troppo lungo"
+                    elif "STOP" in fr:
+                        reason = "STOP — risposta terminata normalmente ma testo vuoto"
+                    else:
+                        reason = f"finish_reason: {fr}"
+            except Exception as fe:
+                reason = f"impossibile leggere finish_reason: {fe}"
+            raise RuntimeError(f"Gemini ha risposto senza testo — {reason}")
         except Exception as e:
             logger.error(f"❌ GeminiClient.generate(): {e}", exc_info=True)
-            return None
+            raise
 
 
 # ============================================================
