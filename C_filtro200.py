@@ -27,6 +27,7 @@ server  = HealthServer("Filtro", VERSION)
 # --- STATO UTENTE ---
 user_filter   = defaultdict(lambda: None)   # filtro selezionato
 user_category = defaultdict(lambda: None)   # categoria selezionata
+user_artist   = {}                          # {uid: str} — artista selezionato per artistic_style
 pending       = {}                          # {uid: {'img': bytes, 'filter_key': str}}
 last_img      = {}                          # {uid: bytes} — ultima immagine usata
 last_prompt   = {}                          # {uid: str} — ultimo prompt inviato all'API
