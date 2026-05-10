@@ -53,6 +53,7 @@ __all__ = [
     'VALERIA_DNA', 'EDITORIAL_WRAPPER',
     'build_valeria_identity', 'generate_caption',
     'analyze_scene', 'genai_types', 'MODEL',
+    'SHARED_VERSION', 'SHARED_DATE',
 ]
 
 logger = logging.getLogger(__name__)
@@ -60,9 +61,11 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "1.0.2"
+VERSION = "1.1.0"
+SHARED_VERSION = "1.1.0"   # aggiornare ad ogni modifica
+SHARED_DATE    = "10/05/2026"  # aggiornare ad ogni modifica
 
-logger.info(f"📦 C_shared100.py v{VERSION} caricato — MODEL={MODEL}")
+logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
 # ============================================================
 # WHITELIST — SICUREZZA
