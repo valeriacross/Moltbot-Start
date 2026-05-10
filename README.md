@@ -8,13 +8,12 @@ Ecosistema di bot Telegram per il personaggio **Valeria Cross AI** — alter ego
 
 | File | Versione | Koyeb service | Run command |
 |------|---------|---------------|-------------|
-| `C_shared100.py` | 1.1.0 | (comune a tutti) | — |
+| `C_shared100.py` | 1.2.0 | (comune a tutti) | — |
 | `C_vogue120.py` | 1.2.0 | colossal-giselle/vogue | `python C_vogue120.py` |
-| `C_architect121.py` | 1.2.1 | homely-annabelle/thearchitect | `python C_architect121.py` |
-| `C_atelier121.py` | 1.2.1 | flexible-denna/atelier | `python C_atelier121.py` |
-| `C_filtro127.py` | 1.2.7 | screeching-jobina/filtro | `python C_filtro127.py` |
-| `C_surprise112.py` | 1.1.2 | near-damara/sorpresa | `python C_surprise112.py` |
-| `C_nosurprise105.py` | 1.0.5 | (deploy separato) | `python C_nosurprise105.py` |
+| `C_architect130.py` | 1.3.0 | homely-annabelle/thearchitect | `python C_architect130.py` |
+| `C_atelier123.py` | 1.2.3 | flexible-denna/atelier | `python C_atelier123.py` |
+| `C_filtro129.py` | 1.2.9 | screeching-jobina/filtro | `python C_filtro129.py` |
+| `C_nosurprise105.py` | 1.0.5 | near-damara/sorpresa | `python C_nosurprise105.py` |
 
 ---
 
@@ -22,21 +21,22 @@ Ecosistema di bot Telegram per il personaggio **Valeria Cross AI** — alter ego
 
 Tutti i bot importano da `C_shared100.py` che centralizza:
 
-- `GeminiClient` — Singleton Gemini API con BLOCK_NONE su tutti i safety settings
+- `GeminiClient` — Singleton Gemini API con BLOCK_NONE. Rilancia eccezioni con `finish_reason` reale.
 - `HealthServer` — Flask health check su porta 10000
 - `is_allowed()` — whitelist utenti via env `ALLOWED_USERS`
-- `detect_mime_type()` — rileva JPEG/PNG/WebP dai magic bytes (usata ovunque)
-- `analyze_scene()` — singolo tentativo, prompt neutro, restituisce errore reale API
+- `detect_mime_type()` — rileva JPEG/PNG/WebP dai magic bytes
+- `analyze_scene()` — singolo tentativo, classifica errori: quota / safety / timeout / generico
 - `generate_caption()` — 5 emoji + 5/10 parole EN
-- `CaptionGenerator` — caption da scenario/filtro (Surprise, Nosurprise, Filtro)
+- `CaptionGenerator` — caption da scenario/filtro (Nosurprise, Filtro)
 - `VALERIA_DNA`, `EDITORIAL_WRAPPER`, `build_valeria_identity()` — identità Valeria
-- `SHARED_VERSION`, `SHARED_DATE` — versione shared verificabile via `/shared`
+- `SHARED_VERSION`, `SHARED_DATE` — verificabili via `/shared`
 
 ### Regole architetturali
 
-- **Tutti i bot generano SOLO prompt testuali per Flow. Nessun bot genera immagini direttamente.**
-- **Flow usa SOLO `masterface.png` come riferimento. Le immagini inviate ai bot NON vengono mai allegate a Flow.**
+- **Tutti i bot generano SOLO prompt testuali per Flow. Nessun bot genera immagini.**
+- **Flow usa le proprie immagini di riferimento. `masterface.png` rimossa dal repo e dal codice.**
 - L'outfit viene estratto tramite `analyze_scene()` e inserito nel prompt come testo.
+- I filtri di Filtro si applicano al soggetto dell'immagine — NON iniettano DNA Valeria.
 
 ---
 
@@ -61,13 +61,17 @@ Tutti i bot importano da `C_shared100.py` che centralizza:
 | `[foto]` | Analizza scena → prompt Flow-ready → caption automatica |
 | `[testo]` | Genera prompt da descrizione testuale |
 
+Pulsanti post-prompt: 📸 Nuova foto | 🏠 Home
+
 ### 📐 Architect
 | Comando | Funzione |
 |---------|---------|
 | `/reset` | Resetta sessione |
 | `/lastprompt` | Reinvia ultimo prompt |
-| `[foto]` | Genera Master Prompt certificato → caption automatica |
-| `[testo]` | Genera prompt da descrizione |
+| `[Testo]` | sanitize → generate → review → send |
+| `[Foto]` | analyze + generate → review → send → caption |
+
+Pulsanti post-prompt: 📸 Nuova foto | ✏️ Nuovo testo
 
 ### ✦ Atelier
 | Comando | Funzione |
@@ -83,15 +87,22 @@ Tutti i bot importano da `C_shared100.py` che centralizza:
 | `/filtro` `/filter` | Selezione filtro artistico |
 | `/lastprompt` | Reinvia ultimo prompt |
 | `/caption` | Genera caption da foto |
-| `[foto]` | Analizza soggetto → applica filtro → prompt Flow-ready → caption automatica |
+| `[foto]` | Analizza → applica filtro → prompt → caption |
 
-### 🎲 Surprise
-| Comando | Funzione |
-|---------|---------|
-| `/start` | Avvia: formato → auto/manuale → prompt → caption |
+**Filtri disponibili (30):**
+
+*Stilistici:* Cinematic High-Angle, Dramatic Low-Angle, Glossy Opal, Iridescent, Galaxy Couture, Arabesque, Dissolvence, Ghost Temporal, Long Exposure
+
+*Fantasy & Art:* Stained Glass, Underwater Gold, 3D Synthetic, Graffiti Artist, Cloud Sculpture, Stile Artistico, LEGO
+
+*Scenografici:* Giantess NYC, Action Figure, Art Doll Exhibition, Toy Store Window, Selfie Stick POV
+
+*Collage:* New Pose, Triple Set, Pastel Clones, Collage 2×2, Photobooth 4×4, Full Body 3×3, 🌟 Y2K Pop Collage
+
+*Altri:* Triptych GHI, Pet Mosaic 4×4, Mirror Selfie
 
 ### 📍 Nosurprise
-Come Surprise ma con foto opzionale come location. La foto viene analizzata e la location estratta sostituisce quella dalla pool. In manuale il primo step (location) viene saltato.
+`/start` → "Hai una foto?" Sì/No → formato → Auto/Manuale → prompt → caption
 
 ---
 
@@ -106,7 +117,7 @@ Come Surprise ma con foto opzionale come location. La foto viene analizzata e la
 | `TELEGRAM_TOKEN_ARCHITECT` | Architect |
 | `TELEGRAM_TOKEN_CLOSET` | Atelier |
 | `TELEGRAM_TOKEN_FX` | Filtro |
-| `TELEGRAM_TOKEN_SORPRESA` | Surprise / Nosurprise |
+| `TELEGRAM_TOKEN_SORPRESA` | Nosurprise |
 
 > ⚠️ **Non scrivere mai chiavi API in file di testo nel repo.**
 
@@ -117,7 +128,7 @@ Come Surprise ma con foto opzionale come location. La foto viene analizzata e la
 - Modello: `gemini-3-flash-preview` (free tier)
 - 20 richieste/giorno per chiave — reset alle 08:00 ora Lisbona
 - 5 chiavi separate = **100 richieste/giorno totali**
-- `analyze_scene()` usa un singolo tentativo — nessuno spreco di quota su fallimento
+- `analyze_scene()` usa singolo tentativo — nessuno spreco su fallimento
 
 ---
 
@@ -127,13 +138,12 @@ Come Surprise ma con foto opzionale come location. La foto viene analizzata e la
 - **Health check:** Flask su porta 10000
 - **Polling:** `infinity_polling` con gestione 409 Conflict (`sleep(15)`) e altri errori (`sleep(5)`)
 
-> ⚠️ **409 Conflict:** su Koyeb → servizio → Deployments → stoppare tutti i deployment vecchi, lasciare solo l'ultimo.
+> ⚠️ **409 Conflict:** Koyeb → servizio → Deployments → stoppare deployment vecchi.
 
 ---
 
 ## Aggiornare C_shared100.py
 
-Ogni modifica a shared richiede:
 1. Aggiornare `SHARED_VERSION` e `SHARED_DATE` nel file
 2. Push su GitHub
 3. Koyeb redeploy di **tutti** i bot
@@ -142,16 +152,13 @@ Ogni modifica a shared richiede:
 
 ## File nel repo
 
-### Attivi
 ```
 C_shared100.py
 C_vogue120.py
-C_architect121.py
-C_atelier121.py
-C_filtro127.py
-C_surprise112.py
+C_architect130.py
+C_atelier123.py
+C_filtro129.py
 C_nosurprise105.py
-masterface.png
 requirements.txt
 README.md
 ```
@@ -169,13 +176,7 @@ vogue-713.py
 
 ## Convenzione versioni
 
-- `C_shared100.py` — nome fisso, versione interna scala (1.0.0 → 1.1.0 → ...)
-- Tutti gli altri bot — nome file rispecchia la versione: `C_vogue120.py` = v1.2.0
+- `C_shared100.py` — nome fisso, versione interna scala
+- Tutti gli altri bot — nome file rispecchia la versione: `C_architect130.py` = v1.3.0
 - Ogni modifica incrementa versione e nome file
 - **Mai due file con lo stesso numero di versione**
-
----
-
-## masterface.png
-
-Usata da `C_atelier121.py` e `C_filtro127.py`. Non usata da Vogue, Architect, Surprise, Nosurprise.
