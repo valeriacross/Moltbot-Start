@@ -9,10 +9,10 @@ Ecosistema di bot Telegram per il personaggio **Valeria Cross AI** — alter ego
 | File | Versione | Koyeb service | Run command |
 |------|---------|---------------|-------------|
 | `C_shared100.py` | 1.2.0 | (comune a tutti) | — |
-| `C_vogue120.py` | 1.2.0 | colossal-giselle/vogue | `python C_vogue120.py` |
+| `C_vogue121.py` | 1.2.1 | colossal-giselle/vogue | `python C_vogue121.py` |
 | `C_architect130.py` | 1.3.0 | homely-annabelle/thearchitect | `python C_architect130.py` |
-| `C_atelier123.py` | 1.2.3 | flexible-denna/atelier | `python C_atelier123.py` |
-| `C_filtro129.py` | 1.2.9 | screeching-jobina/filtro | `python C_filtro129.py` |
+| `C_atelier124.py` | 1.2.4 | flexible-denna/atelier | `python C_atelier124.py` |
+| `C_filtro204.py` | 2.0.4 | screeching-jobina/filtro | `python C_filtro204.py` |
 | `C_nosurprise105.py` | 1.0.5 | near-damara/sorpresa | `python C_nosurprise105.py` |
 
 ---
@@ -22,7 +22,7 @@ Ecosistema di bot Telegram per il personaggio **Valeria Cross AI** — alter ego
 Tutti i bot importano da `C_shared100.py` che centralizza:
 
 - `GeminiClient` — Singleton Gemini API con BLOCK_NONE. Rilancia eccezioni con `finish_reason` reale.
-- `HealthServer` — Flask health check su porta 10000
+- `HealthServer` — Flask health check su porta 10000 (necessario per Koyeb)
 - `is_allowed()` — whitelist utenti via env `ALLOWED_USERS`
 - `detect_mime_type()` — rileva JPEG/PNG/WebP dai magic bytes
 - `analyze_scene()` — singolo tentativo, classifica errori: quota / safety / timeout / generico
@@ -87,19 +87,30 @@ Pulsanti post-prompt: 📸 Nuova foto | ✏️ Nuovo testo
 | `/filtro` `/filter` | Selezione filtro artistico |
 | `/lastprompt` | Reinvia ultimo prompt |
 | `/caption` | Genera caption da foto |
-| `[foto]` | Analizza → applica filtro → prompt → caption |
+| `[foto]` | Analizza → applica filtro → prompt → reminder → caption |
 
-**Filtri disponibili (30):**
+**Filtri disponibili — 7 categorie:**
 
 *Stilistici:* Cinematic High-Angle, Dramatic Low-Angle, Glossy Opal, Iridescent, Galaxy Couture, Arabesque, Dissolvence, Ghost Temporal, Long Exposure
 
-*Fantasy & Art:* Stained Glass, Underwater Gold, 3D Synthetic, Graffiti Artist, Cloud Sculpture, Stile Artistico, LEGO
+*Fantasy & Art:* Stained Glass, Underwater Gold, 3D Synthetic, Graffiti Artist, Cloud Sculpture, LEGO
 
 *Scenografici:* Giantess NYC, Action Figure, Art Doll Exhibition, Toy Store Window, Selfie Stick POV
 
-*Collage:* New Pose, Triple Set, Pastel Clones, Collage 2×2, Photobooth 4×4, Full Body 3×3, 🌟 Y2K Pop Collage
+*Collage:* New Pose, Triple Set, Pastel Clones, Collage 2×2, Photobooth 4×4, Full Body 3×3, 🌟 Y2K Pop Collage (pool 20 pose random)
 
-*Altri:* Triptych GHI, Pet Mosaic 4×4, Mirror Selfie
+*Mosaic:* Pet Mosaic 4×4, Mirror Selfie, Triptych GHI
+
+*🎨 Stile Artistico (menu a 2 livelli — 20 artisti):*
+- Rinascimento & Classici: Leonardo, Raffaello, Michelangelo, Caravaggio
+- Impressionismo & Post: Renoir, Van Gogh, Matisse, Chagall
+- Modernismo & Astratto: Klimt, Mirò, Mondrian, Picasso
+- Surrealismo: Magritte, Dalì, De Chirico
+- Contemporaneo & Pop: Banksy, Lichtenstein, Mucha, Hopper, Basquiat
+
+*Altri:* (vari)
+
+> ⚠️ Dopo ogni prompt Filtro: reminder per caricare l'immagine di riferimento su Flow.
 
 ### 📍 Nosurprise
 `/start` → "Hai una foto?" Sì/No → formato → Auto/Manuale → prompt → caption
@@ -135,7 +146,7 @@ Pulsanti post-prompt: 📸 Nuova foto | ✏️ Nuovo testo
 ## Infrastruttura
 
 - **Deploy:** Koyeb (un servizio per bot)
-- **Health check:** Flask su porta 10000
+- **Health check:** Flask su porta 10000 — necessario per Koyeb
 - **Polling:** `infinity_polling` con gestione 409 Conflict (`sleep(15)`) e altri errori (`sleep(5)`)
 
 > ⚠️ **409 Conflict:** Koyeb → servizio → Deployments → stoppare deployment vecchi.
@@ -148,16 +159,23 @@ Pulsanti post-prompt: 📸 Nuova foto | ✏️ Nuovo testo
 2. Push su GitHub
 3. Koyeb redeploy di **tutti** i bot
 
+## Procedura update completa
+
+Ad ogni sessione di modifiche aggiornare:
+1. HANDOFF
+2. README.md
+3. VERSIONI_BOT Excel (CODICE + VERS. CODICE manualmente)
+
 ---
 
 ## File nel repo
 
 ```
 C_shared100.py
-C_vogue120.py
+C_vogue121.py
 C_architect130.py
-C_atelier123.py
-C_filtro129.py
+C_atelier124.py
+C_filtro204.py
 C_nosurprise105.py
 requirements.txt
 README.md
@@ -177,6 +195,6 @@ vogue-713.py
 ## Convenzione versioni
 
 - `C_shared100.py` — nome fisso, versione interna scala
-- Tutti gli altri bot — nome file rispecchia la versione: `C_architect130.py` = v1.3.0
+- Tutti gli altri bot — nome file rispecchia la versione: `C_filtro204.py` = v2.0.4
 - Ogni modifica incrementa versione e nome file
 - **Mai due file con lo stesso numero di versione**
