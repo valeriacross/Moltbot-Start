@@ -1,44 +1,38 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 1.7.0
+Versione: 1.3.0
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
 
-CHANGELOG 1.9.0:
+CHANGELOG 1.3.0 (11/05/2026):
+  - CaptionGenerator.extract_caption(): filtro post-generazione che estrae
+    la caption finale dal testo di Gemini, ignorando il ragionamento interno.
+    Applicato in from_scenario(), from_image(), from_filter() e generate_caption().
+
+CHANGELOG 1.2.0 (10/05/2026):
+  - GeminiClient.generate(): ispeziona finish_reason quando response.text è vuoto,
+    rilancia eccezione con motivo reale invece di return None silenzioso.
+  - analyze_scene(): classifica eccezioni e ritorna messaggi espliciti
+    (429/quota, SAFETY block, timeout, generico).
+  - generate_caption(): stessa classificazione errori.
+
+CHANGELOG 1.1.0 (10/05/2026):
+  - detect_mime_type(): rileva JPEG/PNG/WebP dai magic bytes.
+    Usata in analyze_scene(), generate_caption() e CaptionGenerator — nessun mime_type hardcoded.
+  - SHARED_VERSION e SHARED_DATE esportate — verificabili via /shared su tutti i bot.
+
+CHANGELOG 1.0.2 (09/05/2026):
+  - _ANALYZE_PROMPTS (5 tentativi) → _ANALYZE_PROMPT singolo, nessun retry.
+  - analyze_scene(): singolo tentativo, espone errore reale.
+  - GeminiClient.generate(): rilancia eccezioni invece di return None.
+
+CHANGELOG 1.0.1 (09/05/2026):
+  - GeminiClient.generate(): safety_settings BLOCK_NONE su tutte le categorie.
+  - Aggiunta analyze_scene() centralizzata.
+  - Aggiunta generate_caption() centralizzata.
+  - Aggiunta CaptionGenerator con from_scenario(), from_image(), from_filter().
   - Centralizzati VALERIA_DNA, EDITORIAL_WRAPPER, build_valeria_identity().
-  - Aggiunta generate_caption(img_bytes, client): funzione unica per Vogue,
-    Architect e Atelier. 5 emoji + 5/10 parole inglese, senza DNA Valeria.
-    Sostituisce le implementazioni locali nei singoli bot.
-
-CHANGELOG 1.8.0:
-  - Aggiunta analyze_scene(): funzione centralizzata di analisi immagine
-    usata da Vogue, Architect e Atelier. Prompt focalizzato su ambiente,
-    indumenti e accessori — zero menzione di persona/corpo/viso.
-    Fallback automatico con prompt neutro se il primo viene bloccato.
-
-CHANGELOG 1.7.0:
-  - Aggiunto log avvio con versione (visibile su Koyeb).
-  - Allineamento docstring versione (era rimasta a 1.5.0 per errore).
-
-CHANGELOG 1.6.0:
-  - GeminiClient.generate(): safety_settings disabilitati (BLOCK_NONE su tutte le categorie).
-    Necessario per analisi outfit fashion che venivano bloccate dai filtri Gemini.
-
-CHANGELOG 1.5.0:
-  - GeminiClient: implementato pattern Singleton corretto con __new__.
-    Ogni chiamata GeminiClient() restituisce la stessa istanza — nessuna
-    connessione duplicata, nessun consumo inutile di risorse.
-
-CHANGELOG 1.4.0:
-  - HealthServer.start(): aggiunto use_reloader=False e threaded=True a app.run().
-
-CHANGELOG 1.3.0:
-  - SICUREZZA: aggiunta funzione is_allowed(uid) — whitelist utenti via env ALLOWED_USERS.
-
-CHANGELOG 1.2.0:
-  - FIX CRITICO GeminiClient.generate(): prompt testuale wrappato come Part.from_text()
-    in payload misto con immagini. Risolve analisi immagini fallita su tutti i bot.
 """
 
 import os, html, logging, threading, flask
