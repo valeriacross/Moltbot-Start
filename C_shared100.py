@@ -61,9 +61,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "1.2.0"
-SHARED_VERSION = "1.2.0"   # aggiornare ad ogni modifica
-SHARED_DATE    = "10/05/2026"  # aggiornare ad ogni modifica
+VERSION = "1.3.0"
+SHARED_VERSION = "1.3.0"   # aggiornare ad ogni modifica
+SHARED_DATE    = "11/05/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -203,7 +203,8 @@ def generate_caption(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | No
         )
         result = client.generate(prompt, contents=[img_part])
         if result:
-            return result.strip(), None
+            cleaned = CaptionGenerator.extract_caption(result) or result.strip()
+            return cleaned, None
         return None, "⚠️ Nessuna risposta da Gemini (causa sconosciuta)."
     except Exception as e:
         err_text = str(e)
@@ -429,6 +430,26 @@ class CaptionGenerator:
         "- Return ONLY the caption on a single line, nothing else\n"
     )
 
+    @staticmethod
+    def extract_caption(text: str) -> str | None:
+        """
+        Estrae la caption finale dal testo di Gemini.
+        Gemini a volte ragiona ad alta voce prima di rispondere —
+        cerca l'ultima riga non vuota che inizia con uno o più emoji.
+        Se non trovata, ritorna l'ultima riga non vuota.
+        """
+        import unicodedata
+        def starts_with_emoji(line):
+            return line and unicodedata.category(line[0]) in ('So', 'Sm') or (
+                len(line) > 1 and ord(line[0]) > 0x1F000)
+        lines = [l.strip() for l in text.strip().splitlines() if l.strip()]
+        # Cerca l'ultima riga che inizia con emoji
+        for line in reversed(lines):
+            if starts_with_emoji(line):
+                return line
+        # Fallback: ultima riga non vuota
+        return lines[-1] if lines else None
+
     def __init__(self, client: GeminiClient):
         self.client = client
 
@@ -453,7 +474,7 @@ class CaptionGenerator:
         )
         result = self.client.generate(prompt)
         if result:
-            return result, None
+            return self.extract_caption(result) or result, None
         return None, "⚠️ Caption non disponibile."
 
     def from_image(self, img_bytes: bytes) -> tuple[str | None, str | None]:
@@ -473,7 +494,7 @@ class CaptionGenerator:
             )
             result = self.client.generate(prompt, contents=[img_part])
             if result:
-                return result, None
+                return self.extract_caption(result) or result, None
             return None, "⚠️ Caption non disponibile."
         except Exception as e:
             logger.error(f"❌ CaptionGenerator.from_image(): {e}", exc_info=True)
@@ -498,7 +519,7 @@ class CaptionGenerator:
             )
             result = self.client.generate(prompt, contents=[img_part])
             if result:
-                return result, None
+                return self.extract_caption(result) or result, None
             return None, "⚠️ Caption non disponibile."
         except Exception as e:
             logger.error(f"❌ CaptionGenerator.from_filter(): {e}", exc_info=True)
