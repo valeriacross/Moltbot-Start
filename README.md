@@ -12,8 +12,8 @@ Ecosistema di bot Telegram per il personaggio **Valeria Cross AI** — alter ego
 | `C_vogue121.py` | 1.2.1 | colossal-giselle/vogue | `python C_vogue121.py` |
 | `C_architect132.py` | 1.3.2 | homely-annabelle/thearchitect | `python C_architect132.py` |
 | `C_atelier124.py` | 1.2.4 | flexible-denna/atelier | `python C_atelier124.py` |
-| `C_filtro204.py` | 2.0.4 | screeching-jobina/filtro | `python C_filtro204.py` |
-| `C_nosurprise105.py` | 1.0.5 | near-damara/sorpresa | `python C_nosurprise105.py` |
+| `C_filtro206.py` | 2.0.6 | screeching-jobina/filtro | `python C_filtro206.py` |
+| `C_nosurprise106.py` | 1.0.6 | near-damara/sorpresa | `python C_nosurprise106.py` |
 
 ---
 
@@ -26,14 +26,14 @@ Tutti i bot importano da `C_shared100.py` che centralizza:
 - `is_allowed()` — whitelist utenti via env `ALLOWED_USERS`
 - `detect_mime_type()` — rileva JPEG/PNG/WebP dai magic bytes
 - `analyze_scene()` — singolo tentativo, classifica errori: quota / safety / timeout / generico
-- `generate_caption()` — 5 emoji + 5/10 parole EN
-- `CaptionGenerator` — caption da scenario/filtro; `extract_caption()` filtra ragionamento interno Gemini
+- `generate_caption()` — 5 emoji + 5/10 parole EN; `extract_caption()` filtra ragionamento Gemini
+- `CaptionGenerator` — caption da scenario/filtro (Nosurprise, Filtro)
 - `VALERIA_DNA`, `EDITORIAL_WRAPPER`, `build_valeria_identity()` — identità Valeria
 - `SHARED_VERSION`, `SHARED_DATE` — verificabili via `/shared`
 
 ### Regole architetturali
 
-- **Tutti i bot generano SOLO prompt testuali per Flow. Nessun bot genera immagini.**
+- **Tutti i bot generano SOLO prompt testuali per Flow** — eccetto 🎨 Emoji Art che elabora localmente.
 - **Flow usa le proprie immagini di riferimento. `masterface.png` rimossa.**
 - L'outfit viene estratto tramite `analyze_scene()` e inserito nel prompt come testo.
 - I filtri di Filtro si applicano al soggetto dell'immagine — NON iniettano DNA Valeria.
@@ -59,23 +59,28 @@ Pulsanti: 📸 Nuova foto | 🏠 Home
 
 ### 📐 Architect
 `/start` → Testo | Foto. Pipeline: sanitize → generate → review_and_fix → send → caption.
-Intestazione prompt: `EDITORIAL_WRAPPER`. NEGATIVE PROMPT: 3 blocchi (Face, Hair, Body).
-Pulsanti: 📸 Nuova foto | ✏️ Nuovo testo (non sovrascrivono il prompt).
+Intestazione: EDITORIAL_WRAPPER. NEGATIVE PROMPT: Face / Hair / Body.
+Pulsanti post-prompt: non sovrascrivono il prompt.
 
 ### ✦ Atelier
 `[foto]` → analisi outfit → prompt shooting → caption. `/caption` per caption manuale.
 
-### 🎨 Filtro — 7 categorie, 30+ filtri
-Stilistici · Fantasy & Art · Scenografici · Collage · Mosaic · **🎨 Stile Artistico** · Altri
+### 🎨 Filtro — 7 categorie
 
-**Stile Artistico:** menu a 2 livelli — 5 categorie → 20 artisti (Leonardo, Raffaello, Michelangelo, Caravaggio, Renoir, Van Gogh, Matisse, Chagall, Klimt, Mirò, Mondrian, Picasso, Magritte, Dalì, De Chirico, Banksy, Lichtenstein, Mucha, Hopper, Basquiat)
+**Stilistici** · **Fantasy & Art** · **Scenografici** · **Collage** · **Mosaic** · **🎨 Stile Artistico** · **✨ Altri**
 
-**Y2K Pop Collage:** pool 20 pose, 5 casuali ad ogni generazione.
+**Stile Artistico:** menu 2 livelli — 5 categorie → 20 artisti:
+Leonardo · Raffaello · Michelangelo · Caravaggio · Renoir · Van Gogh · Matisse · Chagall · Klimt · Mirò · Mondrian · Picasso · Magritte · Dalì · De Chirico · Banksy · Lichtenstein · Mucha · Hopper · Basquiat
 
-Post-prompt: reminder per caricare immagine di riferimento su Flow.
+**🌟 Y2K Pop Collage:** pool 20 pose, 5 casuali ad ogni generazione.
+
+**🎨 Emoji Art (Altri):** elaborazione locale con `pilmoji` — zero chiamate Gemini, invia PNG direttamente. Block size 8px, aspect ratio preservato, palette 100+ emoji.
+
+> ⚠️ Post-prompt Filtro: reminder per caricare l'immagine di riferimento su Flow.
 
 ### 📍 Nosurprise
 `/start` → foto opzionale come location → formato → Auto/Manuale → prompt → caption.
+LOCATION_POOL: 254 location (inclusi Alien, Lost, Lost in Space, Predator, Transformers, Pixar, Disney).
 
 ---
 
@@ -101,6 +106,19 @@ Post-prompt: reminder per caricare immagine di riferimento su Flow.
 - `gemini-3-flash-preview` — free tier, 20 req/giorno per chiave, reset 08:00 Lisbona
 - 5 chiavi = 100 req/giorno totali
 - `analyze_scene()` usa singolo tentativo
+- 🎨 Emoji Art non consuma quota Gemini
+
+---
+
+## Dipendenze (requirements.txt)
+
+```
+pyTelegramBotAPI==4.31.0
+flask==3.0.0
+Pillow>=10.0.0
+google-genai>=1.66.0
+pilmoji>=2.0.4
+```
 
 ---
 
@@ -131,8 +149,8 @@ C_shared100.py
 C_vogue121.py
 C_architect132.py
 C_atelier124.py
-C_filtro204.py
-C_nosurprise105.py
+C_filtro206.py
+C_nosurprise106.py
 requirements.txt
 README.md
 ```
@@ -147,6 +165,6 @@ architect-902.py · filtro-602.py · shared.py · surprise-508.py · vogue-713.p
 ## Convenzione versioni
 
 - `C_shared100.py` — nome fisso, versione interna scala
-- Altri bot — nome file = versione: `C_architect132.py` = v1.3.2
+- Altri bot — nome file = versione: `C_filtro206.py` = v2.0.6
 - Ogni modifica → versione incrementata → nuovo file
 - **Mai due file con lo stesso numero**
