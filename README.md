@@ -8,10 +8,10 @@ Ecosistema di bot Telegram per il personaggio **Valeria Cross AI** — alter ego
 
 | File | Versione | Koyeb service | Run command |
 |------|---------|---------------|-------------|
-| `C_shared100.py` | 1.3.0 | (comune a tutti) | — |
-| `C_vogue121.py` | 1.2.1 | colossal-giselle/vogue | `python C_vogue121.py` |
-| `C_architect132.py` | 1.3.2 | homely-annabelle/thearchitect | `python C_architect132.py` |
-| `C_atelier124.py` | 1.2.4 | flexible-denna/atelier | `python C_atelier124.py` |
+| `C_shared100.py` | 1.5.0 | (comune a tutti) | — |
+| `C_vogue123.py` | 1.2.3 | colossal-giselle/vogue | `python C_vogue123.py` |
+| `C_architect134.py` | 1.3.4 | homely-annabelle/thearchitect | `python C_architect134.py` |
+| `C_atelier127.py` | 1.2.7 | flexible-denna/atelier | `python C_atelier127.py` |
 | `C_filtro215.py` | 2.1.5 | screeching-jobina/filtro | `python C_filtro215.py` |
 | `C_nosurprise106.py` | 1.0.6 | near-damara/sorpresa | `python C_nosurprise106.py` |
 
@@ -19,34 +19,43 @@ Ecosistema di bot Telegram per il personaggio **Valeria Cross AI** — alter ego
 
 ## Architettura
 
-Tutti i bot importano da `C_shared100.py` che centralizza:
+Tutti i bot importano da `C_shared100.py` v1.5.0:
 
-- `GeminiClient` — Singleton Gemini API con BLOCK_NONE. Rilancia eccezioni con `finish_reason` reale.
-- `HealthServer` — Flask health check su porta 10000 (necessario per Koyeb)
-- `is_allowed()` — whitelist utenti via env `ALLOWED_USERS`
-- `detect_mime_type()` — rileva JPEG/PNG/WebP dai magic bytes
-- `analyze_scene()` — singolo tentativo, classifica errori: quota / safety / timeout / generico
-- `generate_caption()` — 5 emoji + 5/10 parole EN; `extract_caption()` filtra ragionamento Gemini
-- `CaptionGenerator` — caption da scenario/filtro (Nosurprise, Filtro)
-- `VALERIA_DNA`, `EDITORIAL_WRAPPER`, `build_valeria_identity()` — identità Valeria
-- `SHARED_VERSION`, `SHARED_DATE` — verificabili via `/shared`
+- `GeminiClient` — Singleton, BLOCK_NONE, rilancia eccezioni con finish_reason reale
+- `HealthServer` — Flask porta 10000 (necessario per Koyeb)
+- `analyze_scene()` — singolo tentativo, classifica errori
+- `generate_caption()` — caption da immagine, 5 emoji + frase
+- `generate_mini_caption(text)` — caption da testo prompt, 5 emoji + frase, no gender
+- `generate_mini_prompt(text)` — mini prompt strutturato formato Nosurprise
+- `CaptionGenerator` — Nosurprise, Filtro
+- `VALERIA_DNA`, `EDITORIAL_WRAPPER` — identità Valeria
+- `SHARED_VERSION`, `SHARED_DATE` — via `/shared`
 
 ### Regole architetturali
 
-- **Tutti i bot generano SOLO prompt testuali per Flow** — eccetto filtri LEGO che elaborano localmente con PIL.
-- **Flow usa le proprie immagini di riferimento. `masterface.png` rimossa.**
-- I filtri di Filtro si applicano al soggetto — NON iniettano DNA Valeria.
+- **Tutti i bot generano SOLO prompt testuali per Flow** — eccetto filtri LEGO (PIL locale).
+- **Flow usa le proprie immagini. masterface.png rimossa.**
+- I filtri di Filtro NON iniettano DNA Valeria.
 
 ---
 
 ## Comandi comuni
 
-| Comando | Funzione |
-|---------|---------|
-| `/start` | Avvia il bot |
-| `/help` | Lista comandi |
-| `/info` | Versione bot e stato API |
-| `/shared` | Versione e data di C_shared100.py |
+`/start` · `/help` · `/info` · `/shared`
+
+---
+
+## Pulsanti post-prompt (Vogue, Architect, Atelier)
+
+Dopo ogni prompt generato:
+```
+📸 Nuova foto    🏠 Home / ✏️ Nuovo testo
+📝 Mini caption  📋 Mini prompt
+```
+
+**Mini caption** — 5 emoji + frase breve no-gender dall'essenza visiva del prompt.
+**Mini prompt** — formato strutturato Nosurprise:
+`📍 Location · 🌤 Sky · 👗 Outfit · 🎨 Style · 💃 Pose · ✨ Mood · 🏛 Body`
 
 ---
 
@@ -54,35 +63,25 @@ Tutti i bot importano da `C_shared100.py` che centralizza:
 
 **Stilistici** · **Fantasy & Art** · **Scenografici** · **Collage** · **Mosaic** · **🎨 Stile Artistico** · **✨ Altri**
 
-### 🎨 Stile Artistico (menu 2 livelli — 20 artisti)
-Leonardo · Raffaello · Michelangelo · Caravaggio · Renoir · Van Gogh · Matisse · Chagall · Klimt · Mirò · Mondrian · Picasso · Magritte · Dalì · De Chirico · Banksy · Lichtenstein · Mucha · Hopper · Basquiat
+**Stile Artistico:** 20 artisti in 5 categorie (menu 2 livelli)
 
-### 🌟 Y2K Pop Collage
-Pool 20 pose, 5 casuali ad ogni generazione.
+**Y2K Pop Collage:** pool 20 pose, 5 casuali per generazione
 
-### 🧱 LEGO Mosaic (Altri)
-- Griglia A3: 52×37 studs, stud 40px con 3D sottile
-- Palette LEGO ufficiale 50 colori
-- Post-generazione: **lista mattoncini Excel** con colori, tipi, codici BrickLink, link cliccabili
+**🧱 LEGO Mosaic (Altri):** griglia A3 (52×37 studs), Plate 1×1, lista Excel BrickLink
 
-### 🌌 LEGO Galaxy (Altri)
-- Stessa griglia A3
-- Bokeh automatico (radiale/verticale) rilevato dall'analisi dell'immagine
-- Tre elementi visivi: round piatti (sfondo), stud standard (soggetto), stud tall (zone omogenee)
-- Lista mattoncini Excel con 3 tipi distinti: Plate Round 1×1 · Plate 1×1 · Brick Round 1×1
+**🌌 LEGO Galaxy (Altri):** stessa griglia, bokeh automatico, 3 tipi elemento, lista Excel
 
-> ⚠️ I filtri LEGO non consumano quota Gemini — elaborazione locale con PIL.
-> Post-prompt Filtro: reminder per caricare l'immagine di riferimento su Flow.
+> Post-prompt Filtro: reminder per caricare immagine di riferimento su Flow.
 
 ---
 
 ## Nosurprise v1.0.6
 
-LOCATION_POOL: 254 location (inclusi Alien, Lost, Lost in Space, Predator, Transformers, Pixar, Disney).
+254 location — inclusi Alien, Lost, Lost in Space, Predator, Transformers, Pixar, Disney.
 
 ---
 
-## Dipendenze (requirements.txt)
+## Dipendenze
 
 ```
 pyTelegramBotAPI==4.31.0
@@ -98,7 +97,7 @@ openpyxl>=3.1.0
 
 | Variabile | Dove |
 |-----------|------|
-| `GOOGLE_API_KEY` | Ogni bot — chiave separata (5 progetti) |
+| `GOOGLE_API_KEY` | Ogni bot — chiave separata |
 | `ALLOWED_USERS` | `273003890` — tutti |
 | `PORT` | `10000` — tutti |
 | `TELEGRAM_TOKEN` | Vogue |
@@ -111,31 +110,31 @@ openpyxl>=3.1.0
 
 ## Quota Gemini
 
-- `gemini-3-flash-preview` — 20 req/giorno per chiave, reset 08:00 Lisbona
-- 5 chiavi = 100 req/giorno totali · Filtri LEGO: zero quota
+20 req/giorno per chiave · reset 08:00 Lisbona · 5 chiavi = 100 req/giorno
+Filtri LEGO: zero quota · Mini caption/prompt: 1 req ciascuno
 
 ---
 
 ## File nel repo
 
 ```
-C_shared100.py · C_vogue121.py · C_architect132.py
-C_atelier124.py · C_filtro215.py · C_nosurprise106.py
+C_shared100.py · C_vogue123.py · C_architect134.py
+C_atelier127.py · C_filtro215.py · C_nosurprise106.py
 requirements.txt · README.md
 ```
 
-### Da eliminare (obsoleti)
+### Obsoleti da eliminare
 ```
 architect-902.py · filtro-602.py · shared.py · surprise-508.py · vogue-713.py
 ```
 
 ---
 
-## Aggiornare C_shared100.py
+## Aggiornare shared
 
-1. Aggiornare `SHARED_VERSION`, `SHARED_DATE` e docstring changelog
-2. Push su GitHub · 3. Koyeb redeploy di **tutti** i bot
+1. SHARED_VERSION + SHARED_DATE + docstring changelog
+2. Push GitHub · 3. Redeploy **tutti** i bot su Koyeb
 
-## Update — procedura completa
+## Update completo
 
-1. HANDOFF · 2. README.md · 3. VERSIONI_BOT Excel
+HANDOFF · README · VERSIONI_BOT Excel
