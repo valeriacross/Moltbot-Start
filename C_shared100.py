@@ -45,7 +45,7 @@ __all__ = [
     'VALERIA_FACE', 'VALERIA_BODY_STRONG', 'VALERIA_BODY_SAFE',
     'VALERIA_WATERMARK', 'VALERIA_NEGATIVE',
     'VALERIA_DNA', 'EDITORIAL_WRAPPER',
-    'build_valeria_identity', 'generate_caption',
+    'build_valeria_identity', 'generate_caption', 'generate_mini_caption', 'generate_mini_prompt',
     'analyze_scene', 'genai_types', 'MODEL',
     'SHARED_VERSION', 'SHARED_DATE',
 ]
@@ -55,9 +55,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "1.3.0"
-SHARED_VERSION = "1.3.0"   # aggiornare ad ogni modifica
-SHARED_DATE    = "11/05/2026"  # aggiornare ad ogni modifica
+VERSION = "1.5.0"
+SHARED_VERSION = "1.5.0"   # aggiornare ad ogni modifica
+SHARED_DATE    = "24/05/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -211,6 +211,93 @@ def generate_caption(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | No
             return None, "❌ <b>Timeout Gemini.</b> Riprova tra qualche secondo."
         else:
             return None, f"❌ <b>Errore caption:</b>\n<code>{err_text}</code>"
+
+
+def generate_mini_caption(text: str, client: 'GeminiClient') -> tuple[str | None, str | None]:
+    """
+    Genera una mini caption social da un testo (prompt Flow, descrizione scena, scenario).
+    Output: 5 emoji + frase di 5/10 parole in inglese. No gender, no DNA Valeria.
+    Usata da Vogue, Architect, Atelier come caption alternativa testuale al prompt Flow.
+    Returns: (caption, error)
+    """
+    if not client.available:
+        return None, "⚠️ API key non configurata."
+    try:
+        prompt = (
+            "Read the following image generation prompt and extract its visual essence.\n"
+            "Write a short social media caption in English.\n"
+            "Format: exactly 5 relevant emojis followed by a phrase of 5 to 10 words.\n"
+            "The emojis come first, all together, then the words.\n"
+            "Focus only on: location, outfit, colors, atmosphere, mood, artistic style.\n"
+            "Do NOT mention any person, name, nationality, age or gender.\n"
+            "Do NOT reference the fact that this is an AI prompt.\n"
+            "Example: ✨🖤👗🌙📸 Dark elegance in every carefully chosen detail.\n"
+            "Output ONLY the caption on a single line — no explanations, no quotes.\n\n"
+            f"PROMPT:\n{text[:2000]}"
+        )
+        logger.info("📝 generate_mini_caption: chiamata API testo")
+        result = client.generate(prompt)
+        if result:
+            cleaned = CaptionGenerator.extract_caption(result) or result.strip()
+            return cleaned, None
+        return None, "⚠️ Nessuna risposta da Gemini."
+    except Exception as e:
+        err_text = str(e)
+        logger.error(f"❌ generate_mini_caption(): {err_text}", exc_info=True)
+        if "429" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower():
+            return None, "❌ <b>Quota API esaurita.</b> Reset alle 08:00 ora Lisbona."
+        elif "SAFETY" in err_text:
+            return None, "❌ <b>Safety block di Gemini.</b> Riprova."
+        elif "timeout" in err_text.lower() or "deadline" in err_text.lower():
+            return None, "❌ <b>Timeout Gemini.</b> Riprova tra qualche secondo."
+        else:
+            return None, f"❌ <b>Errore mini caption:</b>\n<code>{err_text}</code>"
+
+
+def generate_mini_prompt(text: str, client: 'GeminiClient') -> tuple[str | None, str | None]:
+    """
+    Estrae dal prompt Flow un mini-prompt strutturato con emoji — formato Nosurprise.
+    Output: blocco testuale con sezioni Location, Sky, Outfit, Style, Pose, Mood, Body.
+    No gender, no nomi propri del soggetto.
+    Returns: (mini_prompt, error)
+    """
+    if not client.available:
+        return None, "⚠️ API key non configurata."
+    try:
+        prompt = (
+            "Read the following image generation prompt carefully.\n"
+            "Extract and rewrite its key visual elements in this EXACT structured format:\n\n"
+            "📍 Location: [specific place, architecture, environment, geographic context — 1 line]\n"
+            "🌤 Sky: [lighting quality, time of day, weather, light direction — 1 line]\n"
+            "👗 Outfit: [every garment, fabric, color, brand if mentioned, accessories, shoes — 1 line]\n"
+            "🎨 Style: [artistic/photographic style, rendering, mood aesthetic — 1 line]\n"
+            "💃 Pose: [body position, framing, camera angle, gaze — 1 line]\n"
+            "✨ Mood: [emotional atmosphere, feeling, energy — 1 line]\n"
+            "🏛 Body: [physical description of the subject — no name, no gender pronouns — 1 line]\n\n"
+            "Rules:\n"
+            "— Do NOT use any gender pronouns (he/she/his/her). Use neutral language.\n"
+            "— Do NOT invent details not present in the prompt.\n"
+            "— If a section has no information in the prompt, write: [not specified]\n"
+            "— Keep each line concise but complete.\n"
+            "— Output ONLY the 7 structured lines above, nothing else.\n\n"
+            f"PROMPT:\n{text[:3000]}"
+        )
+        logger.info("📋 generate_mini_prompt: chiamata API testo")
+        result = client.generate(prompt)
+        if result:
+            return result.strip(), None
+        return None, "⚠️ Nessuna risposta da Gemini."
+    except Exception as e:
+        err_text = str(e)
+        logger.error(f"❌ generate_mini_prompt(): {err_text}", exc_info=True)
+        if "429" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower():
+            return None, "❌ <b>Quota API esaurita.</b> Reset alle 08:00 ora Lisbona."
+        elif "SAFETY" in err_text:
+            return None, "❌ <b>Safety block di Gemini.</b> Riprova."
+        elif "timeout" in err_text.lower() or "deadline" in err_text.lower():
+            return None, "❌ <b>Timeout Gemini.</b> Riprova tra qualche secondo."
+        else:
+            return None, f"❌ <b>Errore mini prompt:</b>\n<code>{err_text}</code>"
 
 
 # ============================================================
