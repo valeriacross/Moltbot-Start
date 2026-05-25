@@ -46,6 +46,7 @@ __all__ = [
     'VALERIA_WATERMARK', 'VALERIA_NEGATIVE',
     'VALERIA_DNA', 'EDITORIAL_WRAPPER',
     'build_valeria_identity', 'generate_caption', 'generate_mini_caption', 'generate_mini_prompt',
+    'review_and_fix', 'sanitize_user_input',
     'analyze_scene', 'genai_types', 'MODEL',
     'SHARED_VERSION', 'SHARED_DATE',
 ]
@@ -55,9 +56,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "1.5.0"
-SHARED_VERSION = "1.5.0"   # aggiornare ad ogni modifica
-SHARED_DATE    = "24/05/2026"  # aggiornare ad ogni modifica
+VERSION = "1.7.0"
+SHARED_VERSION = "1.7.0"   # aggiornare ad ogni modifica
+SHARED_DATE    = "25/05/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -298,6 +299,105 @@ def generate_mini_prompt(text: str, client: 'GeminiClient') -> tuple[str | None,
             return None, "❌ <b>Timeout Gemini.</b> Riprova tra qualche secondo."
         else:
             return None, f"❌ <b>Errore mini prompt:</b>\n<code>{err_text}</code>"
+
+
+def review_and_fix(prompt: str, client: 'GeminiClient') -> str:
+    """
+    Revisione e correzione contraddizioni nel prompt generato.
+    Corregge capelli, occhiali, body hair, watermark, subject bleed.
+    In caso di errore ritorna il prompt originale invariato.
+    """
+    try:
+        review_instr = (
+            "You are a prompt quality reviewer. Carefully read the following image generation prompt "
+            "and fix ALL contradictions, inconsistencies and conflicts. Return ONLY the corrected prompt, "
+            "no explanations, no preamble.\n\n"
+            "MANDATORY FIXES — apply all of these:\n\n"
+            "1. HAIR: Valeria Cross has SHORT silver/grey hair (sides 1-2cm, top max 15cm, nape exposed). "
+            "Remove or replace ANY mention of: long hair, brown hair, dark hair, black hair, curly hair, "
+            "flowing hair, loose waves, slicked back long hair, wet long hair, hair falling on shoulders, "
+            "hair spread around head, hair fanned out, dark flowing locks, wavy dark hair, hair against background. "
+            "Replace with: short silver Italian cut, slightly voluminous top, nape exposed.\n\n"
+            "2. GLASSES MANDATORY: Valeria Cross ALWAYS wears thin octagonal Vogue Havana dark tortoiseshell glasses. "
+            "If the prompt does NOT mention glasses or eyeglasses, ADD this phrase in the Facial identity section: "
+            "'thin octagonal Vogue Havana dark tortoiseshell frame eyeglasses (MANDATORY, always present)'. "
+            "Also ensure 'no glasses' does NOT appear anywhere in the prompt.\n\n"
+            "2b. GLASSES POSE REMOVAL: Remove ANY description of hands or fingers touching, adjusting, holding or "
+            "raising to the glasses or temple area. The glasses are simply worn — no hand interaction with them.\n\n"
+            "3. NEGATIVE PROMPTS CONFLICTS: Scan the negative prompts section. "
+            "Remove from negatives any term that contradicts a positive element in the prompt.\n\n"
+            "3b. MIRROR SELFIE RULE: If the prompt contains selfie, mirror, mirror selfie, bathroom, restroom, reflection — "
+            "smartphone held in hand IS a required prop. Ensure it is present as positive element and removed from negatives.\n\n"
+            "4. SUBJECT BLEED: Remove any physical description belonging to the original reference subject. "
+            "Valeria Cross DNA: Male Italian face 60yo, silver beard 6-7cm, octagonal Vogue glasses, "
+            "silver short hair, hourglass body, smooth skin.\n\n"
+            "5. WATERMARK TEXT: Must read exactly: 'feat. Valeria Cross 👠' "
+            "in elegant champagne cursive, very small, bottom center/left, 90% opacity. "
+            "Replace any other watermark text with the exact text above.\n\n"
+            "6. NAME REMOVAL: Remove any occurrence of 'Valeria Cross' or 'DNA of Valeria Cross' from the prompt body.\n\n"
+            "7. KEEP INTACT: scene, outfit, lighting, environment, pose, mood, camera settings, "
+            "photographic style, watermark spec, all creative elements not related to the subject's identity.\n\n"
+            "8. BODY HAIR ENFORCEMENT: Ensure Subject body section explicitly states: "
+            "'completely hairless body', 'no body hair, no chest hair, no arm hair, no leg hair', "
+            "'soft feminine hourglass silhouette'. "
+            "In NEGATIVE PROMPT — BODY ensure: 'body hair, chest hair, arm hair, leg hair, hairy torso, hairy arms'.\n\n"
+            f"PROMPT TO REVIEW:\n\n{prompt}"
+        )
+        logger.info("🔍 review_and_fix: avviata")
+        response = client._client.models.generate_content(
+            model=client._model,
+            contents=review_instr,
+            config=genai_types.GenerateContentConfig(
+                temperature=0.3,
+                max_output_tokens=8192,
+            )
+        )
+        if response and response.text:
+            fixed = response.text.strip()
+            logger.info(f"✅ review_and_fix: completata ({len(fixed)} chars)")
+            return fixed
+        logger.warning("⚠️ review_and_fix: risposta vuota — uso prompt originale")
+        return prompt
+    except Exception as e:
+        logger.warning(f"⚠️ review_and_fix: fallita, uso prompt originale: {e}")
+        return prompt
+
+
+def sanitize_user_input(text: str, client: 'GeminiClient') -> str:
+    """
+    Pre-processa il testo dell'utente rimuovendo elementi incompatibili con il DNA di Valeria Cross.
+    Rimuove: makeup, capelli non coerenti, watermark errati, tratti facciali femminili espliciti.
+    Non bloccante — in caso di errore ritorna il testo originale.
+    """
+    if not text or not text.strip():
+        return text
+    try:
+        instr = (
+            "You are a pre-processing filter for an AI image generation system. "
+            "The subject of every image is a fixed character with these IMMUTABLE traits:\n"
+            "- Male Italian face, ~60 years old, silver/grey short hair (max 15cm, nape exposed)\n"
+            "- Silver/grey beard 6-7cm, thin octagonal dark glasses (ALWAYS present)\n"
+            "- NO makeup of any kind (no eyeshadow, no eyeliner, no lipstick, no contour, no mascara)\n"
+            "- NO long hair, NO dark hair, NO brown/black/blonde hair\n"
+            "- Hourglass feminine body, smooth skin\n\n"
+            "Your task: clean the user's idea text by REMOVING or REPLACING these elements:\n"
+            "1. Any makeup description → REMOVE entirely\n"
+            "2. Any hair description conflicting with short silver hair → REMOVE entirely\n"
+            "3. Any watermark not reading 'feat. Valeria Cross' → REMOVE entirely\n"
+            "4. Any explicit mention of a young female face or female facial traits → REMOVE\n"
+            "5. Keep EVERYTHING else intact: scene, outfit, pose, environment, lighting, camera specs, mood\n\n"
+            "Return ONLY the cleaned text. No explanations, no preamble.\n\n"
+            f"USER TEXT:\n{text}"
+        )
+        result = client.generate(instr)
+        if result:
+            if result != text:
+                logger.info("🧹 sanitize_user_input: rimossi elementi conflittuali")
+            return result
+        return text
+    except Exception as e:
+        logger.warning(f"⚠️ sanitize_user_input: fallita (non bloccante): {e}")
+        return text
 
 
 # ============================================================
