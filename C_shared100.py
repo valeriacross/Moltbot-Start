@@ -56,8 +56,8 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "1.7.0"
-SHARED_VERSION = "1.7.0"   # aggiornare ad ogni modifica
+VERSION = "1.8.0"
+SHARED_VERSION = "1.8.0"   # aggiornare ad ogni modifica
 SHARED_DATE    = "25/05/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -204,8 +204,8 @@ def generate_caption(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | No
     except Exception as e:
         err_text = str(e)
         logger.error(f"❌ generate_caption(): {err_text}", exc_info=True)
-        if "429" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower():
-            return None, "❌ <b>Quota API esaurita.</b> Reset alle 08:00 ora Lisbona."
+        if "429" in err_text or "503" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower() or "unavailable" in err_text.lower():
+            return None, ("❌ <b>Servizio Gemini non disponibile.</b> Sovraccarico temporaneo. Riprova tra qualche minuto." if "503" in err_text or "unavailable" in err_text.lower() else "❌ <b>Quota API esaurita.</b> Reset alle 08:00 ora Lisbona.")
         elif "SAFETY" in err_text:
             return None, "❌ <b>Safety block di Gemini.</b> Prova con un'immagine diversa."
         elif "timeout" in err_text.lower() or "deadline" in err_text.lower():
@@ -245,8 +245,8 @@ def generate_mini_caption(text: str, client: 'GeminiClient') -> tuple[str | None
     except Exception as e:
         err_text = str(e)
         logger.error(f"❌ generate_mini_caption(): {err_text}", exc_info=True)
-        if "429" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower():
-            return None, "❌ <b>Quota API esaurita.</b> Reset alle 08:00 ora Lisbona."
+        if "429" in err_text or "503" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower() or "unavailable" in err_text.lower():
+            return None, ("❌ <b>Servizio Gemini non disponibile.</b> Sovraccarico temporaneo. Riprova tra qualche minuto." if "503" in err_text or "unavailable" in err_text.lower() else "❌ <b>Quota API esaurita.</b> Reset alle 08:00 ora Lisbona.")
         elif "SAFETY" in err_text:
             return None, "❌ <b>Safety block di Gemini.</b> Riprova."
         elif "timeout" in err_text.lower() or "deadline" in err_text.lower():
@@ -291,8 +291,8 @@ def generate_mini_prompt(text: str, client: 'GeminiClient') -> tuple[str | None,
     except Exception as e:
         err_text = str(e)
         logger.error(f"❌ generate_mini_prompt(): {err_text}", exc_info=True)
-        if "429" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower():
-            return None, "❌ <b>Quota API esaurita.</b> Reset alle 08:00 ora Lisbona."
+        if "429" in err_text or "503" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower() or "unavailable" in err_text.lower():
+            return None, ("❌ <b>Servizio Gemini non disponibile.</b> Sovraccarico temporaneo. Riprova tra qualche minuto." if "503" in err_text or "unavailable" in err_text.lower() else "❌ <b>Quota API esaurita.</b> Reset alle 08:00 ora Lisbona.")
         elif "SAFETY" in err_text:
             return None, "❌ <b>Safety block di Gemini.</b> Riprova."
         elif "timeout" in err_text.lower() or "deadline" in err_text.lower():
@@ -447,12 +447,18 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
         err_text = str(e)
         logger.error(f"❌ analyze_scene: {err_text}")
         # Classifica l'errore per un messaggio utente chiaro
-        if "429" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower():
-            friendly = (
-                "❌ <b>Quota API esaurita.</b>\n"
-                "Le 20 richieste giornaliere di questa chiave sono finite.\n"
-                "Reset alle 08:00 ora Lisbona."
-            )
+        if "429" in err_text or "503" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower() or "unavailable" in err_text.lower():
+            if "503" in err_text or "unavailable" in err_text.lower():
+                friendly = (
+                    "❌ <b>Servizio Gemini non disponibile.</b>\n"
+                    "Sovraccarico temporaneo. Riprova tra qualche minuto."
+                )
+            else:
+                friendly = (
+                    "❌ <b>Quota API esaurita.</b>\n"
+                    "Le 20 richieste giornaliere di questa chiave sono finite.\n"
+                    "Reset alle 08:00 ora Lisbona."
+                )
         elif "SAFETY" in err_text:
             friendly = (
                 "❌ <b>Safety block di Gemini.</b>\n"
