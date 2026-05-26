@@ -5,9 +5,10 @@ Versione: 1.9.0
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
 
-CHANGELOG 1.9.0 (25/05/2026):
-  - Versione consolidata: allineamento docstring con tutte le funzioni aggiunte
-    nelle versioni 1.4.0-1.8.0.
+CHANGELOG 2.0.0 (26/05/2026):
+  - Fix critico in review_and_fix(): client._model → MODEL.
+    GeminiClient non espone _model come attributo pubblico.
+    Causava crash silenzioso su tutti i bot che usano review_and_fix.
 
 CHANGELOG 1.8.0 (25/05/2026):
   - Classificazione errore 503 UNAVAILABLE in analyze_scene(), generate_caption(),
@@ -68,9 +69,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "1.9.0"
-SHARED_VERSION = "1.9.0"   # aggiornare ad ogni modifica
-SHARED_DATE    = "25/05/2026"  # aggiornare ad ogni modifica
+VERSION = "2.0.0"
+SHARED_VERSION = "2.0.0"   # aggiornare ad ogni modifica
+SHARED_DATE    = "26/05/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -357,7 +358,7 @@ def review_and_fix(prompt: str, client: 'GeminiClient') -> str:
         )
         logger.info("🔍 review_and_fix: avviata")
         response = client._client.models.generate_content(
-            model=client._model,
+            model=MODEL,
             contents=review_instr,
             config=genai_types.GenerateContentConfig(
                 temperature=0.3,
