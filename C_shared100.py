@@ -69,8 +69,8 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.0.0"
-SHARED_VERSION = "2.0.0"   # aggiornare ad ogni modifica
+VERSION = "2.0.1"
+SHARED_VERSION = "2.0.1"   # aggiornare ad ogni modifica
 SHARED_DATE    = "26/05/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -270,30 +270,29 @@ def generate_mini_caption(text: str, client: 'GeminiClient') -> tuple[str | None
 
 def generate_mini_prompt(text: str, client: 'GeminiClient') -> tuple[str | None, str | None]:
     """
-    Estrae dal prompt Flow un mini-prompt strutturato con emoji — formato Nosurprise.
-    Output: blocco testuale con sezioni Location, Sky, Outfit, Style, Pose, Mood, Body.
-    No gender, no nomi propri del soggetto.
+    Estrae dal prompt Flow un mini-prompt strutturato — stesso schema di Nosurprise format_scenario.
+    Output: 7 righe con emoji, max 15 parole per riga.
     Returns: (mini_prompt, error)
     """
     if not client.available:
         return None, "⚠️ API key non configurata."
     try:
         prompt = (
-            "Read the following image generation prompt carefully.\n"
-            "Extract and rewrite its key visual elements in this EXACT structured format:\n\n"
-            "📍 Location: [specific place, architecture, environment, geographic context — 1 line]\n"
-            "🌤 Sky: [lighting quality, time of day, weather, light direction — 1 line]\n"
-            "👗 Outfit: [every garment, fabric, color, brand if mentioned, accessories, shoes — 1 line]\n"
-            "🎨 Style: [artistic/photographic style, rendering, mood aesthetic — 1 line]\n"
-            "💃 Pose: [body position, framing, camera angle, gaze — 1 line]\n"
-            "✨ Mood: [emotional atmosphere, feeling, energy — 1 line]\n"
-            "🏛 Body: [physical description of the subject — no name, no gender pronouns — 1 line]\n\n"
+            "Read the following image generation prompt and extract its key visual elements.\n"
+            "Return EXACTLY this format — 7 lines, nothing else before or after:\n\n"
+            "📍 Location: [place name, city, country — max 15 words]\n"
+            "🌤 Sky: [lighting, time of day, weather — max 15 words]\n"
+            "👗 Outfit: [garments, colors, accessories — max 15 words]\n"
+            "🎨 Style: [photographic or artistic style — max 15 words]\n"
+            "💃 Pose: [body position, framing, gaze — max 15 words]\n"
+            "✨ Mood: [emotional atmosphere — max 15 words]\n"
+            "🏛 Body: [physical description, no name, no gender pronouns — max 15 words]\n\n"
             "Rules:\n"
-            "— Do NOT use any gender pronouns (he/she/his/her). Use neutral language.\n"
-            "— Do NOT invent details not present in the prompt.\n"
-            "— If a section has no information in the prompt, write: [not specified]\n"
-            "— Keep each line concise but complete.\n"
-            "— Output ONLY the 7 structured lines above, nothing else.\n\n"
+            "- Each line: emoji + label + colon + value. Nothing else.\n"
+            "- Max 15 words per line. Be concise.\n"
+            "- No gender pronouns (he/she/his/her).\n"
+            "- If a section has no info: write [not specified].\n"
+            "- Output ONLY the 7 lines. No preamble, no explanation, no blank lines.\n\n"
             f"PROMPT:\n{text[:3000]}"
         )
         logger.info("📋 generate_mini_prompt: chiamata API testo")
