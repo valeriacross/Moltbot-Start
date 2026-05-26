@@ -69,8 +69,8 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.0.2"
-SHARED_VERSION = "2.0.2"   # aggiornare ad ogni modifica
+VERSION = "2.0.3"
+SHARED_VERSION = "2.0.3"   # aggiornare ad ogni modifica
 SHARED_DATE    = "26/05/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -527,8 +527,9 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
 
 class GeminiClient:
     """
-    Wrapper Singleton attorno a genai.Client.
-    Ogni chiamata GeminiClient() restituisce la stessa istanza.
+    Wrapper Singleton attorno a genai.Client con rotation automatica multi-chiave.
+    Legge GOOGLE_API_KEY, GOOGLE_API_KEY_2, GOOGLE_API_KEY_3, GOOGLE_API_KEY_4 dall'environment.
+    Su 429/quota esaurita ruota automaticamente alla chiave successiva.
     """
     _instance = None
     _lock = threading.Lock()
@@ -544,15 +545,38 @@ class GeminiClient:
     def __init__(self, api_key: str = None):
         if self._initialized:
             return
-        self.api_key = api_key or os.environ.get("GOOGLE_API_KEY")
-        self._client = genai.Client(api_key=self.api_key) if self.api_key else None
-        if not self._client:
-            logger.warning("⚠️ GeminiClient: GOOGLE_API_KEY non configurata.")
+        # Raccoglie tutte le chiavi disponibili
+        keys = []
+        for env_var in ["GOOGLE_API_KEY", "GOOGLE_API_KEY_2", "GOOGLE_API_KEY_3", "GOOGLE_API_KEY_4"]:
+            k = os.environ.get(env_var)
+            if k:
+                keys.append(k)
+        if api_key and api_key not in keys:
+            keys.insert(0, api_key)
+
+        self._keys = keys
+        self._key_index = 0
+        self._clients = [genai.Client(api_key=k) for k in keys] if keys else []
+        self._client = self._clients[0] if self._clients else None
+
+        if not self._clients:
+            logger.warning("⚠️ GeminiClient: nessuna GOOGLE_API_KEY configurata.")
+        else:
+            logger.info(f"🔑 GeminiClient: {len(self._clients)} chiave/i disponibile/i")
         self._initialized = True
+
+    def _rotate_key(self):
+        """Ruota alla chiave successiva — chiamato su 429/quota."""
+        if len(self._clients) <= 1:
+            return False
+        self._key_index = (self._key_index + 1) % len(self._clients)
+        self._client = self._clients[self._key_index]
+        logger.warning(f"🔄 GeminiClient: rotazione chiave → indice {self._key_index + 1}/{len(self._clients)}")
+        return True
 
     @property
     def available(self) -> bool:
-        return self._client is not None
+        return bool(self._clients)
 
     def generate(self, prompt: str, contents: list = None, model: str = MODEL) -> str | None:
         """
@@ -624,7 +648,31 @@ class GeminiClient:
                 reason = f"impossibile leggere finish_reason: {fe}"
             raise RuntimeError(f"Gemini ha risposto senza testo — {reason}")
         except Exception as e:
+            err_text = str(e)
             logger.error(f"❌ GeminiClient.generate(): {e}", exc_info=True)
+            # Su 429/quota esaurita tenta rotation alla chiave successiva
+            if ("429" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower()):
+                if self._rotate_key():
+                    logger.info("🔄 Ritento con nuova chiave...")
+                    try:
+                        if contents:
+                            text_part = genai_types.Part.from_text(text=prompt)
+                            payload = list(contents) + [text_part]
+                        else:
+                            payload = prompt
+                        response2 = self._client.models.generate_content(
+                            model=model,
+                            contents=payload,
+                            config=genai_types.GenerateContentConfig(
+                                safety_settings=safety,
+                                max_output_tokens=3000,
+                            )
+                        )
+                        if response2.text:
+                            return response2.text.strip()
+                    except Exception as e2:
+                        logger.error(f"❌ GeminiClient.generate() chiave {self._key_index+1}: {e2}")
+                        raise e2
             raise
 
 
