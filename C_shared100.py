@@ -69,8 +69,8 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.0.1"
-SHARED_VERSION = "2.0.1"   # aggiornare ad ogni modifica
+VERSION = "2.0.2"
+SHARED_VERSION = "2.0.2"   # aggiornare ad ogni modifica
 SHARED_DATE    = "26/05/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -268,49 +268,76 @@ def generate_mini_caption(text: str, client: 'GeminiClient') -> tuple[str | None
             return None, f"❌ <b>Errore mini caption:</b>\n<code>{err_text}</code>"
 
 
-def generate_mini_prompt(text: str, client: 'GeminiClient') -> tuple[str | None, str | None]:
+def generate_mini_prompt(text: str, client=None) -> tuple:
     """
     Estrae dal prompt Flow un mini-prompt strutturato — stesso schema di Nosurprise format_scenario.
-    Output: 7 righe con emoji, max 15 parole per riga.
+    Parser locale: zero chiamate Gemini. Estrae sezioni dal testo del prompt.
     Returns: (mini_prompt, error)
     """
-    if not client.available:
-        return None, "⚠️ API key non configurata."
+    import re as _re
+
+    def _extract(patterns, default='[not specified]'):
+        for pattern in patterns:
+            m = _re.search(pattern, text, _re.IGNORECASE)
+            if m:
+                val = m.group(1).strip().strip('.-–—*')
+                if len(val) > 4:
+                    return val[:120]
+        return default
+
     try:
-        prompt = (
-            "Read the following image generation prompt and extract its key visual elements.\n"
-            "Return EXACTLY this format — 7 lines, nothing else before or after:\n\n"
-            "📍 Location: [place name, city, country — max 15 words]\n"
-            "🌤 Sky: [lighting, time of day, weather — max 15 words]\n"
-            "👗 Outfit: [garments, colors, accessories — max 15 words]\n"
-            "🎨 Style: [photographic or artistic style — max 15 words]\n"
-            "💃 Pose: [body position, framing, gaze — max 15 words]\n"
-            "✨ Mood: [emotional atmosphere — max 15 words]\n"
-            "🏛 Body: [physical description, no name, no gender pronouns — max 15 words]\n\n"
-            "Rules:\n"
-            "- Each line: emoji + label + colon + value. Nothing else.\n"
-            "- Max 15 words per line. Be concise.\n"
-            "- No gender pronouns (he/she/his/her).\n"
-            "- If a section has no info: write [not specified].\n"
-            "- Output ONLY the 7 lines. No preamble, no explanation, no blank lines.\n\n"
-            f"PROMPT:\n{text[:3000]}"
+        location = _extract([
+            r'(?:Scene|Location|Setting|Environment)[:\s—-]+([^\n]{10,})',
+            r'(?:LOCATION|SCENE)[:\s—-]+([^\n]{10,})',
+        ])
+        if len(location) > 80:
+            location = location.split(',')[0].strip()[:80]
+
+        sky = _extract([
+            r'(?:Lighting(?:\s+and\s+camera)?|Sky|Light(?:ing)?|Time of day)[:\s—-]+([^\n]{5,})',
+            r'(?:LIGHTING|SKY)[:\s—-]+([^\n]{5,})',
+        ])
+
+        outfit = _extract([
+            r'(?:Outfit|Clothing|Garments?)[:\s—-]+([^\n]{10,})',
+            r'(?:OUTFIT)[:\s—-]+([^\n]{10,})',
+            r'(?:wearing|dressed in)\s+([^\n]{10,})',
+        ])
+
+        style = _extract([
+            r'(?:Style|Photographic style|Rendering)[:\s—-]+([^\n]{5,})',
+            r'(?:STYLE|RENDERING)[:\s—-]+([^\n]{5,})',
+            r'((?:cinematic|editorial|fashion|documentary|portrait)\s+[^\n]{5,})',
+        ])
+
+        pose = _extract([
+            r'(?:Pose|Position|Framing|Camera angle)[:\s—-]+([^\n]{5,})',
+            r'(?:POSE|COMPOSITION)[:\s—-]+([^\n]{5,})',
+        ])
+
+        mood = _extract([
+            r'(?:Mood|Atmosphere|Emotional\s+tone)[:\s—-]+([^\n]{5,})',
+            r'(?:MOOD|ATMOSPHERE)[:\s—-]+([^\n]{5,})',
+        ])
+
+        body = _extract([
+            r'(?:Subject\s+body|Body|Physical\s+description)[:\s—-]+([^\n]{5,})',
+            r'(?:BODY|SUBJECT BODY)[:\s—-]+([^\n]{5,})',
+        ])
+
+        result = (
+            f"📍 <b>Location:</b> {location}\n"
+            f"🌤 <b>Sky:</b> {sky}\n"
+            f"👗 <b>Outfit:</b> {outfit}\n"
+            f"🎨 <b>Style:</b> {style}\n"
+            f"💃 <b>Pose:</b> {pose}\n"
+            f"✨ <b>Mood:</b> {mood}\n"
+            f"🏛 <b>Body:</b> {body}"
         )
-        logger.info("📋 generate_mini_prompt: chiamata API testo")
-        result = client.generate(prompt)
-        if result:
-            return result.strip(), None
-        return None, "⚠️ Nessuna risposta da Gemini."
+        return result, None
+
     except Exception as e:
-        err_text = str(e)
-        logger.error(f"❌ generate_mini_prompt(): {err_text}", exc_info=True)
-        if "429" in err_text or "503" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower() or "unavailable" in err_text.lower():
-            return None, ("❌ <b>Servizio Gemini non disponibile.</b> Sovraccarico temporaneo. Riprova tra qualche minuto." if "503" in err_text or "unavailable" in err_text.lower() else "❌ <b>Quota API esaurita.</b> Reset alle 08:00 ora Lisbona.")
-        elif "SAFETY" in err_text:
-            return None, "❌ <b>Safety block di Gemini.</b> Riprova."
-        elif "timeout" in err_text.lower() or "deadline" in err_text.lower():
-            return None, "❌ <b>Timeout Gemini.</b> Riprova tra qualche secondo."
-        else:
-            return None, f"❌ <b>Errore mini prompt:</b>\n<code>{err_text}</code>"
+        return None, f"❌ <b>Errore mini prompt:</b> <code>{str(e)}</code>"
 
 
 def review_and_fix(prompt: str, client: 'GeminiClient') -> str:
@@ -338,8 +365,10 @@ def review_and_fix(prompt: str, client: 'GeminiClient') -> str:
             "raising to the glasses or temple area. The glasses are simply worn — no hand interaction with them.\n\n"
             "3. NEGATIVE PROMPTS CONFLICTS: Scan the negative prompts section. "
             "Remove from negatives any term that contradicts a positive element in the prompt.\n\n"
-            "3b. MIRROR SELFIE RULE: If the prompt contains selfie, mirror, mirror selfie, bathroom, restroom, reflection — "
-            "smartphone held in hand IS a required prop. Ensure it is present as positive element and removed from negatives.\n\n"
+            "3b. MIRROR SELFIE RULE: ONLY if the prompt explicitly contains 'mirror selfie' or both 'selfie' AND 'mirror' together — "
+            "then smartphone held in hand IS a required prop. "
+            "Do NOT add smartphone for decorative mirrors, antique mirrors, historical scenes, artistic reflections, "
+            "or any mirror that is not a selfie context.\n\n"
             "4. SUBJECT BLEED: Remove any physical description belonging to the original reference subject. "
             "Valeria Cross DNA: Male Italian face 60yo, silver beard 6-7cm, octagonal Vogue glasses, "
             "silver short hair, hourglass body, smooth skin.\n\n"
