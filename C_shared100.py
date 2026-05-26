@@ -69,8 +69,8 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.0.3"
-SHARED_VERSION = "2.0.3"   # aggiornare ad ogni modifica
+VERSION = "2.0.4"
+SHARED_VERSION = "2.0.4"   # aggiornare ad ogni modifica
 SHARED_DATE    = "26/05/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -385,18 +385,10 @@ def review_and_fix(prompt: str, client: 'GeminiClient') -> str:
             f"PROMPT TO REVIEW:\n\n{prompt}"
         )
         logger.info("🔍 review_and_fix: avviata")
-        response = client._client.models.generate_content(
-            model=MODEL,
-            contents=review_instr,
-            config=genai_types.GenerateContentConfig(
-                temperature=0.3,
-                max_output_tokens=8192,
-            )
-        )
-        if response and response.text:
-            fixed = response.text.strip()
-            logger.info(f"✅ review_and_fix: completata ({len(fixed)} chars)")
-            return fixed
+        result = client.generate(review_instr, max_tokens=8192)
+        if result:
+            logger.info(f"✅ review_and_fix: completata ({len(result)} chars)")
+            return result
         logger.warning("⚠️ review_and_fix: risposta vuota — uso prompt originale")
         return prompt
     except Exception as e:
@@ -578,7 +570,7 @@ class GeminiClient:
     def available(self) -> bool:
         return bool(self._clients)
 
-    def generate(self, prompt: str, contents: list = None, model: str = MODEL) -> str | None:
+    def generate(self, prompt: str, contents: list = None, model: str = MODEL, max_tokens: int = 3000) -> str | None:
         """
         Genera testo con Gemini.
         contents: lista di Part aggiuntivi (immagini, ecc.) — vengono messi PRIMA del testo.
@@ -623,7 +615,7 @@ class GeminiClient:
                 contents=payload,
                 config=genai_types.GenerateContentConfig(
                     safety_settings=safety,
-                    max_output_tokens=3000,
+                    max_output_tokens=max_tokens,
                 )
             )
             if response.text:
@@ -665,7 +657,7 @@ class GeminiClient:
                             contents=payload,
                             config=genai_types.GenerateContentConfig(
                                 safety_settings=safety,
-                                max_output_tokens=3000,
+                                max_output_tokens=max_tokens,
                             )
                         )
                         if response2.text:
