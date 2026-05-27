@@ -69,9 +69,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.0.4"
-SHARED_VERSION = "2.0.4"   # aggiornare ad ogni modifica
-SHARED_DATE    = "26/05/2026"  # aggiornare ad ogni modifica
+VERSION = "2.0.5"
+SHARED_VERSION = "2.0.5"   # aggiornare ad ogni modifica
+SHARED_DATE    = "27/05/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -520,7 +520,7 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
 class GeminiClient:
     """
     Wrapper Singleton attorno a genai.Client con rotation automatica multi-chiave.
-    Legge GOOGLE_API_KEY, GOOGLE_API_KEY_2, GOOGLE_API_KEY_3, GOOGLE_API_KEY_4 dall'environment.
+    Legge GOOGLE_API_KEY, GOOGLE_API_KEY_2, GOOGLE_API_KEY_3 dall'environment.
     Su 429/quota esaurita ruota automaticamente alla chiave successiva.
     """
     _instance = None
@@ -539,7 +539,7 @@ class GeminiClient:
             return
         # Raccoglie tutte le chiavi disponibili
         keys = []
-        for env_var in ["GOOGLE_API_KEY", "GOOGLE_API_KEY_2", "GOOGLE_API_KEY_3", "GOOGLE_API_KEY_4"]:
+        for env_var in ["GOOGLE_API_KEY", "GOOGLE_API_KEY_2", "GOOGLE_API_KEY_3"]:
             k = os.environ.get(env_var)
             if k:
                 keys.append(k)
