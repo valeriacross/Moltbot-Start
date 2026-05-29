@@ -60,7 +60,7 @@ __all__ = [
     'VALERIA_DNA', 'EDITORIAL_WRAPPER',
     'build_valeria_identity', 'generate_caption', 'generate_mini_caption', 'generate_mini_prompt',
     'review_and_fix', 'sanitize_user_input',
-    'analyze_scene', 'genai_types', 'MODEL',
+    'analyze_scene', 'genai_types', 'MODEL', 'detect_mime_type',
     'SHARED_VERSION', 'SHARED_DATE',
 ]
 
@@ -69,9 +69,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.0.5"
-SHARED_VERSION = "2.0.5"   # aggiornare ad ogni modifica
-SHARED_DATE    = "27/05/2026"  # aggiornare ad ogni modifica
+VERSION = "2.1.0"
+SHARED_VERSION = "2.1.0"   # aggiornare ad ogni modifica
+SHARED_DATE    = "29/05/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
