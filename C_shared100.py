@@ -71,7 +71,7 @@ MODEL = "gemini-3-flash-preview"
 # Versione
 VERSION = "2.1.0"
 SHARED_VERSION = "2.1.0"   # aggiornare ad ogni modifica
-SHARED_DATE    = "29/05/2026"  # aggiornare ad ogni modifica
+SHARED_DATE    = "30/05/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
