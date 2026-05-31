@@ -5,6 +5,10 @@ Versione: 1.9.0
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
 
+CHANGELOG 2.2.0 (31/05/2026):
+  - GeminiClient: property current_key_num (1-based) e metodo on_key_rotation(callback).
+    Permette ai bot di ricevere notifica immediata del cambio chiave API.
+
 CHANGELOG 2.0.0 (26/05/2026):
   - Fix critico in review_and_fix(): client._model → MODEL.
     GeminiClient non espone _model come attributo pubblico.
@@ -60,7 +64,7 @@ __all__ = [
     'VALERIA_DNA', 'EDITORIAL_WRAPPER',
     'build_valeria_identity', 'generate_caption', 'generate_mini_caption', 'generate_mini_prompt',
     'review_and_fix', 'sanitize_user_input',
-    'analyze_scene', 'genai_types', 'MODEL', 'detect_mime_type',
+    'analyze_scene', 'genai_types', 'MODEL', 'detect_mime_type', 'is_allowed',
     'SHARED_VERSION', 'SHARED_DATE',
 ]
 
@@ -69,9 +73,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.1.0"
-SHARED_VERSION = "2.1.0"   # aggiornare ad ogni modifica
-SHARED_DATE    = "30/05/2026"  # aggiornare ad ogni modifica
+VERSION = "2.2.0"
+SHARED_VERSION = "2.2.0"   # aggiornare ad ogni modifica
+SHARED_DATE    = "31/05/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -550,6 +554,7 @@ class GeminiClient:
         self._key_index = 0
         self._clients = [genai.Client(api_key=k) for k in keys] if keys else []
         self._client = self._clients[0] if self._clients else None
+        self._rotation_callbacks = []
 
         if not self._clients:
             logger.warning("⚠️ GeminiClient: nessuna GOOGLE_API_KEY configurata.")
@@ -563,8 +568,28 @@ class GeminiClient:
             return False
         self._key_index = (self._key_index + 1) % len(self._clients)
         self._client = self._clients[self._key_index]
-        logger.warning(f"🔄 GeminiClient: rotazione chiave → indice {self._key_index + 1}/{len(self._clients)}")
+        new_num = self._key_index + 1
+        logger.warning(f"🔄 GeminiClient: rotazione chiave → indice {new_num}/{len(self._clients)}")
+        # Notifica tutti i callback registrati
+        for cb in self._rotation_callbacks:
+            try:
+                cb(new_num)
+            except Exception as cb_err:
+                logger.warning(f"⚠️ on_key_rotation callback error: {cb_err}")
         return True
+
+    @property
+    def current_key_num(self) -> int:
+        """Ritorna il numero (1-based) della chiave API attualmente in uso."""
+        return self._key_index + 1
+
+    def on_key_rotation(self, callback):
+        """
+        Registra una callback chiamata ogni volta che la chiave ruota.
+        callback(new_key_num: int) — new_key_num è 1-based.
+        Permette ai bot di notificare l'utente del cambio chiave.
+        """
+        self._rotation_callbacks.append(callback)
 
     @property
     def available(self) -> bool:
