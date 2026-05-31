@@ -8,19 +8,19 @@ Ecosistema di bot Telegram per il personaggio **Valeria Cross AI**.
 
 | File | Versione | Koyeb service | Run command |
 |------|---------|---------------|-------------|
-| `C_shared100.py` | 2.1.0 | (comune a tutti) | — |
-| `Vogue_100.py` | 1.0.0 | colossal-giselle/vogue | `python Vogue_100.py` |
+| `C_shared100.py` | 2.2.0 | (comune a tutti) | — |
+| `Vogue_101.py | 1.0.1 | colossal-giselle/vogue | `python Vogue_100.py` |
 | `Architect_100.py` | 1.0.0 | homely-annabelle/thearchitect | `python Architect_100.py` |
-| `Atelier_100.py` | 1.0.0 | flexible-denna/atelier | `python Atelier_100.py` |
+| `Atelier_102.py | 1.0.2 | flexible-denna/atelier | `python Atelier_100.py` |
 | `Filtro_100.py` | 1.0.0 | screeching-jobina/filtro | `python Filtro_100.py` |
-| `Surprise_100.py` | 1.0.0 | near-damara/sorpresa | `python Surprise_100.py` |
+| `Surprise_120.py | 1.2.0 | near-damara/sorpresa | `python Surprise_100.py` |
 
 > **Nota:** `C_shared100.py` mantiene il nome originale — tutti i bot lo importano come `C_shared100`.
 > Aggiornare il Run command su Koyeb coi nuovi nomi file.
 
 ---
 
-## Shared v2.1.0
+## Shared v2.2.0
 
 GeminiClient multi-chiave (max 3, rotation su 429) · review_and_fix · sanitize_user_input · generate_mini_caption · generate_mini_prompt (parser locale) · analyze_scene · generate_caption · CaptionGenerator · detect_mime_type · VALERIA_DNA / EDITORIAL_WRAPPER / build_valeria_identity
 
