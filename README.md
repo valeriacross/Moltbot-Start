@@ -9,11 +9,11 @@ Ecosistema di bot Telegram per il personaggio **Valeria Cross AI**.
 | File | Versione | Koyeb service | Run command |
 |------|---------|---------------|-------------|
 | `C_shared100.py` | 2.2.0 | (comune a tutti) | — |
-| `Vogue_101.py | 1.0.1 | colossal-giselle/vogue | `python Vogue_100.py` |
+| `Vogue_101.py` | 1.0.1 | colossal-giselle/vogue | `python Vogue_101.py` |
 | `Architect_100.py` | 1.0.0 | homely-annabelle/thearchitect | `python Architect_100.py` |
-| `Atelier_102.py | 1.0.2 | flexible-denna/atelier | `python Atelier_100.py` |
+| `Atelier_102.py` | 1.0.2 | flexible-denna/atelier | `python Atelier_102.py` |
 | `Filtro_100.py` | 1.0.0 | screeching-jobina/filtro | `python Filtro_100.py` |
-| `Surprise_120.py | 1.2.0 | near-damara/sorpresa | `python Surprise_100.py` |
+| `Surprise_120.py` | 1.2.0 | surprise1/sorpresa | `python Surprise_120.py` |
 
 > **Nota:** `C_shared100.py` mantiene il nome originale — tutti i bot lo importano come `C_shared100`.
 > Aggiornare il Run command su Koyeb coi nuovi nomi file.
