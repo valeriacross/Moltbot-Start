@@ -1,6 +1,6 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.2.0
+Versione: 2.3.0
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
@@ -73,9 +73,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.2.0"
-SHARED_VERSION = "2.2.0"   # aggiornare ad ogni modifica
-SHARED_DATE    = "31/05/2026"  # aggiornare ad ogni modifica
+VERSION = "2.3.0"
+SHARED_VERSION = "2.3.0"   # aggiornare ad ogni modifica
+SHARED_DATE    = "02/06/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -667,10 +667,12 @@ class GeminiClient:
         except Exception as e:
             err_text = str(e)
             logger.error(f"❌ GeminiClient.generate(): {e}", exc_info=True)
-            # Su 429/quota esaurita tenta rotation alla chiave successiva
+            # Su 429/quota esaurita: tenta TUTTE le chiavi rimanenti in sequenza
             if ("429" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower()):
-                if self._rotate_key():
-                    logger.info("🔄 Ritento con nuova chiave...")
+                for _attempt in range(len(self._clients) - 1):
+                    if not self._rotate_key():
+                        break
+                    logger.info(f"🔄 Ritento con chiave #{self._key_index + 1}...")
                     try:
                         if contents:
                             text_part = genai_types.Part.from_text(text=prompt)
@@ -688,6 +690,10 @@ class GeminiClient:
                         if response2.text:
                             return response2.text.strip()
                     except Exception as e2:
+                        err2 = str(e2)
+                        if "429" in err2 or "quota" in err2.lower() or "exhausted" in err2.lower():
+                            logger.warning(f"⚠️ Chiave #{self._key_index + 1} esaurita, provo la prossima...")
+                            continue  # prova la chiave successiva
                         logger.error(f"❌ GeminiClient.generate() chiave {self._key_index+1}: {e2}")
                         raise e2
             raise
