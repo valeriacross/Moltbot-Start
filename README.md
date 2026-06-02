@@ -8,21 +8,22 @@ Ecosistema di bot Telegram per il personaggio **Valeria Cross AI**.
 
 | File | Versione | Koyeb service | Run command |
 |------|---------|---------------|-------------|
-| `C_shared100.py` | 2.2.0 | (comune a tutti) | — |
+| `C_shared100.py` | 2.3.1 | (comune a tutti) | — |
 | `Vogue_101.py` | 1.0.1 | colossal-giselle/vogue | `python Vogue_101.py` |
 | `Architect_100.py` | 1.0.0 | homely-annabelle/thearchitect | `python Architect_100.py` |
 | `Atelier_102.py` | 1.0.2 | flexible-denna/atelier | `python Atelier_102.py` |
 | `Filtro_100.py` | 1.0.0 | screeching-jobina/filtro | `python Filtro_100.py` |
-| `Surprise_120.py` | 1.2.0 | surprise1/sorpresa | `python Surprise_120.py` |
+| `Surprise_124.py` | 1.2.4 | surprise1/sorpresa | `python Surprise_124.py` |
 
-> **Nota:** `C_shared100.py` mantiene il nome originale — tutti i bot lo importano come `C_shared100`.
-> Aggiornare il Run command su Koyeb coi nuovi nomi file.
+> `C_shared100.py` mantiene il nome originale — tutti i bot lo importano come `C_shared100`.
 
 ---
 
-## Shared v2.2.0
+## Shared v2.3.1
 
-GeminiClient multi-chiave (max 3, rotation su 429) · review_and_fix · sanitize_user_input · generate_mini_caption · generate_mini_prompt (parser locale) · analyze_scene · generate_caption · CaptionGenerator · detect_mime_type · VALERIA_DNA / EDITORIAL_WRAPPER / build_valeria_identity
+GeminiClient multi-chiave (max 3, rotation loop su 429, on_key_rotation callback) · review_and_fix (max_tokens=8192) · sanitize_user_input · generate_mini_caption · generate_mini_prompt (parser locale) · analyze_scene · generate_caption · CaptionGenerator · detect_mime_type · VALERIA_DNA / EDITORIAL_WRAPPER / build_valeria_identity
+
+**Safety block:** messaggio utente chiaro quando Gemini blocca un'immagine per contenuto sensibile.
 
 ---
 
@@ -30,11 +31,13 @@ GeminiClient multi-chiave (max 3, rotation su 429) · review_and_fix · sanitize
 
 **Atelier** — `analyze_scene → review_and_fix → prompt → caption automatica` · 60 gen/giorno con 3 chiavi · pulsanti 📸 Nuova foto / 🏠 Home
 
-**Vogue / Architect** — prompt → caption · Mini caption + Mini prompt (parser locale, zero Gemini)
+**Vogue** — foto/testo → review → prompt → caption · Mini caption + Mini prompt · on_key_rotation notifica
 
-**Surprise** — pool locale · `/pride` integrato (Walter, Carlotta, Fufos, Fritz) · pick_auto protetto su 503
+**Architect** — prompt testo o foto → review → caption
 
-**Filtro** — 7 categorie · 20 artisti · Y2K Pop Collage · LEGO Mosaic/Galaxy con lista Excel BrickLink
+**Surprise** — pool locale · output duplice (single + mosaic) · `/pride` (Walter/Carlotta/Fufos/Fritz, 8 location Lisbona) · `/flag` (PRIDE! mosaic 3×2, zero token, 11M+ combinazioni)
+
+**Filtro** — 7 categorie · LEGO Mosaic/Galaxy con lista Excel BrickLink
 
 ---
 
@@ -61,22 +64,22 @@ openpyxl>=3.1.0
 | `TELEGRAM_TOKEN_ARCHITECT` | Architect |
 | `TELEGRAM_TOKEN_CLOSET` | Atelier |
 | `TELEGRAM_TOKEN_FX` | Filtro |
-| `TELEGRAM_TOKEN_SORPRESA` | Surprise + Pride |
+| `TELEGRAM_TOKEN_SORPRESA` | Surprise + Pride + Flag |
 
 ---
 
 ## Quota Gemini
 
 20 req/giorno per chiave · reset 08:00 Lisbona · con 3 chiavi = 60/giorno per bot
-LEGO e Pride: zero quota
+LEGO, Pride e Flag: zero quota
 
 ---
 
 ## File nel repo
 
 ```
-C_shared100.py · Vogue_100.py · Architect_100.py
-Atelier_100.py · Filtro_100.py · Surprise_100.py
+C_shared100.py · Vogue_101.py · Architect_100.py
+Atelier_102.py · Filtro_100.py · Surprise_124.py
 requirements.txt · README.md
 ```
 
