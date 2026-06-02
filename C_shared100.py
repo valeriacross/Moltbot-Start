@@ -1,6 +1,6 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.3.0
+Versione: 2.3.1
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
@@ -73,9 +73,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.3.0"
-SHARED_VERSION = "2.3.0"   # aggiornare ad ogni modifica
-SHARED_DATE    = "02/06/2026"  # aggiornare ad ogni modifica
+VERSION = "2.3.1"
+SHARED_VERSION = "2.3.1"   # aggiornare ad ogni modifica
+SHARED_DATE    = "03/06/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -496,10 +496,10 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
                     "Le 20 richieste giornaliere di questa chiave sono finite.\n"
                     "Reset alle 08:00 ora Lisbona."
                 )
-        elif "SAFETY" in err_text:
+        elif "SAFETY" in err_text or "SAFETY BLOCK" in err_text or "sconosciuto" in err_text:
             friendly = (
-                "❌ <b>Safety block di Gemini.</b>\n"
-                "Gemini ha rifiutato l'analisi di questa immagine.\n"
+                "⚠️ <b>Immagine bloccata dai filtri Gemini.</b>\n"
+                "Gemini rifiuta questa foto (contenuto sensibile).\n"
                 "Prova con un'immagine diversa."
             )
         elif "API key" in err_text or "API_KEY" in err_text or "credentials" in err_text.lower():
@@ -652,7 +652,7 @@ class GeminiClient:
                 if candidate:
                     fr = str(candidate.finish_reason)
                     if "SAFETY" in fr:
-                        reason = "SAFETY BLOCK — Gemini ha rifiutato il contenuto (finish_reason: SAFETY)"
+                        reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
                     elif "RECITATION" in fr:
                         reason = "RECITATION — Gemini ha bloccato per potenziale riproduzione di contenuto protetto"
                     elif "MAX_TOKENS" in fr:
@@ -661,6 +661,19 @@ class GeminiClient:
                         reason = "STOP — risposta terminata normalmente ma testo vuoto"
                     else:
                         reason = f"finish_reason: {fr}"
+                else:
+                    # Nessun candidato — Gemini ha bloccato l'intera richiesta
+                    # Controlla prompt_feedback per il motivo
+                    try:
+                        pf = str(response.prompt_feedback) if hasattr(response, "prompt_feedback") else ""
+                        if "SAFETY" in pf or "BLOCK" in pf:
+                            reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
+                        elif pf:
+                            reason = f"prompt_feedback: {pf[:80]}"
+                        else:
+                            reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
+                    except Exception:
+                        reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
             except Exception as fe:
                 reason = f"impossibile leggere finish_reason: {fe}"
             raise RuntimeError(f"Gemini ha risposto senza testo — {reason}")
