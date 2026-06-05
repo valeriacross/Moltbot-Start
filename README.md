@@ -1,43 +1,37 @@
 # Valeria Cross AI — Moltbot
 
-Ecosistema di bot Telegram per il personaggio **Valeria Cross AI**.
+**Ultimo aggiornamento:** 05/06/2026
+
+Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
 ---
 
 ## Bot attivi
 
-| File | Versione | Koyeb service | Run command |
-|------|---------|---------------|-------------|
-| `C_shared100.py` | 2.3.1 | (comune a tutti) | — |
-| `Vogue_101.py` | 1.0.1 | colossal-giselle/vogue | `python Vogue_101.py` |
-| `Architect_100.py` | 1.0.0 | homely-annabelle/thearchitect | `python Architect_100.py` |
-| `Atelier_102.py` | 1.0.2 | flexible-denna/atelier | `python Atelier_102.py` |
-| `Filtro_100.py` | 1.0.0 | screeching-jobina/filtro | `python Filtro_100.py` |
-| `Surprise_124.py` | 1.2.4 | surprise1/sorpresa | `python Surprise_124.py` |
+| Bot | File | Versione | Koyeb |
+|-----|------|---------|-------|
+| VogueBot | `Vogue_102.py` | 1.0.2 | colossal-giselle/vogue |
+| ArchitectBot | `Architect_101.py` | 1.0.1 | homely-annabelle/thearchitect |
+| AtelierBot | `Atelier_104.py` | 1.0.4 | flexible-denna/atelier |
+| FiltroBot | `Filtro_104.py` | 1.0.4 | screeching-jobina/filtro |
+| SurpriseBot | `Surprise_124.py` | 1.2.4 | surprise1/sorpresa |
 
-> `C_shared100.py` mantiene il nome originale — tutti i bot lo importano come `C_shared100`.
-
----
-
-## Shared v2.3.1
-
-GeminiClient multi-chiave (max 3, rotation loop su 429, on_key_rotation callback) · review_and_fix (max_tokens=8192) · sanitize_user_input · generate_mini_caption · generate_mini_prompt (parser locale) · analyze_scene · generate_caption · CaptionGenerator · detect_mime_type · VALERIA_DNA / EDITORIAL_WRAPPER / build_valeria_identity
-
-**Safety block:** messaggio utente chiaro quando Gemini blocca un'immagine per contenuto sensibile.
+**Shared:** `C_shared100.py` v2.3.2 — comune a tutti i bot
 
 ---
 
-## Pipeline per bot
+## Struttura file
 
-**Atelier** — `analyze_scene → review_and_fix → prompt → caption automatica` · 60 gen/giorno con 3 chiavi · pulsanti 📸 Nuova foto / 🏠 Home
-
-**Vogue** — foto/testo → review → prompt → caption · Mini caption + Mini prompt · on_key_rotation notifica
-
-**Architect** — prompt testo o foto → review → caption
-
-**Surprise** — pool locale · output duplice (single + mosaic) · `/pride` (Walter/Carlotta/Fufos/Fritz, 8 location Lisbona) · `/flag` (PRIDE! mosaic 3×2, zero token, 11M+ combinazioni)
-
-**Filtro** — 7 categorie · LEGO Mosaic/Galaxy con lista Excel BrickLink
+```
+C_shared100.py      # Libreria condivisa — GeminiClient, prompt, utils
+Vogue_102.py        # VogueBot — analisi foto → prompt Flow
+Architect_101.py    # ArchitectBot — prompt testo/foto → editoriale
+Atelier_104.py      # AtelierBot — outfit analysis → prompt con filtri
+Filtro_104.py       # FiltroBot — 7 categorie filtro + LEGO + Mosaic
+Surprise_124.py     # SurpriseBot — location + outfit random + /pride + /flag
+requirements.txt    # Dipendenze pip
+README.md           # Questo file
+```
 
 ---
 
@@ -45,44 +39,59 @@ GeminiClient multi-chiave (max 3, rotation loop su 429, on_key_rotation callback
 
 ```
 pyTelegramBotAPI==4.31.0
-flask==3.1.3
-Pillow>=12.2.0
-google-genai>=2.6.0
-openpyxl>=3.1.0
+flask==3.0.0
+Pillow>=10.0.0
+google-genai>=1.66.0
+pilmoji>=2.0.4
 ```
 
 ---
 
-## Variabili d'ambiente Koyeb
+## Variabili d'ambiente (Koyeb)
 
-| Variabile | Dove |
-|-----------|------|
-| `GOOGLE_API_KEY` (+_2, +_3) | ogni bot — chiavi separate |
+| Variabile | Descrizione |
+|-----------|-------------|
+| `TELEGRAM_TOKEN` | VogueBot |
+| `TELEGRAM_TOKEN_ARCHITECT` | ArchitectBot |
+| `TELEGRAM_TOKEN_CLOSET` | AtelierBot |
+| `TELEGRAM_TOKEN_FX` | FiltroBot |
+| `TELEGRAM_TOKEN_SORPRESA` | SurpriseBot / Pride / Flag |
+| `GOOGLE_API_KEY` | Chiave Gemini principale (tutti i bot) |
+| `GOOGLE_API_KEY_2` | Chiave Gemini secondaria (Vogue, Atelier) |
+| `GOOGLE_API_KEY_3` | Chiave Gemini terziaria (Vogue, Atelier) |
 | `ALLOWED_USERS` | `273003890` |
 | `PORT` | `10000` |
-| `TELEGRAM_TOKEN` | Vogue |
-| `TELEGRAM_TOKEN_ARCHITECT` | Architect |
-| `TELEGRAM_TOKEN_CLOSET` | Atelier |
-| `TELEGRAM_TOKEN_FX` | Filtro |
-| `TELEGRAM_TOKEN_SORPRESA` | Surprise + Pride + Flag |
 
 ---
 
-## Quota Gemini
+## GeminiClient
 
-20 req/giorno per chiave · reset 08:00 Lisbona · con 3 chiavi = 60/giorno per bot
-LEGO, Pride e Flag: zero quota
+- Max 3 chiavi per bot (`GOOGLE_API_KEY`, `_2`, `_3`)
+- Rotation round-robin ad ogni chiamata
+- Callback `on_key_rotation` per notifica utente
+- Safety block: messaggio chiaro all'utente
 
 ---
 
-## File nel repo
+## Comandi per bot
 
-```
-C_shared100.py · Vogue_101.py · Architect_100.py
-Atelier_102.py · Filtro_100.py · Surprise_124.py
-requirements.txt · README.md
-```
+### VogueBot
+`/start` · `/info` · `/shared` · `/dna` · `/caption`
 
-## Update completo
+### ArchitectBot
+`/start` · `/help` · `/info` · `/lastprompt` · `/shared`
 
-HANDOFF · README · VERSIONI_BOT Excel
+### AtelierBot
+`/start` · `/help` · `/info` · `/lastprompt` · `/caption` · `/shared`
+
+### FiltroBot
+`/start` · `/filtro` · `/help` · `/info` · `/lastprompt` · `/caption` · `/mosaic` · `/done` · `/shared`
+
+### SurpriseBot
+`/start` · `/flag` · `/pride` · `/help` · `/info` · `/shared` · `/lastprompt`
+
+---
+
+## Repository
+
+`valeriacross/Moltbot-Start` — Frankfurt
