@@ -1,6 +1,6 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.3.2
+Versione: 2.3.4
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
@@ -73,9 +73,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.3.2"
-SHARED_VERSION = "2.3.2"   # aggiornare ad ogni modifica
-SHARED_DATE    = "03/06/2026"  # aggiornare ad ogni modifica
+VERSION = "2.3.4"
+SHARED_VERSION = "2.3.4"   # aggiornare ad ogni modifica
+SHARED_DATE    = "06/06/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -555,6 +555,8 @@ class GeminiClient:
         self._clients = [genai.Client(api_key=k) for k in keys] if keys else []
         self._client = self._clients[0] if self._clients else None
         self._rotation_callbacks = []
+        self._key_use_callbacks = []        # callback ad ogni chiamata (chiave, count)
+        self._call_counts = [0] * len(keys)  # contatore per chiave — si azzera al riavvio
 
         if not self._clients:
             logger.warning("⚠️ GeminiClient: nessuna GOOGLE_API_KEY configurata.")
@@ -591,6 +593,19 @@ class GeminiClient:
         """
         self._rotation_callbacks.append(callback)
 
+    def on_key_use(self, callback):
+        """
+        Registra una callback chiamata ad OGNI chiamata generate().
+        callback(key_num: int, call_count: int) — key_num 1-based, call_count cumulativo per quella chiave.
+        Utile per mostrare quale chiave è in uso e quante call ha fatto oggi.
+        """
+        self._key_use_callbacks.append(callback)
+
+    @property
+    def call_counts(self) -> list[int]:
+        """Ritorna la lista dei contatori per chiave (0-based index)."""
+        return list(self._call_counts)
+
     @property
     def available(self) -> bool:
         return bool(self._clients)
@@ -614,6 +629,16 @@ class GeminiClient:
         # Round-robin: ruota la chiave PRIMA di ogni chiamata
         if len(self._clients) > 1:
             self._rotate_key()
+        # Incrementa contatore della chiave corrente e notifica on_key_use callbacks
+        if self._call_counts:
+            self._call_counts[self._key_index] += 1
+            _cur_count = self._call_counts[self._key_index]
+            _cur_key   = self._key_index + 1
+            for _cb in self._key_use_callbacks:
+                try:
+                    _cb(_cur_key, _cur_count)
+                except Exception as _cb_err:
+                    logger.warning(f"\u26a0\ufe0f on_key_use callback error: {_cb_err}")
         try:
             if contents:
                 text_part = genai_types.Part.from_text(text=prompt)
@@ -682,13 +707,25 @@ class GeminiClient:
             raise RuntimeError(f"Gemini ha risposto senza testo — {reason}")
         except Exception as e:
             err_text = str(e)
-            logger.error(f"❌ GeminiClient.generate(): {e}", exc_info=True)
-            # Su 429/quota esaurita: tenta TUTTE le chiavi rimanenti in sequenza
-            if ("429" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower()):
+            logger.error(f"\u274c GeminiClient.generate(): {e}", exc_info=True)
+            # Errori transitori: 429/quota, 503/overload, timeout, rete
+            # -> tenta TUTTE le chiavi rimanenti prima di arrendersi
+            _is_transient = (
+                "429" in err_text
+                or "503" in err_text
+                or "quota" in err_text.lower()
+                or "exhausted" in err_text.lower()
+                or "unavailable" in err_text.lower()
+                or "overloaded" in err_text.lower()
+                or "timeout" in err_text.lower()
+                or "timed out" in err_text.lower()
+                or "connection" in err_text.lower()
+            )
+            if _is_transient:
                 for _attempt in range(len(self._clients) - 1):
                     if not self._rotate_key():
                         break
-                    logger.info(f"🔄 Ritento con chiave #{self._key_index + 1}...")
+                    logger.info(f"\U0001f504 Ritento con chiave #{self._key_index + 1} (errore transitorio)...")
                     try:
                         if contents:
                             text_part = genai_types.Part.from_text(text=prompt)
@@ -707,10 +744,22 @@ class GeminiClient:
                             return response2.text.strip()
                     except Exception as e2:
                         err2 = str(e2)
-                        if "429" in err2 or "quota" in err2.lower() or "exhausted" in err2.lower():
-                            logger.warning(f"⚠️ Chiave #{self._key_index + 1} esaurita, provo la prossima...")
-                            continue  # prova la chiave successiva
-                        logger.error(f"❌ GeminiClient.generate() chiave {self._key_index+1}: {e2}")
+                        _is_transient2 = (
+                            "429" in err2
+                            or "503" in err2
+                            or "quota" in err2.lower()
+                            or "exhausted" in err2.lower()
+                            or "unavailable" in err2.lower()
+                            or "overloaded" in err2.lower()
+                            or "timeout" in err2.lower()
+                            or "timed out" in err2.lower()
+                            or "connection" in err2.lower()
+                        )
+                        if _is_transient2:
+                            logger.warning(f"\u26a0\ufe0f Chiave #{self._key_index + 1} transitorio, provo la prossima...")
+                            continue
+                        # Errore non transitorio (SAFETY, parametro errato, ecc.) — stop
+                        logger.error(f"\u274c GeminiClient.generate() chiave {self._key_index+1}: {e2}")
                         raise e2
             raise
 
