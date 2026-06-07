@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 05/06/2026
+**Ultimo aggiornamento:** 07/06/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -10,28 +10,42 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 | Bot | File | Versione | Koyeb |
 |-----|------|---------|-------|
-| VogueBot | `Vogue_102.py` | 1.0.2 | colossal-giselle/vogue |
-| ArchitectBot | `Architect_101.py` | 1.0.1 | homely-annabelle/thearchitect |
-| AtelierBot | `Atelier_104.py` | 1.0.4 | flexible-denna/atelier |
-| FiltroBot | `Filtro_104.py` | 1.0.4 | screeching-jobina/filtro |
+| VogueBot | `Vogue_104.py` | 1.0.4 | colossal-giselle/vogue |
+| ArchitectBot | `Architect_103.py` | 1.0.3 | homely-annabelle/thearchitect |
+| AtelierBot | `Atelier_108.py` | 1.0.8 | flexible-denna/atelier |
+| FiltroBot | `Filtro_107.py` | 1.0.7 | screeching-jobina/filtro |
 | SurpriseBot | `Surprise_124.py` | 1.2.4 | surprise1/sorpresa |
 
-**Shared:** `C_shared100.py` v2.3.2 — comune a tutti i bot
+**Shared:** `C_shared100.py` v2.3.5 — comune a tutti i bot
 
 ---
 
 ## Struttura file
 
 ```
-C_shared100.py      # Libreria condivisa — GeminiClient, prompt, utils
-Vogue_102.py        # VogueBot — analisi foto → prompt Flow
-Architect_101.py    # ArchitectBot — prompt testo/foto → editoriale
-Atelier_104.py      # AtelierBot — outfit analysis → prompt con filtri
-Filtro_104.py       # FiltroBot — 7 categorie filtro + LEGO + Mosaic
-Surprise_124.py     # SurpriseBot — location + outfit random + /pride + /flag
-requirements.txt    # Dipendenze pip
-README.md           # Questo file
+C_shared100.py       # Libreria condivisa — GeminiClient, CaptionGenerator, prompt, utils
+Vogue_104.py         # VogueBot — analisi foto/testo → prompt Flow
+Architect_103.py     # ArchitectBot — prompt testo/foto → editoriale
+Atelier_108.py       # AtelierBot — outfit analysis → prompt con filtri
+Filtro_107.py        # FiltroBot — 7 categorie filtro + LEGO + Mosaic + Scarabocchio
+Surprise_124.py      # SurpriseBot — location + outfit random + /pride + /flag
+requirements.txt     # Dipendenze pip
+README.md            # Questo file
 ```
+
+---
+
+## Strategia call Gemini
+
+| Bot | Call/operazione | Caption |
+|-----|----------------|---------|
+| Atelier | 2 (analyze + review) | locale — zero call |
+| Vogue | 2 (analyze + review) | locale — zero call |
+| Architect | 1-2 | locale — zero call |
+| Filtro | 1 (analyze) | locale — zero call |
+| Surprise | 1 (review) | locale — zero call |
+
+`/caption` on-demand = 1 call Gemini (qualità superiore).
 
 ---
 
@@ -55,21 +69,21 @@ pilmoji>=2.0.4
 | `TELEGRAM_TOKEN_ARCHITECT` | ArchitectBot |
 | `TELEGRAM_TOKEN_CLOSET` | AtelierBot |
 | `TELEGRAM_TOKEN_FX` | FiltroBot |
-| `TELEGRAM_TOKEN_SORPRESA` | SurpriseBot / Pride / Flag |
-| `GOOGLE_API_KEY` | Chiave Gemini principale (tutti i bot) |
-| `GOOGLE_API_KEY_2` | Chiave Gemini secondaria (Vogue, Atelier) |
-| `GOOGLE_API_KEY_3` | Chiave Gemini terziaria (Vogue, Atelier) |
+| `TELEGRAM_TOKEN_SORPRESA` | SurpriseBot |
+| `GOOGLE_API_KEY` | Chiave Gemini principale |
+| `GOOGLE_API_KEY_2` | Chiave Gemini secondaria |
+| `GOOGLE_API_KEY_3` | Chiave Gemini terziaria |
 | `ALLOWED_USERS` | `273003890` |
 | `PORT` | `10000` |
 
 ---
 
-## GeminiClient
+## GeminiClient v2.3.5
 
-- Max 3 chiavi per bot (`GOOGLE_API_KEY`, `_2`, `_3`)
 - Rotation round-robin ad ogni chiamata
-- Callback `on_key_rotation` per notifica utente
-- Safety block: messaggio chiaro all'utente
+- Retry su tutti gli errori transitori (429, 503, timeout, connection)
+- `CaptionGenerator.local()` — caption zero call per tutti i bot
+- `/caption` on-demand via `from_image()` — 1 call Gemini
 
 ---
 
@@ -89,9 +103,3 @@ pilmoji>=2.0.4
 
 ### SurpriseBot
 `/start` · `/flag` · `/pride` · `/help` · `/info` · `/shared` · `/lastprompt`
-
----
-
-## Repository
-
-`valeriacross/Moltbot-Start` — Frankfurt
