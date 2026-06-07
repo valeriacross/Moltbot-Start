@@ -1,6 +1,6 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.3.4
+Versione: 2.3.5
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
@@ -73,9 +73,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.3.4"
-SHARED_VERSION = "2.3.4"   # aggiornare ad ogni modifica
-SHARED_DATE    = "06/06/2026"  # aggiornare ad ogni modifica
+VERSION = "2.3.5"
+SHARED_VERSION = "2.3.5"   # aggiornare ad ogni modifica
+SHARED_DATE    = "07/06/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -888,6 +888,127 @@ class CaptionGenerator:
         except Exception as e:
             logger.error(f"❌ CaptionGenerator.from_filter(): {e}", exc_info=True)
             return None, f"❌ Errore: {html.escape(str(e))}"
+
+
+
+    @staticmethod
+    def local(text: str, filter_label: str = None) -> str:
+        """
+        Caption locale — zero call Gemini.
+        Estrae parole chiave dal testo e costruisce emoji + frase breve.
+        Args:
+            text:         testo sorgente (prompt, scena, scenario)
+            filter_label: nome filtro opzionale es. "🌀 Dalì"
+        Returns:
+            caption string — mai None, fallback garantito
+        """
+        import random as _rnd
+        import re as _re
+
+        t = text.lower()
+
+        COLOR_MAP = [
+            (["gold","golden","gilded","ochre","amber"],       "✨"),
+            (["silver","metallic","chrome","platinum"],        "🪙"),
+            (["red","crimson","scarlet","burgundy","ruby"],    "❤️"),
+            (["pink","blush","rose","fuchsia","magenta"],      "🌸"),
+            (["orange","terracotta","rust","copper"],          "🧡"),
+            (["yellow","sunflower","lemon","mustard"],         "💛"),
+            (["green","emerald","sage","olive","forest"],      "💚"),
+            (["blue","cobalt","navy","sapphire","cerulean"],   "💙"),
+            (["purple","violet","lavender","indigo","plum"],   "💜"),
+            (["black","ebony","noir","onyx"],                  "🖤"),
+            (["white","ivory","cream","pearl","alabaster"],    "🤍"),
+            (["brown","chocolate","caramel","bronze","tan"],   "🤎"),
+        ]
+        ENV_MAP = [
+            (["desert","dune","sahara","arid","sand"],         "🏜️"),
+            (["urban","city","street","rooftop","skyline"],    "🏙️"),
+            (["forest","jungle","woods","botanical"],          "🌿"),
+            (["beach","ocean","sea","coast","wave","shore"],   "🌊"),
+            (["mountain","alpine","cliff","peak","canyon"],    "⛰️"),
+            (["garden","floral","flower","bloom","meadow"],    "🌺"),
+            (["studio","seamless","backdrop","neutral"],       "📸"),
+            (["night","midnight","evening"],                   "🌙"),
+            (["sunset","sunrise","dusk","dawn"],               "🌅"),
+            (["indoor","interior","room","loft"],              "🏠"),
+            (["piazza","ruins","classical","ancient","arch"],  "🏛️"),
+            (["rain","mist","fog","cloudy"],                   "🌧️"),
+            (["snow","winter","ice","frozen"],                 "❄️"),
+        ]
+        MOOD_MAP = [
+            (["dramatic","intense","powerful","bold"],         "⚡"),
+            (["elegant","refined","sophisticated","chic"],     "👑"),
+            (["dreamy","dreamlike","ethereal","surreal"],      "✨"),
+            (["dark","moody","mysterious"],                    "🖤"),
+            (["vibrant","vivid","colorful","energetic"],       "🎨"),
+            (["romantic","sensual","soft","gentle"],           "🌹"),
+            (["cinematic","editorial","fashion","vogue"],      "🎞️"),
+            (["playful","fun","joyful","whimsical"],           "🎉"),
+            (["minimal","clean","simple","pure"],              "◻️"),
+            (["raw","grunge","rough"],                         "🧱"),
+            (["mystical","magic","glow","luminous"],           "🔮"),
+        ]
+        FASHION_MAP = [
+            (["lace","tulle","sheer","transparent"],           "🩰"),
+            (["leather","biker","patent"],                     "🖤"),
+            (["silk","satin","velvet","chiffon"],              "✨"),
+            (["denim","jeans"],                                "👖"),
+            (["coat","trench","blazer","jacket"],              "🧥"),
+            (["gown","dress","skirt","couture"],               "👗"),
+            (["boots","heels","stiletto"],                     "👠"),
+            (["sunglasses","glasses","shades"],                "🕶️"),
+            (["hat","beret","cap","headpiece"],                "🎩"),
+            (["jewel","necklace","earring","bracelet","ring"], "💎"),
+        ]
+        STOPWORDS = {
+            "the","a","an","and","or","but","in","on","at","to","for","of",
+            "with","by","from","as","is","are","was","were","be","been",
+            "this","that","these","those","it","its","not","no","so","yet",
+            "above","below","into","onto","over","under","within","without",
+            "described","subject","outfit","style","prompt","generate","image",
+            "photo","picture","reinterpret","preserve","exactly","palette",
+            "background","solid","colors","only","patterns","quality","feel",
+            "painted","texture","atmosphere","composition","use","using","make",
+            "create","draw","redraw","write","render","show","white","black",
+        }
+
+        def _match(pool):
+            return [e for kws, e in pool if any(k in t for k in kws)]
+
+        mood_e    = _match(MOOD_MAP)
+        color_e   = _match(COLOR_MAP)
+        env_e     = _match(ENV_MAP)
+        fashion_e = _match(FASHION_MAP)
+
+        selected = []
+        for pool in [mood_e, color_e, env_e, fashion_e]:
+            if pool and len(selected) < 5:
+                selected.append(pool[0])
+
+        if filter_label:
+            fe = _re.findall(
+                r"[🀀-🿿☀-➿⌀-⏿]",
+                filter_label
+            )
+            if fe and fe[0] not in selected:
+                selected.insert(0, fe[0])
+
+        if not selected:
+            selected = [_rnd.choice(["✨", "🎨", "🖤", "💫", "🌟"])]
+
+        STRIP_CHARS = ".,!?;:()[]"
+        words = [w.strip(STRIP_CHARS).strip(chr(34)).strip(chr(39)) for w in text.split()]
+        kw = []
+        seen = set()
+        for w in words:
+            wl = w.lower()
+            if len(wl) > 3 and wl not in STOPWORDS and wl.isalpha() and wl not in seen:
+                seen.add(wl)
+                kw.append(wl)
+
+        phrase = " ".join(kw[:8]) if kw else "editorial fashion mood"
+        return "{} {}".format("".join(selected[:5]), phrase)
 
 
 # ============================================================
