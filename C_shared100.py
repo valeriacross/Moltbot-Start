@@ -1,6 +1,6 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.3.6
+Versione: 2.3.8
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
@@ -73,8 +73,8 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.3.6"
-SHARED_VERSION = "2.3.6"   # aggiornare ad ogni modifica
+VERSION = "2.3.8"
+SHARED_VERSION = "2.3.8"   # aggiornare ad ogni modifica
 SHARED_DATE    = "07/06/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -524,7 +524,7 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
 class GeminiClient:
     """
     Wrapper Singleton attorno a genai.Client con rotation automatica multi-chiave.
-    Legge GOOGLE_API_KEY, GOOGLE_API_KEY_2, GOOGLE_API_KEY_3 dall'environment.
+    Legge GOOGLE_API_KEY, GOOGLE_API_KEY_2, GOOGLE_API_KEY_3, GOOGLE_API_KEY_4 dall'environment.
     Su 429/quota esaurita ruota automaticamente alla chiave successiva.
     """
     _instance = None
@@ -543,7 +543,7 @@ class GeminiClient:
             return
         # Raccoglie tutte le chiavi disponibili
         keys = []
-        for env_var in ["GOOGLE_API_KEY", "GOOGLE_API_KEY_2", "GOOGLE_API_KEY_3"]:
+        for env_var in ["GOOGLE_API_KEY", "GOOGLE_API_KEY_2", "GOOGLE_API_KEY_3", "GOOGLE_API_KEY_4"]:
             k = os.environ.get(env_var)
             if k:
                 keys.append(k)
@@ -557,6 +557,7 @@ class GeminiClient:
         self._rotation_callbacks = []
         self._key_use_callbacks = []        # callback ad ogni chiamata (chiave, count)
         self._call_counts = [0] * len(keys)  # contatore per chiave — si azzera al riavvio
+        self._total_calls = 0               # contatore globale — tutte le chiavi sommate
 
         if not self._clients:
             logger.warning("⚠️ GeminiClient: nessuna GOOGLE_API_KEY configurata.")
@@ -629,16 +630,16 @@ class GeminiClient:
         # Round-robin: ruota la chiave PRIMA di ogni chiamata
         if len(self._clients) > 1:
             self._rotate_key()
-        # Incrementa contatore della chiave corrente e notifica on_key_use callbacks
+        # Incrementa contatori e notifica on_key_use callbacks
+        self._total_calls += 1
         if self._call_counts:
             self._call_counts[self._key_index] += 1
-            _cur_count = self._call_counts[self._key_index]
-            _cur_key   = self._key_index + 1
-            for _cb in self._key_use_callbacks:
-                try:
-                    _cb(_cur_key, _cur_count)
-                except Exception as _cb_err:
-                    logger.warning(f"\u26a0\ufe0f on_key_use callback error: {_cb_err}")
+        _cur_key = self._key_index + 1
+        for _cb in self._key_use_callbacks:
+            try:
+                _cb(_cur_key, self._total_calls)
+            except Exception as _cb_err:
+                logger.warning(f"\u26a0\ufe0f on_key_use callback error: {_cb_err}")
         try:
             if contents:
                 text_part = genai_types.Part.from_text(text=prompt)
