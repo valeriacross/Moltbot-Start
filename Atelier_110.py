@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # --- CONFIGURAZIONE ---
-VERSION = "1.0.7"
+VERSION = "1.10.0"
 TOKEN   = os.environ.get("TELEGRAM_TOKEN_CLOSET")
 
 # GeminiClient da C_shared100 v2.2.0 — gestisce nativamente la rotation
