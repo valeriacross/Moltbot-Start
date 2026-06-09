@@ -563,6 +563,7 @@ class GeminiClient:
             logger.warning("⚠️ GeminiClient: nessuna GOOGLE_API_KEY configurata.")
         else:
             logger.info(f"🔑 GeminiClient: {len(self._clients)} chiave/i disponibile/i")
+            self._schedule_daily_reset()
         self._initialized = True
 
     def _rotate_key(self):
