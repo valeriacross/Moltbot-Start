@@ -1,6 +1,6 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.3.10
+Versione: 2.3.11
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
@@ -73,8 +73,8 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.3.10"
-SHARED_VERSION = "2.3.10"   # aggiornare ad ogni modifica
+VERSION = "2.3.11"
+SHARED_VERSION = "2.3.11"   # aggiornare ad ogni modifica
 SHARED_DATE    = "07/06/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -618,7 +618,7 @@ class GeminiClient:
         def _reset_loop():
             while True:
                 now = _dt.datetime.utcnow()
-                next_reset = now.replace(hour=8, minute=0, second=0, microsecond=0)
+                next_reset = now.replace(hour=7, minute=0, second=0, microsecond=0)
                 if now >= next_reset:
                     next_reset += _dt.timedelta(days=1)
                 wait_secs = (next_reset - now).total_seconds()
