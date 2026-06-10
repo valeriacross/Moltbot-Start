@@ -1,6 +1,6 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.3.8
+Versione: 2.3.10
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
@@ -73,8 +73,8 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.3.8"
-SHARED_VERSION = "2.3.8"   # aggiornare ad ogni modifica
+VERSION = "2.3.10"
+SHARED_VERSION = "2.3.10"   # aggiornare ad ogni modifica
 SHARED_DATE    = "07/06/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -563,8 +563,9 @@ class GeminiClient:
             logger.warning("⚠️ GeminiClient: nessuna GOOGLE_API_KEY configurata.")
         else:
             logger.info(f"🔑 GeminiClient: {len(self._clients)} chiave/i disponibile/i")
-            self._schedule_daily_reset()
         self._initialized = True
+        if self._clients:
+            self._schedule_daily_reset()
 
     def _rotate_key(self):
         """Ruota alla chiave successiva — chiamato su 429/quota."""
@@ -602,6 +603,31 @@ class GeminiClient:
         Utile per mostrare quale chiave è in uso e quante call ha fatto oggi.
         """
         self._key_use_callbacks.append(callback)
+
+    def reset_counters(self):
+        """Azzera tutti i contatori call — chiamare su /start e automaticamente alle 08:00 UTC."""
+        self._call_counts = [0] * len(self._clients)
+        self._total_calls = 0
+        logger.info("🔄 GeminiClient: contatori call azzerati")
+
+    def _schedule_daily_reset(self):
+        """Pianifica reset automatico ogni giorno alle 08:00 UTC (= 09:00 Lisbona estate)."""
+        import threading as _t
+        import datetime as _dt
+
+        def _reset_loop():
+            while True:
+                now = _dt.datetime.utcnow()
+                next_reset = now.replace(hour=8, minute=0, second=0, microsecond=0)
+                if now >= next_reset:
+                    next_reset += _dt.timedelta(days=1)
+                wait_secs = (next_reset - now).total_seconds()
+                logger.info(f"⏰ Prossimo reset contatori in {int(wait_secs//3600)}h {int((wait_secs%3600)//60)}m (08:00 UTC)")
+                _t.Event().wait(timeout=wait_secs)
+                self.reset_counters()
+
+        t = _t.Thread(target=_reset_loop, daemon=True, name="GeminiCounterReset")
+        t.start()
 
     @property
     def call_counts(self) -> list[int]:
