@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 08/06/2026
+**Ultimo aggiornamento:** 15/06/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -10,13 +10,13 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 | Bot | File | Versione | Koyeb | Chiavi |
 |-----|------|---------|-------|--------|
-| VogueBot | `Vogue_106.py` | 1.0.6 | colossal-giselle/vogue | 3 |
-| ArchitectBot | `Architect_104.py` | 1.0.4 | homely-annabelle/thearchitect | 2 |
-| AtelierBot | `Atelier_111.py` | 1.1.1 | flexible-denna/atelier | 3 |
+| VogueBot | `Vogue_108.py` | 1.0.8 | colossal-giselle/vogue | 2 |
+| ArchitectBot | `Architect_107.py` | 1.0.7 | homely-annabelle/thearchitect | 2 |
+| AtelierBot | `Atelier_113.py` | 1.1.3 | flexible-denna/atelier | 4 |
 | FiltroBot | `Filtro_108.py` | 1.0.8 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_124.py` | 1.2.4 | surprise1/sorpresa | 1 |
 
-**Shared:** `C_shared100.py` v2.3.7 · **10 API key totali**
+**Shared:** `C_shared100.py` v2.3.11 · **10 API key totali**
 
 ---
 
@@ -24,9 +24,9 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 ```
 C_shared100.py       # Libreria condivisa
-Vogue_106.py         # Analisi foto/testo → prompt Flow
-Architect_104.py     # Prompt testo/foto → editoriale
-Atelier_111.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Vogue_108.py         # Analisi foto/testo → prompt Flow
+Architect_107.py     # Prompt testo/foto → editoriale · /generico (prompt neutro)
+Atelier_113.py       # Outfit analysis → prompt con filtri (filtro persistente)
 Filtro_108.py        # 7 categorie + LEGO + Mosaic + Scarabocchio
 Surprise_124.py      # Location + outfit random + /pride + /flag
 requirements.txt
@@ -37,13 +37,22 @@ README.md
 
 ## Call Gemini per bot
 
-| Bot | Call/foto | Caption |
-|-----|-----------|---------|
-| Atelier | 2 | `/caption` on-demand |
-| Vogue | 2 | `/caption` on-demand |
-| Architect | 1-2 | nessuna |
-| Filtro | 1 | `/caption` on-demand |
-| Surprise | 1 | nessuna |
+| Bot | Call/foto | Caption | Extra |
+|-----|-----------|---------|-------|
+| Atelier | 2 | `/caption` on-demand | — |
+| Vogue | 2 | `/caption` on-demand | — |
+| Architect | 1-2 | nessuna | `/generico` (1 call) |
+| Filtro | 1 | `/caption` on-demand | — |
+| Surprise | 1 | nessuna | — |
+
+---
+
+## Contatori chiave
+
+Ogni bot con `on_key_use` mostra `🔑 Key N · call #N` ad ogni chiamata Gemini — contatore PER CHIAVE, non globale. Si azzera:
+- Automaticamente ogni giorno alle **08:00 ora di Lisbona** (07:00 UTC)
+- Su `/start` (Atelier, Vogue)
+- Al riavvio del servizio Koyeb
 
 ---
 
@@ -59,13 +68,34 @@ pilmoji>=2.0.4
 
 ---
 
-## Comandi
+## Variabili d'ambiente (Koyeb)
+
+| Variabile | Descrizione |
+|-----------|-------------|
+| `TELEGRAM_TOKEN` | VogueBot |
+| `TELEGRAM_TOKEN_ARCHITECT` | ArchitectBot |
+| `TELEGRAM_TOKEN_CLOSET` | AtelierBot |
+| `TELEGRAM_TOKEN_FX` | FiltroBot |
+| `TELEGRAM_TOKEN_SORPRESA` | SurpriseBot |
+| `GOOGLE_API_KEY` (+_2, +_3, +_4) | Chiavi Gemini — quantità varia per bot |
+| `ALLOWED_USERS` | `273003890` |
+| `PORT` | `10000` |
+
+---
+
+## Nota tecnica importante
+
+`review_and_fix()` in C_shared ha un prompt di sistema interno che **forza** il DNA Valeria Cross (viso, corpo, watermark). Non usarla per task che richiedono di rimuovere o alterare quel DNA — usare `gemini.generate()` direttamente con un prompt dedicato (vedi `/generico` in Architect come esempio).
+
+---
+
+## Comandi per bot
 
 ### VogueBot
 `/start` · `/info` · `/shared` · `/dna` · `/caption`
 
 ### ArchitectBot
-`/start` · `/help` · `/info` · `/lastprompt` · `/shared`
+`/start` · `/help` · `/info` · `/lastprompt` · `/generico` · `/shared`
 
 ### AtelierBot
 `/start` · `/help` · `/info` · `/lastprompt` · `/caption` · `/shared`
