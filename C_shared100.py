@@ -1,9 +1,15 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.3.11
+Versione: 2.3.12
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.3.12 (20/06/2026):
+  - Fix robustezza GeminiCounterReset: datetime.utcnow() (deprecato) sostituito con
+    datetime.now(timezone.utc). _reset_loop() ora avvolto in try/except — prima,
+    una qualsiasi eccezione interna terminava il thread di reset giornaliero per
+    sempre, in modo silenzioso, senza log e senza che i contatori si azzerassero più.
 
 CHANGELOG 2.2.0 (31/05/2026):
   - GeminiClient: property current_key_num (1-based) e metodo on_key_rotation(callback).
@@ -73,9 +79,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.3.11"
-SHARED_VERSION = "2.3.11"   # aggiornare ad ogni modifica
-SHARED_DATE    = "07/06/2026"  # aggiornare ad ogni modifica
+VERSION = "2.3.12"
+SHARED_VERSION = "2.3.12"   # aggiornare ad ogni modifica
+SHARED_DATE    = "20/06/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -611,20 +617,31 @@ class GeminiClient:
         logger.info("🔄 GeminiClient: contatori call azzerati")
 
     def _schedule_daily_reset(self):
-        """Pianifica reset automatico ogni giorno alle 08:00 UTC (= 09:00 Lisbona estate)."""
+        """Pianifica reset automatico ogni giorno alle 08:00 UTC (= 09:00 Lisbona estate).
+        FIX 2.3.12: datetime.utcnow() (deprecato, naive) sostituito con
+        datetime.now(timezone.utc) (aware) — evita TypeError silenziosi futuri su
+        confronti naive/aware. Il loop è inoltre avvolto in try/except: prima, una
+        qualsiasi eccezione interna terminava il thread per sempre senza alcun log,
+        e i contatori restavano bloccati fino al riavvio del servizio senza che
+        nessuno se ne accorgesse.
+        """
         import threading as _t
         import datetime as _dt
 
         def _reset_loop():
             while True:
-                now = _dt.datetime.utcnow()
-                next_reset = now.replace(hour=7, minute=0, second=0, microsecond=0)
-                if now >= next_reset:
-                    next_reset += _dt.timedelta(days=1)
-                wait_secs = (next_reset - now).total_seconds()
-                logger.info(f"⏰ Prossimo reset contatori in {int(wait_secs//3600)}h {int((wait_secs%3600)//60)}m (08:00 UTC)")
-                _t.Event().wait(timeout=wait_secs)
-                self.reset_counters()
+                try:
+                    now = _dt.datetime.now(_dt.timezone.utc)
+                    next_reset = now.replace(hour=7, minute=0, second=0, microsecond=0)
+                    if now >= next_reset:
+                        next_reset += _dt.timedelta(days=1)
+                    wait_secs = (next_reset - now).total_seconds()
+                    logger.info(f"⏰ Prossimo reset contatori in {int(wait_secs//3600)}h {int((wait_secs%3600)//60)}m (08:00 UTC)")
+                    _t.Event().wait(timeout=wait_secs)
+                    self.reset_counters()
+                except Exception as e:
+                    logger.error(f"❌ GeminiCounterReset: errore nel loop, ritento tra 60s: {e}", exc_info=True)
+                    _t.Event().wait(timeout=60)
 
         t = _t.Thread(target=_reset_loop, daemon=True, name="GeminiCounterReset")
         t.start()

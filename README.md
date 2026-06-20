@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 15/06/2026
+**Ultimo aggiornamento:** 20/06/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -10,13 +10,13 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 | Bot | File | Versione | Koyeb | Chiavi |
 |-----|------|---------|-------|--------|
-| VogueBot | `Vogue_108.py` | 1.0.8 | colossal-giselle/vogue | 2 |
-| ArchitectBot | `Architect_107.py` | 1.0.7 | homely-annabelle/thearchitect | 2 |
-| AtelierBot | `Atelier_113.py` | 1.1.3 | flexible-denna/atelier | 4 |
-| FiltroBot | `Filtro_108.py` | 1.0.8 | screeching-jobina/filtro | 1 |
-| SurpriseBot | `Surprise_124.py` | 1.2.4 | surprise1/sorpresa | 1 |
+| VogueBot | `Vogue_200.py` | 2.0.0 | colossal-giselle/vogue | 2 |
+| ArchitectBot | `Architect_200.py` | 2.0.0 | homely-annabelle/thearchitect | 2 |
+| AtelierBot | `Atelier_200.py` | 2.0.0 | flexible-denna/atelier | 4 |
+| FiltroBot | `Filtro_200.py` | 2.0.0 | screeching-jobina/filtro | 1 |
+| SurpriseBot | `Surprise_200.py` | 2.0.0 | surprise1/sorpresa | 1 |
 
-**Shared:** `C_shared100.py` v2.3.11 · **10 API key totali**
+**Shared:** `C_shared100.py` v2.3.12 · **10 API key totali**
 
 ---
 
@@ -24,11 +24,11 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 ```
 C_shared100.py       # Libreria condivisa
-Vogue_108.py         # Analisi foto/testo → prompt Flow
-Architect_107.py     # Prompt testo/foto → editoriale · /generico (prompt neutro)
-Atelier_113.py       # Outfit analysis → prompt con filtri (filtro persistente)
-Filtro_108.py        # 7 categorie + LEGO + Mosaic + Scarabocchio
-Surprise_124.py      # Location + outfit random + /pride + /flag
+Vogue_200.py         # Analisi foto/testo → prompt Flow
+Architect_200.py     # Prompt testo/foto → editoriale · /generico (prompt neutro)
+Atelier_200.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Filtro_200.py        # 7 categorie + LEGO + Mosaic + Scarabocchio
+Surprise_200.py      # Location + outfit random + /pride + /flag
 requirements.txt
 README.md
 ```
@@ -82,6 +82,10 @@ pilmoji>=2.0.4
 | `PORT` | `10000` |
 
 ---
+
+## Fix robustezza (20/06/2026)
+
+Audit di tutti e 6 i file, 6 bug concreti corretti: reset giornaliero contatori reso resiliente a eccezioni interne (prima poteva fermarsi silenziosamente per sempre), gestione errori aggiunta a generazioni Atelier/Architect che potevano bloccarsi senza messaggio, e corretto un bug Surprise che selezionava silenziosamente location/outfit diversi da quelli cliccati dal secondo giro in sessione. Dettagli completi in `HANDOFF-MASTER`, sezione 2bis.
 
 ## Nota tecnica importante
 
