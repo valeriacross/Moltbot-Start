@@ -1,9 +1,18 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.3.12
+Versione: 2.3.13
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.3.13 (25/06/2026):
+  - _ANALYZE_PROMPT: aggiunto campo PROPS & ACTIONS dopo ACCESSORIES.
+    Cattura oggetti fisici in contatto diretto col corpo del soggetto (posizione,
+    punto di contatto, azione). Prima, prop interattivi come "ice cube held between
+    lips" venivano ignorati o descritti vagamente in BACKGROUND — causando prompt
+    Atelier privi degli elementi scenici più forti dell'immagine originale.
+    Nessuna altra modifica alla pipeline: protezione NSFW (analisi testuale mediata,
+    senza visione diretta dell'immagine nei passaggi successivi) invariata.
 
 CHANGELOG 2.3.12 (20/06/2026):
   - Fix robustezza GeminiCounterReset: datetime.utcnow() (deprecato) sostituito con
@@ -79,9 +88,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.3.12"
-SHARED_VERSION = "2.3.12"   # aggiornare ad ogni modifica
-SHARED_DATE    = "20/06/2026"  # aggiornare ad ogni modifica
+VERSION = "2.3.13"
+SHARED_VERSION = "2.3.13"   # aggiornare ad ogni modifica
+SHARED_DATE    = "25/06/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -456,6 +465,14 @@ _ANALYZE_PROMPT = (
     "Describe the garment as if it exists independently — no wearer mentioned.]\n\n"
     "ACCESSORIES: [Every accessory as a standalone object — jewelry, footwear, headwear, bags, "
     "with color+HEX.]\n\n"
+    "PROPS & ACTIONS: [Physical objects interacting directly with the subject's body — "
+    "exact position, contact point, and action being performed. "
+    "Be specific and literal: describe where the object is, how it contacts the body, and what is happening. "
+    "Examples: 'single clear ice cube held between lips, partially inserted in mouth', "
+    "'four translucent ice cubes stacked vertically on upper chest between collarbones, "
+    "melting water running in rivulets down torso', "
+    "'liquid dripping from chin onto chest'. "
+    "If no props interact with the body: 'None.']\n\n"
     "COLOR PALETTE: [Dominant HEX codes with label.]\n\n"
     "BACKGROUND: [Exact location, architecture, surfaces, props, environment — be specific.]\n\n"
     "LIGHTING: [Light source, direction, quality, color temperature, mood — 1-2 sentences.]\n\n"
@@ -463,7 +480,8 @@ _ANALYZE_PROMPT = (
     "MOOD: [Overall atmosphere, color grade, cinematic style — 1 sentence.]\n\n"
     "Rules:\n"
     "— Describe garments and accessories as standalone objects\n"
-    "— Be precise and detailed on fabrics, colors and environment"
+    "— Be precise and detailed on fabrics, colors and environment\n"
+    "— For PROPS & ACTIONS: describe physical contact and actions literally, not metaphorically"
 )
 
 
