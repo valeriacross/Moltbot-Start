@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 20/06/2026
+**Ultimo aggiornamento:** 25/06/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -11,12 +11,12 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 | Bot | File | Versione | Koyeb | Chiavi |
 |-----|------|---------|-------|--------|
 | VogueBot | `Vogue_200.py` | 2.0.0 | colossal-giselle/vogue | 2 |
-| ArchitectBot | `Architect_200.py` | 2.0.0 | homely-annabelle/thearchitect | 2 |
-| AtelierBot | `Atelier_200.py` | 2.0.0 | flexible-denna/atelier | 4 |
+| ArchitectBot | `Architect_201.py` | 2.0.1 | homely-annabelle/thearchitect | 1 |
+| AtelierBot | `Atelier_202.py` | 2.0.2 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_200.py` | 2.0.0 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_200.py` | 2.0.0 | surprise1/sorpresa | 1 |
 
-**Shared:** `C_shared100.py` v2.3.12 · **10 API key totali**
+**Shared:** `C_shared100.py` v2.3.14 · **10 API key totali**
 
 ---
 
@@ -25,8 +25,8 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 ```
 C_shared100.py       # Libreria condivisa
 Vogue_200.py         # Analisi foto/testo → prompt Flow
-Architect_200.py     # Prompt testo/foto → editoriale · /generico (prompt neutro)
-Atelier_200.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Architect_201.py     # Prompt testo/foto → editoriale · /generico (prompt neutro)
+Atelier_202.py       # Outfit analysis → prompt con filtri (filtro persistente)
 Filtro_200.py        # 7 categorie + LEGO + Mosaic + Scarabocchio
 Surprise_200.py      # Location + outfit random + /pride + /flag
 requirements.txt
@@ -83,9 +83,9 @@ pilmoji>=2.0.4
 
 ---
 
-## Fix robustezza (20/06/2026)
+## Fix robustezza (20/06/2026 → 25/06/2026)
 
-Audit di tutti e 6 i file, 6 bug concreti corretti: reset giornaliero contatori reso resiliente a eccezioni interne (prima poteva fermarsi silenziosamente per sempre), gestione errori aggiunta a generazioni Atelier/Architect che potevano bloccarsi senza messaggio, e corretto un bug Surprise che selezionava silenziosamente location/outfit diversi da quelli cliccati dal secondo giro in sessione. Dettagli completi in `HANDOFF-MASTER`, sezione 2bis.
+Audit completo il 20/06, fix puntuali il 25/06. Modifiche principali: reset giornaliero contatori reso resiliente (shared 2.3.12), `analyze_scene()` ora cattura prop interattivi con campo dedicato `PROPS & ACTIONS` (shared 2.3.13), 5ª chiave API aggiunta per Atelier (shared 2.3.14), fix `/generico` in Architect (201), rimozione ratio/count da Atelier e miglioramento fedeltà scena in `build_shooting_prompt` (202). Dettagli in `HANDOFF-MASTER`, sezioni 2bis e 2ter.
 
 ## Nota tecnica importante
 
