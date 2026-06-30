@@ -1,9 +1,17 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.3.14
+Versione: 2.3.15
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.3.15 (01/07/2026):
+  - Solo pulizia documentale, nessuna modifica funzionale. Corretto commento
+    obsoleto in _schedule_daily_reset(): il docstring riportava ancora
+    "08:00 UTC (= 09:00 Lisbona estate)", residuo del fix 2.3.11 mai
+    aggiornato dopo che il codice era stato corretto a hour=7 (07:00 UTC
+    = 08:00 Lisbona estate). Il comportamento a runtime non cambia — era
+    solo il commento a essere disallineato dal codice reale.
 
 CHANGELOG 2.3.14 (25/06/2026):
   - GeminiClient: aggiunta GOOGLE_API_KEY_5 alla lista variabili d'ambiente.
@@ -94,9 +102,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3-flash-preview"
 
 # Versione
-VERSION = "2.3.14"
-SHARED_VERSION = "2.3.14"   # aggiornare ad ogni modifica
-SHARED_DATE    = "25/06/2026"  # aggiornare ad ogni modifica
+VERSION = "2.3.15"
+SHARED_VERSION = "2.3.15"   # aggiornare ad ogni modifica
+SHARED_DATE    = "01/07/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -641,7 +649,7 @@ class GeminiClient:
         logger.info("🔄 GeminiClient: contatori call azzerati")
 
     def _schedule_daily_reset(self):
-        """Pianifica reset automatico ogni giorno alle 08:00 UTC (= 09:00 Lisbona estate).
+        """Pianifica reset automatico ogni giorno alle 07:00 UTC (= 08:00 Lisbona estate).
         FIX 2.3.12: datetime.utcnow() (deprecato, naive) sostituito con
         datetime.now(timezone.utc) (aware) — evita TypeError silenziosi futuri su
         confronti naive/aware. Il loop è inoltre avvolto in try/except: prima, una
