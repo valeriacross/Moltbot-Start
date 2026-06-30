@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 25/06/2026
+**Ultimo aggiornamento:** 27/06/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -11,7 +11,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 | Bot | File | Versione | Koyeb | Chiavi |
 |-----|------|---------|-------|--------|
 | VogueBot | `Vogue_200.py` | 2.0.0 | colossal-giselle/vogue | 2 |
-| ArchitectBot | `Architect_201.py` | 2.0.1 | homely-annabelle/thearchitect | 1 |
+| ArchitectBot | `Architect_202.py` | 2.0.2 | homely-annabelle/thearchitect | 1 |
 | AtelierBot | `Atelier_202.py` | 2.0.2 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_200.py` | 2.0.0 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_200.py` | 2.0.0 | surprise1/sorpresa | 1 |
@@ -25,7 +25,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 ```
 C_shared100.py       # Libreria condivisa
 Vogue_200.py         # Analisi foto/testo → prompt Flow
-Architect_201.py     # Prompt testo/foto → editoriale · /generico (prompt neutro)
+Architect_202.py     # Prompt testo/foto → editoriale · /generico (prompt neutro)
 Atelier_202.py       # Outfit analysis → prompt con filtri (filtro persistente)
 Filtro_200.py        # 7 categorie + LEGO + Mosaic + Scarabocchio
 Surprise_200.py      # Location + outfit random + /pride + /flag
@@ -83,9 +83,11 @@ pilmoji>=2.0.4
 
 ---
 
-## Fix robustezza (20/06/2026 → 25/06/2026)
+## Fix robustezza (20/06/2026 → 27/06/2026)
 
-Audit completo il 20/06, fix puntuali il 25/06. Modifiche principali: reset giornaliero contatori reso resiliente (shared 2.3.12), `analyze_scene()` ora cattura prop interattivi con campo dedicato `PROPS & ACTIONS` (shared 2.3.13), 5ª chiave API aggiunta per Atelier (shared 2.3.14), fix `/generico` in Architect (201), rimozione ratio/count da Atelier e miglioramento fedeltà scena in `build_shooting_prompt` (202). Dettagli in `HANDOFF-MASTER`, sezioni 2bis e 2ter.
+Audit completo il 20/06, fix puntuali il 25/06 e 27/06. Modifiche principali: reset giornaliero contatori reso resiliente (shared 2.3.12), `analyze_scene()` ora cattura prop interattivi con campo dedicato `PROPS & ACTIONS` (shared 2.3.13), 5ª chiave API aggiunta per Atelier (shared 2.3.14), rimozione ratio/count e miglioramento fedeltà scena in Atelier (202). Su Architect, fix `/generico` in due passaggi: la versione 201 (25/06) era preventiva ma non centrata sulla causa reale; la 202 (27/06) ha individuato e corretto la causa effettiva — `task_generico` allegava bottoni post-prompt fuori contesto tramite `send_prompt()`. Dettagli in `HANDOFF-MASTER`, sezioni 2bis e 2ter.
+
+**TODO aperto:** il contatore `🔑 Key N · call #N` mostrato dai bot è in realtà globale (somma di tutte le chiavi), non per-chiave come il nome suggerisce — bug noto in `C_shared100.py`, da correggere nella prossima sessione.
 
 ## Nota tecnica importante
 
