@@ -1,9 +1,30 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.3.15
+Versione: 2.3.16
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.3.16 (02/07/2026):
+  - MODEL: "gemini-3-flash-preview" → "gemini-3.5-flash". Motivo: 503 diffusi
+    su tutti i bot nonostante il retry/rotazione chiavi già presente in
+    generate() — riconducibile al fatto che gemini-3-flash-preview è
+    modello preview, con limiti di capacità/priorità più severi per
+    definizione rispetto ai modelli GA (fonte: pagina ufficiale deprecation
+    Google, che raccomanda esplicitamente la migrazione a gemini-3.5-flash).
+    gemini-3.5-flash è GA/stabile, costa 3x il preview attuale ma non ha
+    le restrizioni di capacità del livello preview. Scelta di Valeria tra
+    gemini-3.5-flash (qualità superiore) e gemini-3.1-flash-lite (più
+    economico, alto volume) — se emergono limiti (costo o rate limit) il
+    piano di fallback concordato è passare a gemini-3.1-flash-lite o
+    tornare a gemini-3-flash-preview. Nessun'altra occorrenza del vecchio
+    nome modello nel file (verificato via grep) — tutti i bot ereditano
+    MODEL da qui, nessuna modifica ai singoli bot in questo cambio.
+    NOTA: i comandi /info di Vogue (MODEL_TEXT), Filtro (MODEL_TEXT_ID),
+    Architect/Atelier/Surprise (stringa inline) mostrano ancora
+    "gemini-3-flash-preview" in chat — sono costanti locali ai singoli
+    bot, non lette da qui, quindi restano disallineate finché non
+    vengono aggiornate separatamente nei singoli file bot.
 
 CHANGELOG 2.3.15 (01/07/2026):
   - Solo pulizia documentale, nessuna modifica funzionale. Corretto commento
@@ -99,12 +120,12 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-MODEL = "gemini-3-flash-preview"
+MODEL = "gemini-3.5-flash"
 
 # Versione
-VERSION = "2.3.15"
-SHARED_VERSION = "2.3.15"   # aggiornare ad ogni modifica
-SHARED_DATE    = "01/07/2026"  # aggiornare ad ogni modifica
+VERSION = "2.3.16"
+SHARED_VERSION = "2.3.16"   # aggiornare ad ogni modifica
+SHARED_DATE    = "02/07/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 

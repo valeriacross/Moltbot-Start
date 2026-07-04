@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 01/07/2026
+**Ultimo aggiornamento:** 04/07/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -16,7 +16,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 | FiltroBot | `Filtro_200.py` | 2.0.0 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_200.py` | 2.0.0 | surprise1/sorpresa | 1 |
 
-**Shared:** `C_shared100.py` v2.3.15 · **10 API key totali**
+**Shared:** `C_shared100.py` v2.3.16 · **10 API key totali**
 
 ---
 
@@ -83,11 +83,13 @@ openpyxl>=3.1.5
 
 ---
 
-## Fix robustezza (20/06/2026 → 01/07/2026)
+## Fix robustezza (20/06/2026 → 04/07/2026)
 
-Audit completo il 20/06, fix puntuali il 25/06 e 27/06. Modifiche principali: reset giornaliero contatori reso resiliente (shared 2.3.12), `analyze_scene()` ora cattura prop interattivi con campo dedicato `PROPS & ACTIONS` (shared 2.3.13), 5ª chiave API aggiunta per Atelier (shared 2.3.14), rimozione ratio/count e miglioramento fedeltà scena in Atelier (202). Su Architect, fix `/generico` in due passaggi: la versione 201 (25/06) era preventiva ma non centrata sulla causa reale; la 202 (27/06) ha individuato e corretto la causa effettiva — `task_generico` allegava bottoni post-prompt fuori contesto tramite `send_prompt()`. Il 01/07: pulizia documentale — requirements (README/xlsx/requirements.txt) riallineati, commento obsoleto corretto in shared (2.3.15), nessuna modifica funzionale ai bot. Dettagli in `HANDOFF-MASTER`, sezioni 2bis, 2ter e 2quater.
+Audit completo il 20/06, fix puntuali il 25/06 e 27/06. Modifiche principali: reset giornaliero contatori reso resiliente (shared 2.3.12), `analyze_scene()` ora cattura prop interattivi con campo dedicato `PROPS & ACTIONS` (shared 2.3.13), 5ª chiave API aggiunta per Atelier (shared 2.3.14), rimozione ratio/count e miglioramento fedeltà scena in Atelier (202). Su Architect, fix `/generico` in due passaggi: la versione 201 (25/06) era preventiva ma non centrata sulla causa reale; la 202 (27/06) ha individuato e corretto la causa effettiva — `task_generico` allegava bottoni post-prompt fuori contesto tramite `send_prompt()`. Il 01/07: pulizia documentale — requirements (README/xlsx/requirements.txt) riallineati, commento obsoleto corretto in shared (2.3.15). Il 04/07: modello Gemini aggiornato da `gemini-3-flash-preview` a `gemini-3.5-flash` (shared 2.3.16) per risolvere 503 diffusi legati ai limiti del livello preview; corrette 3 assegnazioni chiave errate su Koyeb (Atelier/Surprise/Filtro condividevano/scambiavano chiavi per errore, ora ciascuno ha la propria su progetto Google Cloud distinto). Dettagli in `HANDOFF-MASTER`, sezioni 2bis, 2ter, 2quater e 2quinquies.
 
-**TODO aperto:** il contatore `🔑 Key N · call #N` mostrato dai bot è in realtà globale (somma di tutte le chiavi), non per-chiave come il nome suggerisce — bug noto in `C_shared100.py`, lasciato volutamente intatto anche nella sessione 01/07 su scelta esplicita di Walter (perimetro limitato alla sola pulizia documentale). Da correggere in una prossima sessione.
+**TODO aperto:** il contatore `🔑 Key N · call #N` mostrato dai bot è in realtà globale (somma di tutte le chiavi), non per-chiave come il nome suggerisce — bug noto in `C_shared100.py`, lasciato volutamente intatto finora su scelta esplicita di Walter. Da correggere in una prossima sessione.
+
+**TODO aperto (04/07):** le stringhe `/info` dei 5 bot mostrano ancora `gemini-3-flash-preview` (Vogue `MODEL_TEXT`, Filtro `MODEL_TEXT_ID`, testo inline in Architect/Atelier/Surprise) nonostante il motore reale sia passato a `gemini-3.5-flash` in shared 2.3.16 — sono costanti locali ai singoli bot, non lette da `C_shared100.py`. Da allineare al prossimo giro di modifiche sui bot, insieme all'incremento di versione file per ciascuno.
 
 ## Nota tecnica importante
 
