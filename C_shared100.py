@@ -1,11 +1,27 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.3.16
+Versione: 2.3.17
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
 
-CHANGELOG 2.3.16 (02/07/2026):
+CHANGELOG 2.3.17 (07/07/2026):
+  - Step 2/2 concordato con Walter dopo test su Atelier con foto di riferimento
+    a body art elaborato (vedi HANDOFF sezione 2sexies/2septies). Aggiunto
+    campo "BODY ART" a _ANALYZE_PROMPT (dopo PROPS & ACTIONS) — cattura
+    tatuaggi/body paint/decorazioni sulla pelle come design visivo standalone,
+    con fallback esplicito 'None.' se assenti (stesso pattern di PROPS &
+    ACTIONS). Aggiunta clausola "BODY ART EXCEPTION — CONDITIONAL" sia a
+    VALERIA_BODY_STRONG che VALERIA_BODY_SAFE: se la scena descrive body art,
+    questo sostituisce "smooth porcelain skin" SOLO sulle zone indicate;
+    altrimenti la pelle resta liscia ovunque come da default — nessuna
+    invenzione di tatuaggi non descritti. Tocca tutti e 5 i bot (tutti
+    importano VALERIA_DNA e/o build_valeria_identity, verificato via grep).
+    Nessuna modifica a _ANALYZE_PROMPT oltre l'aggiunta del campo — ordine
+    delle altre sezioni invariato. Nessun termine body-art nel NEGATIVE
+    prompt esistente, quindi nessun conflitto da rimuovere.
+
+CHANGELOG 2.3.16 (04/07/2026):
   - MODEL: "gemini-3-flash-preview" → "gemini-3.5-flash". Motivo: 503 diffusi
     su tutti i bot nonostante il retry/rotazione chiavi già presente in
     generate() — riconducibile al fatto che gemini-3-flash-preview è
@@ -123,9 +139,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3.5-flash"
 
 # Versione
-VERSION = "2.3.16"
-SHARED_VERSION = "2.3.16"   # aggiornare ad ogni modifica
-SHARED_DATE    = "02/07/2026"  # aggiornare ad ogni modifica
+VERSION = "2.3.17"
+SHARED_VERSION = "2.3.17"   # aggiornare ad ogni modifica
+SHARED_DATE    = "07/07/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -182,7 +198,13 @@ VALERIA_BODY_STRONG = (
     "**⚠️ COEXISTENCE RULE — CRITICAL:** The silver-grey beard on the male face AND the feminine body "
     "are NOT a contradiction. They MUST coexist in the same image. The beard stays. The feminine body stays. "
     "Both are mandatory. Do NOT resolve this by removing the beard. "
-    "Do NOT resolve this by masculinizing the body. Keep both exactly as described.\n\n"
+    "Do NOT resolve this by masculinizing the body. Keep both exactly as described.\n"
+    "**⚠️ BODY ART EXCEPTION — CONDITIONAL:** If the scene reference includes a BODY ART section describing "
+    "tattoos, body paint or decorative skin markings, these OVERRIDE 'smooth porcelain skin' ONLY on the "
+    "areas described — reproduce the pattern, colors and placement exactly as given. Skin NOT covered by "
+    "described markings stays smooth and porcelain as specified above. If BODY ART states 'None' or is "
+    "absent, skin remains fully smooth and unmarked everywhere — do NOT invent tattoos or markings that "
+    "were not explicitly described.\n\n"
 )
 
 VALERIA_BODY_SAFE = (
@@ -195,7 +217,13 @@ VALERIA_BODY_SAFE = (
     "**⚠️ COEXISTENCE RULE — CRITICAL:** The silver-grey beard on the male face AND the feminine body "
     "are NOT a contradiction. They MUST coexist in the same image. The beard stays. The feminine body stays. "
     "Both are mandatory. Do NOT resolve this by removing the beard. "
-    "Do NOT resolve this by masculinizing the body. Keep both exactly as described.\n\n"
+    "Do NOT resolve this by masculinizing the body. Keep both exactly as described.\n"
+    "**⚠️ BODY ART EXCEPTION — CONDITIONAL:** If the scene reference includes a BODY ART section describing "
+    "tattoos, body paint or decorative skin markings, these OVERRIDE 'smooth porcelain skin' ONLY on the "
+    "areas described — reproduce the pattern, colors and placement exactly as given. Skin NOT covered by "
+    "described markings stays smooth and porcelain as specified above. If BODY ART states 'None' or is "
+    "absent, skin remains fully smooth and unmarked everywhere — do NOT invent tattoos or markings that "
+    "were not explicitly described.\n\n"
 )
 
 VALERIA_WATERMARK = "feat. Valeria Cross 👠"
@@ -508,6 +536,11 @@ _ANALYZE_PROMPT = (
     "melting water running in rivulets down torso', "
     "'liquid dripping from chin onto chest'. "
     "If no props interact with the body: 'None.']\n\n"
+    "BODY ART: [Any tattoos, henna, body paint, or decorative markings directly on the skin — "
+    "pattern style, color(s) with HEX, exact placement and coverage area on the body (e.g. 'left forearm', "
+    "'neck and collarbone', 'covering both shoulders and upper back'), line density and level of detail. "
+    "Describe it as a standalone visual design, independent of the wearer. "
+    "If no markings are present on the skin: 'None.']\n\n"
     "COLOR PALETTE: [Dominant HEX codes with label.]\n\n"
     "BACKGROUND: [Exact location, architecture, surfaces, props, environment — be specific.]\n\n"
     "LIGHTING: [Light source, direction, quality, color temperature, mood — 1-2 sentences.]\n\n"
@@ -516,7 +549,9 @@ _ANALYZE_PROMPT = (
     "Rules:\n"
     "— Describe garments and accessories as standalone objects\n"
     "— Be precise and detailed on fabrics, colors and environment\n"
-    "— For PROPS & ACTIONS: describe physical contact and actions literally, not metaphorically"
+    "— For PROPS & ACTIONS: describe physical contact and actions literally, not metaphorically\n"
+    "— For BODY ART: describe only markings actually visible on the skin — do not confuse with printed "
+    "patterns on garments (those belong in OUTFIT)"
 )
 
 
