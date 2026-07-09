@@ -1,9 +1,32 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.3.17
+Versione: 2.3.18
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.3.18 (08/07/2026):
+  - Risolto: la clausola "BODY ART EXCEPTION" (2.3.17) compariva in OGNI
+    prompt generato da tutti i bot, anche con BODY ART: None — testo
+    condizionale inerte nel caso comune. Analisi bot-per-bot (non assunta)
+    ha rivelato che solo Vogue e Atelier passano davvero da analyze_scene()
+    con un campo BODY ART ispezionabile; Filtro ha import morti (VALERIA_DNA
+    mai usato nei suoi prompt); Surprise non analizza mai una foto di
+    riferimento (clausola sempre morta lì, si risolve gratis); Architect fa
+    analisi+scrittura in un'unica chiamata Gemini, senza produrre un campo
+    esterno da controllare — non può avere una versione condizionale.
+    Rimossa la clausola da VALERIA_BODY_STRONG/SAFE (tornano alla forma
+    pre-2.3.17). Aggiunta BODY_ART_EXCEPTION_TEXT (stesso testo, costante
+    isolata) e body_art_clause(scene_description) — quest'ultima restituisce
+    il testo solo se BODY ART nella scena non è "None"/assente, altrimenti
+    stringa vuota. Vogue e Atelier chiamano body_art_clause() dopo
+    l'identità. Architect, su scelta esplicita di Walter, concatena
+    BODY_ART_EXCEPTION_TEXT direttamente e sempre — stesso comportamento
+    che aveva dal 07/07, solo spostato da VALERIA_BODY_STRONG a questa
+    costante dedicata (compensazione necessaria per non perdere la
+    capacità di preservare body art lì come effetto collaterale di questo
+    fix, dato che Architect condivide VALERIA_DNA con Vogue). Filtro e
+    Surprise non toccati — non ne avevano bisogno.
 
 CHANGELOG 2.3.17 (07/07/2026):
   - Step 2/2 concordato con Walter dopo test su Atelier con foto di riferimento
@@ -118,7 +141,7 @@ CHANGELOG 1.0.x (09/05/2026):
     generate_caption(), CaptionGenerator, VALERIA_DNA, EDITORIAL_WRAPPER.
 """
 
-import os, html, logging, threading, flask
+import os, html, logging, threading, flask, re
 from google import genai
 from google.genai import types as genai_types
 
@@ -139,9 +162,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3.5-flash"
 
 # Versione
-VERSION = "2.3.17"
-SHARED_VERSION = "2.3.17"   # aggiornare ad ogni modifica
-SHARED_DATE    = "07/07/2026"  # aggiornare ad ogni modifica
+VERSION = "2.3.18"
+SHARED_VERSION = "2.3.18"   # aggiornare ad ogni modifica
+SHARED_DATE    = "08/07/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -198,13 +221,7 @@ VALERIA_BODY_STRONG = (
     "**⚠️ COEXISTENCE RULE — CRITICAL:** The silver-grey beard on the male face AND the feminine body "
     "are NOT a contradiction. They MUST coexist in the same image. The beard stays. The feminine body stays. "
     "Both are mandatory. Do NOT resolve this by removing the beard. "
-    "Do NOT resolve this by masculinizing the body. Keep both exactly as described.\n"
-    "**⚠️ BODY ART EXCEPTION — CONDITIONAL:** If the scene reference includes a BODY ART section describing "
-    "tattoos, body paint or decorative skin markings, these OVERRIDE 'smooth porcelain skin' ONLY on the "
-    "areas described — reproduce the pattern, colors and placement exactly as given. Skin NOT covered by "
-    "described markings stays smooth and porcelain as specified above. If BODY ART states 'None' or is "
-    "absent, skin remains fully smooth and unmarked everywhere — do NOT invent tattoos or markings that "
-    "were not explicitly described.\n\n"
+    "Do NOT resolve this by masculinizing the body. Keep both exactly as described.\n\n"
 )
 
 VALERIA_BODY_SAFE = (
@@ -217,13 +234,7 @@ VALERIA_BODY_SAFE = (
     "**⚠️ COEXISTENCE RULE — CRITICAL:** The silver-grey beard on the male face AND the feminine body "
     "are NOT a contradiction. They MUST coexist in the same image. The beard stays. The feminine body stays. "
     "Both are mandatory. Do NOT resolve this by removing the beard. "
-    "Do NOT resolve this by masculinizing the body. Keep both exactly as described.\n"
-    "**⚠️ BODY ART EXCEPTION — CONDITIONAL:** If the scene reference includes a BODY ART section describing "
-    "tattoos, body paint or decorative skin markings, these OVERRIDE 'smooth porcelain skin' ONLY on the "
-    "areas described — reproduce the pattern, colors and placement exactly as given. Skin NOT covered by "
-    "described markings stays smooth and porcelain as specified above. If BODY ART states 'None' or is "
-    "absent, skin remains fully smooth and unmarked everywhere — do NOT invent tattoos or markings that "
-    "were not explicitly described.\n\n"
+    "Do NOT resolve this by masculinizing the body. Keep both exactly as described.\n\n"
 )
 
 VALERIA_WATERMARK = "feat. Valeria Cross 👠"
@@ -235,7 +246,48 @@ VALERIA_NEGATIVE = (
     "extra fingers, JSON output, text overlay."
 )
 
-# DNA completo assemblato — usato da Vogue e Architect
+# BODY ART EXCEPTION — introdotta in 2.3.17, spostata fuori dai blocchi BODY
+# statici in 2.3.18. Testo unico condiviso, usato in due modi diversi:
+# 1) SEMPRE presente in Architect (che non ha un campo BODY ART esterno da
+#    controllare — analisi e scrittura avvengono in un'unica chiamata Gemini,
+#    senza produrre un testo intermedio ispezionabile). Architect importa
+#    questa costante e la concatena direttamente dopo VALERIA_DNA.
+# 2) CONDIZIONALMENTE presente in Vogue e Atelier tramite body_art_clause()
+#    sotto — questi bot passano da analyze_scene(), che produce un vero
+#    campo "BODY ART: ..." da poter ispezionare prima di decidere se la
+#    clausola serve o è testo morto (caso comune: BODY ART: None).
+BODY_ART_EXCEPTION_TEXT = (
+    "**⚠️ BODY ART EXCEPTION — CONDITIONAL:** If the scene reference includes a BODY ART section describing "
+    "tattoos, body paint or decorative skin markings, these OVERRIDE 'smooth porcelain skin' ONLY on the "
+    "areas described — reproduce the pattern, colors and placement exactly as given. Skin NOT covered by "
+    "described markings stays smooth and porcelain as specified above. If BODY ART states 'None' or is "
+    "absent, skin remains fully smooth and unmarked everywhere — do NOT invent tattoos or markings that "
+    "were not explicitly described.\n\n"
+)
+
+def body_art_clause(scene_description: str) -> str:
+    """Restituisce BODY_ART_EXCEPTION_TEXT SOLO se scene_description contiene
+    un campo BODY ART con contenuto reale (non 'None'/assente) — altrimenti
+    stringa vuota, per non appesantire il prompt nel caso comune (nessun
+    tatuaggio nella foto). Usare dopo l'identità (VALERIA_DNA o
+    build_valeria_identity()) nei bot che passano da analyze_scene()
+    (Vogue, Atelier). NON usare in Architect — vedi nota sopra."""
+    if not scene_description:
+        return ""
+    m = re.search(r'BODY ART:\s*(.+?)(?:\n\n|\Z)', scene_description, re.IGNORECASE | re.DOTALL)
+    if not m:
+        return ""
+    val = m.group(1).strip()
+    if not val or val.lower().startswith("none"):
+        return ""
+    return BODY_ART_EXCEPTION_TEXT
+
+# DNA completo assemblato — usato da Vogue e Architect. NOTA 2.3.18: non
+# include più BODY_ART_EXCEPTION_TEXT (era qui via VALERIA_BODY_STRONG fino
+# alla 2.3.17). Vogue ora aggiunge body_art_clause(scene_description) dopo
+# questa costante; Architect aggiunge BODY_ART_EXCEPTION_TEXT direttamente,
+# sempre, per non perdere la capacità di preservare body art che aveva dal
+# 07/07 — Architect non può renderla condizionale (vedi nota sopra).
 VALERIA_DNA = (
     f"{VALERIA_FACE}"
     f"{VALERIA_BODY_STRONG}"
