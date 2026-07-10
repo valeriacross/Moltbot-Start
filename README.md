@@ -11,7 +11,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 | Bot | File | Versione | Koyeb | Chiavi |
 |-----|------|---------|-------|--------|
 | VogueBot | `Vogue_201.py` | 2.0.1 | colossal-giselle/vogue | 2 |
-| ArchitectBot | `Architect_206.py` | 2.0.6 | homely-annabelle/thearchitect | 1 |
+| ArchitectBot | `Architect_300.py` | 3.0.0 | homely-annabelle/thearchitect | 1 |
 | AtelierBot | `Atelier_204.py` | 2.0.4 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_200.py` | 2.0.0 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_200.py` | 2.0.0 | surprise1/sorpresa | 1 |
@@ -25,7 +25,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 ```
 C_shared100.py       # Libreria condivisa
 Vogue_201.py         # Analisi foto/testo → prompt Flow
-Architect_206.py     # Prompt testo/foto → editoriale · /generico (prompt neutro)
+Architect_300.py     # Analisi JSON completa di un'immagine — nessun DNA Valeria
 Atelier_204.py       # Outfit analysis → prompt con filtri (filtro persistente)
 Filtro_200.py        # 7 categorie + LEGO + Mosaic + Scarabocchio
 Surprise_200.py      # Location + outfit random + /pride + /flag
@@ -41,7 +41,7 @@ README.md
 |-----|-----------|---------|-------|
 | Atelier | 2 | `/caption` on-demand | — |
 | Vogue | 2 | `/caption` on-demand | — |
-| Architect | 1-2 | nessuna | `/generico` (1 call) |
+| Architect | 1 (fino a 2 se retry JSON) | nessuna | analisi JSON completa, nessun DNA |
 | Filtro | 1 | `/caption` on-demand | — |
 | Surprise | 1 | nessuna | — |
 
@@ -85,19 +85,23 @@ openpyxl>=3.1.5
 
 ## Fix robustezza (20/06/2026 → 10/07/2026)
 
-Audit completo il 20/06, fix puntuali il 25/06 e 27/06. Modifiche principali: reset giornaliero contatori reso resiliente (shared 2.3.12), `analyze_scene()` ora cattura prop interattivi con campo dedicato `PROPS & ACTIONS` (shared 2.3.13), 5ª chiave API aggiunta per Atelier (shared 2.3.14), rimozione ratio/count e miglioramento fedeltà scena in Atelier (202). Su Architect, fix `/generico` in cinque passaggi: la versione 201 (25/06) era preventiva ma non centrata sulla causa reale; la 202 (27/06) aveva corretto una causa reale (`send_prompt()` fuori contesto) ma non l'unica; la 203 (07/07) ha trovato la causa restante — Telegram divide automaticamente i testi oltre ~4096 caratteri in più messaggi, e il bot consumava lo stato di attesa al primo pezzo, lasciando il secondo orfano (bufferizza con un debounce prima di generare); la 204 (08/07) ha esteso `GENERICO_SYSTEM_PROMPT` per rimuovere anche i tatuaggi/body art dalla sezione "Reference image analysis" quando genera la versione neutra; la 206 (10/07) ha raddoppiato il debounce da 1.5 a 3 secondi — Walter ha segnalato che i prompt lunghi di Atelier (specialmente mosaico a 4 scatti, spesso oltre 8-10.000 caratteri) venivano ancora tagliati: nessun limite di caratteri trovato nel codice, l'ipotesi più probabile è che con 3+ messaggi Telegram in arrivo il debounce originale scattasse prima che l'ultimo pezzo fosse arrivato. Il 01/07: pulizia documentale — requirements (README/xlsx/requirements.txt) riallineati, commento obsoleto corretto in shared (2.3.15). Il 04/07: modello Gemini aggiornato da `gemini-3-flash-preview` a `gemini-3.5-flash` (shared 2.3.16) per risolvere 503 diffusi legati ai limiti del livello preview; corrette 3 assegnazioni chiave errate su Koyeb (Atelier/Surprise/Filtro condividevano/scambiavano chiavi per errore, ora ciascuno ha la propria su progetto Google Cloud distinto). Il 07/07, in due step concordati con Walter dopo test su Atelier con foto a body art elaborato: **step 1** — Atelier (203), blocco "OUTFIT DETAIL LOCK" per contrastare la semplificazione di outfit elaborati, verificato con esito positivo; **step 2** — shared (2.3.17), nuovo campo `BODY ART` in `_ANALYZE_PROMPT` e clausola condizionale "BODY ART EXCEPTION" in `VALERIA_BODY_STRONG`/`SAFE`, **verificato con esito positivo da Walter** (tatuaggi riprodotti fedelmente, zero drift identità). Il secondo 08/07: risolto il testo morto della clausola "BODY ART EXCEPTION" — analisi bot-per-bot ha rivelato che solo Vogue e Atelier hanno un campo BODY ART reale da controllare (Filtro non usa mai il DNA Valeria nei suoi prompt, Surprise non analizza mai foto). Rimossa da `VALERIA_BODY_STRONG`/`SAFE` (shared 2.3.18), isolata in `BODY_ART_EXCEPTION_TEXT` + nuova funzione `body_art_clause()` che la include solo se la scena ha body art reale — applicata a Vogue (201) e Atelier (204). Architect (205), su scelta esplicita di Walter, la mantiene sempre presente (non può renderla condizionale) tramite un piccolo aggiustamento tecnico necessario a compensare la pulizia fatta in shared. Dettagli in `HANDOFF-MASTER`, sezioni 2bis, 2ter, 2quater, 2quinquies, 2sexies, 2septies, 2octies, 2novies, 2decies e 2undecies.
+Audit completo il 20/06, fix puntuali il 25/06 e 27/06. Modifiche principali: reset giornaliero contatori reso resiliente (shared 2.3.12), `analyze_scene()` ora cattura prop interattivi con campo dedicato `PROPS & ACTIONS` (shared 2.3.13), 5ª chiave API aggiunta per Atelier (shared 2.3.14), rimozione ratio/count e miglioramento fedeltà scena in Atelier (202). Il 01/07: pulizia documentale — requirements (README/xlsx/requirements.txt) riallineati, commento obsoleto corretto in shared (2.3.15). Il 04/07: modello Gemini aggiornato da `gemini-3-flash-preview` a `gemini-3.5-flash` (shared 2.3.16) per risolvere 503 diffusi legati ai limiti del livello preview; corrette 3 assegnazioni chiave errate su Koyeb (Atelier/Surprise/Filtro condividevano/scambiavano chiavi per errore, ora ciascuno ha la propria su progetto Google Cloud distinto). Il 07/07, in due step concordati con Walter dopo test su Atelier con foto a body art elaborato: **step 1** — Atelier (203), blocco "OUTFIT DETAIL LOCK" per contrastare la semplificazione di outfit elaborati, verificato con esito positivo; **step 2** — shared (2.3.17), nuovo campo `BODY ART` in `_ANALYZE_PROMPT` e clausola condizionale "BODY ART EXCEPTION" in `VALERIA_BODY_STRONG`/`SAFE`, **verificato con esito positivo da Walter** (tatuaggi riprodotti fedelmente, zero drift identità). Il secondo 08/07: risolto il testo morto della clausola "BODY ART EXCEPTION" — analisi bot-per-bot ha rivelato che solo Vogue e Atelier hanno un campo BODY ART reale da controllare (Filtro non usa mai il DNA Valeria nei suoi prompt, Surprise non analizza mai foto). Rimossa da `VALERIA_BODY_STRONG`/`SAFE` (shared 2.3.18), isolata in `BODY_ART_EXCEPTION_TEXT` + nuova funzione `body_art_clause()` che la include solo se la scena ha body art reale — applicata a Vogue (201) e Atelier (204).
+
+**Architect — riscrittura completa il 10/07/2026 (v2.0.6 → v3.0.0).** Cinque tentativi di fix su `/generico` (201→206, dal 25/06 al 10/07 — vedi storico precedente di questa sezione, ora superato) non hanno mai risolto il problema alla radice, perché la causa era strutturale: Architect faceva analisi e scrittura in un'unica chiamata Gemini, senza mai produrre un testo intermedio ispezionabile — lo stesso motivo per cui non poteva nemmeno avere la clausola BODY ART condizionale (vedi sopra). Su richiesta esplicita di Walter, `/generico` e tutta la modalità Testo/Foto sono stati **rimossi interamente**. Nuovo scopo del bot: riceve una foto, restituisce un file **.json** con l'analisi completa e fedele della scena — soggetto reale incluso (viso, corpo, capelli, espressione, così come appaiono, nessuna sostituzione), outfit, accessori, body art, sfondo, luce, palette colori — **senza alcun DNA Valeria Cross**. Se il soggetto della foto è Valeria, la descrizione includerà barba/occhiali/corpo di Valeria perché è quello visibile, non perché forzato. Stesso servizio Koyeb e stesso token Telegram, contenuto internamente ripensato. Comando rinominato: `/lastprompt` → `/lastjson`. Dettagli completi in `HANDOFF-MASTER`, sezione 2duodecies.
+
+Dettagli storici in `HANDOFF-MASTER`, sezioni 2bis, 2ter, 2quater, 2quinquies, 2sexies, 2septies, 2octies, 2novies, 2decies, 2undecies e 2duodecies.
 
 **TODO aperto:** il contatore `🔑 Key N · call #N` mostrato dai bot è in realtà globale (somma di tutte le chiavi), non per-chiave come il nome suggerisce — bug noto in `C_shared100.py`, lasciato volutamente intatto finora su scelta esplicita di Walter. Da correggere in una prossima sessione.
 
-**TODO aperto (04/07):** le stringhe `/info` dei 5 bot mostrano ancora `gemini-3-flash-preview` (Vogue `MODEL_TEXT`, Filtro `MODEL_TEXT_ID`, testo inline in Architect/Atelier/Surprise) nonostante il motore reale sia passato a `gemini-3.5-flash` in shared 2.3.16 — sono costanti locali ai singoli bot, non lette da `C_shared100.py`. Da allineare al prossimo giro di modifiche sui bot, insieme all'incremento di versione file per ciascuno.
+**TODO aperto (04/07), ridotto il 10/07:** le stringhe `/info` di Vogue (`MODEL_TEXT`), Filtro (`MODEL_TEXT_ID`), Atelier e Surprise (testo inline) mostrano ancora `gemini-3-flash-preview` nonostante il motore reale sia passato a `gemini-3.5-flash` in shared 2.3.16 — sono costanti locali ai singoli bot, non lette da `C_shared100.py`. Architect è **già corretto** dal 10/07 (riscritto da zero con `/info` aggiornato). Restano da allineare Vogue, Filtro, Atelier, Surprise al prossimo giro di modifiche, insieme all'incremento di versione file per ciascuno.
 
 **TODO aperto (08/07):** fix Vogue (201) e Atelier (204) per la clausola BODY ART condizionale non ancora testati in produzione — Walter deve verificare con foto con/senza tatuaggi prima di considerarli definitivi.
 
-**TODO aperto (10/07):** raddoppio del debounce `/generico` (Architect 206) è un'ipotesi, non una certezza confermata da log — non esiste conferma diretta che il vero problema fosse la tempistica del debounce piuttosto che qualcos'altro. Se il taglio persiste anche con 3 secondi, il prossimo passo è loggare il timestamp di ogni chunk ricevuto per misurare il ritardo reale invece di ipotizzarlo. Da testare su Koyeb con lo stesso prompt mosaico lungo che ha fatto emergere il problema.
+**TODO aperto (10/07):** `Architect_300.py` (riscrittura completa) non ancora testato in produzione — Walter deve verificare su Koyeb che l'analisi JSON funzioni end-to-end (foto → file .json ricevuto in chat) prima di considerarla definitiva. Da testare anche con una foto di Valeria, per confermare che la descrizione del soggetto reale includa correttamente barba/occhiali/corpo senza alcun intervento di DNA.
 
 ## Nota tecnica importante
 
-`review_and_fix()` in C_shared ha un prompt di sistema interno che **forza** il DNA Valeria Cross (viso, corpo, watermark). Non usarla per task che richiedono di rimuovere o alterare quel DNA — usare `gemini.generate()` direttamente con un prompt dedicato (vedi `/generico` in Architect come esempio).
+`review_and_fix()` in C_shared ha un prompt di sistema interno che **forza** il DNA Valeria Cross (viso, corpo, watermark). Non usarla per task che richiedono di rimuovere o alterare quel DNA — usare `gemini.generate()` direttamente con un prompt dedicato, senza chiamare `review_and_fix()`. (Fino al 10/07 l'esempio di riferimento era `/generico` in Architect — rimosso in quella data, vedi sezione dedicata in HANDOFF; Architect ora non usa più `review_and_fix()` né alcun DNA.)
 
 ---
 
@@ -107,7 +111,7 @@ Audit completo il 20/06, fix puntuali il 25/06 e 27/06. Modifiche principali: re
 `/start` · `/info` · `/shared` · `/dna` · `/caption`
 
 ### ArchitectBot
-`/start` · `/help` · `/info` · `/lastprompt` · `/generico` · `/shared`
+`/start` · `/help` · `/info` · `/lastjson` · `/shared`
 
 ### AtelierBot
 `/start` · `/help` · `/info` · `/lastprompt` · `/caption` · `/shared`

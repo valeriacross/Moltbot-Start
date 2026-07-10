@@ -1,0 +1,302 @@
+import os, json, io, html, logging, threading
+import telebot
+from concurrent.futures import ThreadPoolExecutor
+from C_shared100 import GeminiClient, HealthServer, is_allowed, genai_types, detect_mime_type, SHARED_VERSION, SHARED_DATE
+
+# --- LOGGING ---
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# --- CONFIGURAZIONE ---
+# CHANGELOG 3.0.0 (10/07/2026): RISCRITTURA COMPLETA su richiesta esplicita di
+# Walter. /generico non ha mai funzionato in modo affidabile fino in fondo —
+# il problema di fondo era strutturale, non un bug isolato: Architect faceva
+# analisi e scrittura in un'unica chiamata Gemini, senza mai produrre un testo
+# intermedio ispezionabile (motivo per cui la clausola BODY ART non poteva
+# essere condizionale, sezione 2decies/2undecies dell'HANDOFF, e motivo più
+# profondo per cui ogni fix su /generico ha sempre inseguito sintomi diversi
+# senza risolvere la causa reale).
+#
+# Nuovo scopo del bot, totalmente diverso dal precedente:
+# - RIMOSSO: /generico, GENERICO_SYSTEM_PROMPT, make_generic(), tutto lo stato
+#   pending_generico/_generico_state/_GENERICO_DEBOUNCE, la scelta iniziale
+#   Testo/Foto (user_mode, get_mode_kb(), get_after_prompt_kb()),
+#   generate_monolith_prompt() (modalità testo), generate_from_image() (con
+#   DNA Valeria), _architect_review()/review_and_fix(), VALERIA_DNA e
+#   BODY_ART_EXCEPTION_TEXT (nessun DNA da forzare, quindi nessuna eccezione
+#   da gestire), EDITORIAL_WRAPPER, send_prompt() con bottoni post-prompt.
+# - NUOVO: il bot accetta SOLO foto (nessuna modalità da scegliere). Ogni foto
+#   viene analizzata con un unico prompt (analyze_image_full) che chiede a
+#   Gemini un JSON dettagliato e completo della scena — soggetto REALE (viso,
+#   corpo, capelli, espressione, posa, come appaiono davvero, senza alcuna
+#   sostituzione identitaria), outfit, accessori, body art, props, sfondo,
+#   luce, camera, palette colori, mood. Se il soggetto è Valeria, la
+#   descrizione includerà barba/occhiali/corpo di Valeria — perché è quello
+#   che è visibile nella foto, non perché forzato da un DNA statico.
+# - Output consegnato come FILE .json scaricabile via bot.send_document(),
+#   non più testo in chat — elimina alla radice ogni problema di lunghezza
+#   messaggio/debounce che ha afflitto /generico (sezioni 2octies/2undecies).
+# - Nessuna chiamata a analyze_scene() di shared: quella funzione è
+#   deliberatamente cieca sul soggetto (per design, dato che il soggetto
+#   viene sempre sostituito dal DNA Valeria negli altri bot) — qui serve
+#   l'esatto opposto, quindi Architect ha un proprio prompt di analisi
+#   autonomo e completo, non condiviso.
+# - Stesso servizio Koyeb (homely-annabelle/thearchitect), stesso token
+#   Telegram (TELEGRAM_TOKEN_ARCHITECT) — nessun bot nuovo, stesso contenitore
+#   ripensato dentro, come richiesto esplicitamente da Walter.
+# - Comando rinominato: /lastprompt → /lastjson (rimanda l'ultimo file JSON
+#   generato, senza rianalizzare la foto).
+#
+# Nessun'altra parte del progetto tocca questo file: Vogue, Atelier, Filtro,
+# Surprise continuano il loro lavoro con il DNA Valeria esattamente come
+# prima — Architect smette di essere "un terzo bot uguale" e diventa lo
+# strumento di analisi pura, complementare, non sovrapposto.
+VERSION = "3.0.0"
+TOKEN   = os.environ.get("TELEGRAM_TOKEN_ARCHITECT")
+
+gemini   = GeminiClient()
+server   = HealthServer("ARCHITECT", VERSION)
+bot      = telebot.TeleBot(TOKEN, parse_mode="HTML")
+executor = ThreadPoolExecutor(max_workers=4)
+
+logger.info(f"📐 ARCHITECT v{VERSION} — inizializzazione in corso...")
+
+# --- STATO UTENTE ---
+_state_lock = threading.Lock()
+last_json   = {}   # uid → (json_str, filename) — ultimo JSON generato, per /lastjson
+
+# --- PROMPT DI ANALISI — JSON COMPLETO, NESSUN DNA ---
+ANALYSIS_PROMPT = (
+    "You are analyzing a single reference photograph in complete, exhaustive detail, "
+    "from every point of view. Your entire output MUST be a single valid JSON object and "
+    "NOTHING else — no markdown code fences, no ```json wrapper, no commentary before or "
+    "after, no explanation. Just the raw JSON, starting with { and ending with }.\n\n"
+    "Describe EVERY visual aspect of the image with maximum precision. Do NOT omit or "
+    "replace the subject — describe exactly what you see: face, body, hair, expression, "
+    "pose, exactly as they appear in the photo. No identity substitution, no fictional "
+    "character overlay, no DNA injection of any kind. If the subject has a beard, glasses, "
+    "tattoos, a specific body type — describe them as literally seen. This must be a "
+    "faithful, literal, neutral description of the actual photograph, nothing invented.\n\n"
+    "Use exactly this JSON schema. Fill every field with real, specific, detailed "
+    "observations — avoid vague placeholders like 'nice' or 'normal'. Where something is "
+    "genuinely absent from the photo, keep the key but use an empty string, empty array, "
+    "or false — do not delete keys and do not invent details that are not visible:\n\n"
+    "{\n"
+    '  "subject": {\n'
+    '    "apparent_gender_presentation": "",\n'
+    '    "apparent_age_range": "",\n'
+    '    "face": {\n'
+    '      "shape": "", "skin": "", "facial_hair": "", "eyes": "", "eyebrows": "", '
+    '"expression": "", "distinguishing_features": ""\n'
+    '    },\n'
+    '    "hair": {"color": "", "length": "", "style": "", "texture": ""},\n'
+    '    "glasses_or_eyewear": "",\n'
+    '    "body": {"build": "", "visible_proportions": "", "skin_tone": ""},\n'
+    '    "pose": "",\n'
+    '    "camera_framing": ""\n'
+    '  },\n'
+    '  "body_art": {"present": false, "description": "", "placement": "", "colors_hex": []},\n'
+    '  "outfit": [\n'
+    '    {"garment": "", "color_hex": "", "fabric": "", "cut_and_fit": "", '
+    '"embellishments": "", "coverage": ""}\n'
+    '  ],\n'
+    '  "accessories": [\n'
+    '    {"item": "", "placement": "", "material_or_color": ""}\n'
+    '  ],\n'
+    '  "props_and_actions": [\n'
+    '    {"object": "", "contact_point": "", "action": ""}\n'
+    '  ],\n'
+    '  "background": {"location": "", "architecture_or_environment": "", "notable_elements": []},\n'
+    '  "lighting": {"source": "", "direction": "", "quality": "", "color_temperature": ""},\n'
+    '  "camera": {"angle": "", "framing": "", "depth_of_field": ""},\n'
+    '  "color_palette": [{"hex": "", "label": ""}],\n'
+    '  "mood_and_atmosphere": ""\n'
+    "}\n\n"
+    "Output ONLY the JSON object described above — no other text."
+)
+
+def _strip_json_fences(text: str) -> str:
+    """Rimuove eventuali ```json ... ``` o ``` ... ``` che Gemini a volte aggiunge
+    nonostante l'istruzione esplicita di non farlo."""
+    t = text.strip()
+    if t.startswith("```"):
+        lines = t.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]
+        t = "\n".join(lines).strip()
+    return t
+
+def analyze_image_full(img_bytes: bytes) -> tuple[dict | None, str | None]:
+    """Analizza un'immagine e restituisce un JSON dettagliato di ogni suo aspetto,
+    incluso il soggetto reale così com'è — nessuna sostituzione identitaria, nessun
+    DNA. Ritorna (dict, None) in caso di successo, (None, messaggio_errore) altrimenti.
+    Un solo retry se il primo tentativo non produce JSON valido."""
+    try:
+        mime = detect_mime_type(img_bytes)
+        img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type=mime)
+
+        raw = gemini.generate(ANALYSIS_PROMPT, contents=[img_part], max_tokens=4096)
+        if not raw:
+            return None, "Risposta vuota da Gemini."
+
+        cleaned = _strip_json_fences(raw)
+        try:
+            return json.loads(cleaned), None
+        except json.JSONDecodeError as e:
+            logger.warning(f"⚠️ JSON non valido al primo tentativo: {e} — riprovo una volta.")
+
+        retry_prompt = ANALYSIS_PROMPT + (
+            "\n\nIMPORTANT: your previous output was not valid JSON. This time, output "
+            "ONLY the raw JSON object — no markdown, no code fences, no extra text of any kind."
+        )
+        raw2 = gemini.generate(retry_prompt, contents=[img_part], max_tokens=4096)
+        if not raw2:
+            return None, "Risposta vuota al secondo tentativo."
+        cleaned2 = _strip_json_fences(raw2)
+        try:
+            return json.loads(cleaned2), None
+        except json.JSONDecodeError as e2:
+            logger.error(f"❌ JSON non valido anche al secondo tentativo: {e2}")
+            return None, f"JSON non valido anche al secondo tentativo: {e2}"
+
+    except Exception as e:
+        logger.error(f"❌ Errore analyze_image_full: {e}", exc_info=True)
+        return None, f"Errore API: {e}"
+
+# --- COMANDI ---
+@bot.message_handler(commands=['start', 'reset'])
+def start(m):
+    uid = m.from_user.id
+    if not is_allowed(uid):
+        logger.warning(f"🚫 /start non autorizzato: uid={uid} username={m.from_user.username}")
+        return
+    username = m.from_user.username or m.from_user.first_name
+    with _state_lock:
+        last_json.pop(uid, None)
+    logger.info(f"🔄 /start da {username} (id={uid})")
+    bot.send_message(m.chat.id,
+        f"<b>📐 ARCHITECT v{VERSION}</b>\n\n"
+        f"Inviami una foto: ti restituisco un file <b>.json</b> con l'analisi completa "
+        f"della scena — soggetto, outfit, accessori, sfondo, luce, tutto quello che è "
+        f"visibile — senza alcun DNA Valeria Cross. Descrizione fedele, nient'altro."
+    )
+
+@bot.message_handler(commands=['help'])
+def cmd_help(m):
+    bot.send_message(m.chat.id,
+        f"<b>📐 ARCHITECT v{VERSION} — Comandi</b>\n\n"
+        f"/start · /reset — Messaggio iniziale\n"
+        f"/lastjson — Reinvia l'ultimo file JSON generato\n"
+        f"/info — Versione e informazioni\n"
+        f"/shared — Versione shared\n"
+        f"/help — Questo messaggio\n\n"
+        f"<i>Inviami direttamente una foto per iniziare — non c'è altra modalità.</i>"
+    )
+
+@bot.message_handler(commands=['info'])
+def cmd_info(m):
+    bot.send_message(m.chat.id,
+        f"<b>📐 ARCHITECT v{VERSION}</b>\n\n"
+        f"Motore: <code>gemini-3.5-flash</code>\n"
+        f"Funzione: analisi JSON completa dell'immagine — nessun DNA identitario, "
+        f"nessuna sostituzione del soggetto.\n"
+        f"Output: file <code>.json</code> scaricabile.\n"
+    )
+
+@bot.message_handler(commands=['lastjson'])
+def cmd_lastjson(m):
+    uid = m.from_user.id
+    if not is_allowed(uid):
+        logger.warning(f"🚫 /lastjson non autorizzato: uid={uid}")
+        return
+    entry = last_json.get(uid)
+    if not entry:
+        bot.send_message(m.chat.id, "⚠️ Nessun JSON disponibile. Invia prima una foto.")
+        return
+    json_str, filename = entry
+    bot.send_document(m.chat.id,
+        document=io.BytesIO(json_str.encode('utf-8')),
+        visible_file_name=filename)
+
+@bot.message_handler(commands=['shared'])
+def cmd_shared(m):
+    bot.send_message(m.chat.id, f"📦 <b>C_shared100.py</b> v{SHARED_VERSION} — {SHARED_DATE}")
+
+# --- HANDLER TESTO — guida chi scrive per abitudine, nessuna modalità testo ---
+@bot.message_handler(content_types=['text'])
+def handle_text(m):
+    if m.text and m.text.startswith('/'):
+        return
+    uid = m.from_user.id
+    if not is_allowed(uid):
+        logger.warning(f"🚫 Testo non autorizzato: uid={uid}")
+        return
+    bot.send_message(m.chat.id, "📸 Inviami una foto — questo bot analizza solo immagini, non genera più prompt da testo.")
+
+# --- HANDLER FOTO ---
+@bot.message_handler(content_types=['photo'])
+def handle_photo(m):
+    uid = m.from_user.id
+    if not is_allowed(uid):
+        logger.warning(f"🚫 Foto non autorizzata: uid={uid}")
+        return
+    username = m.from_user.username or m.from_user.first_name
+    try:
+        file_info = bot.get_file(m.photo[-1].file_id)
+        img_bytes = bot.download_file(file_info.file_path)
+        logger.info(f"🖼️ Foto da {username} (id={uid}), {len(img_bytes)} bytes")
+    except Exception as e:
+        bot.reply_to(m, f"❌ Errore download foto: {html.escape(str(e))}")
+        return
+
+    wait = bot.send_message(m.chat.id,
+        "🔍 <b>Analisi immagine in corso...</b>\n⏳ Attendi ~20-30 secondi.")
+
+    def task():
+        try:
+            data, err = analyze_image_full(img_bytes)
+            try:
+                bot.delete_message(m.chat.id, wait.message_id)
+            except Exception:
+                pass
+            if err:
+                bot.send_message(m.chat.id,
+                    f"❌ <b>Analisi fallita.</b>\n\n<code>{html.escape(err)}</code>")
+                return
+            json_str = json.dumps(data, indent=2, ensure_ascii=False)
+            filename = f"analisi_{m.photo[-1].file_unique_id}.json"
+            with _state_lock:
+                last_json[uid] = (json_str, filename)
+            bot.send_document(m.chat.id,
+                document=io.BytesIO(json_str.encode('utf-8')),
+                visible_file_name=filename,
+                caption="✅ Analisi completa — nessun DNA Valeria, descrizione fedele dell'immagine.")
+            logger.info(f"✅ JSON inviato a {username} ({len(json_str)} chars)")
+        except Exception as e:
+            logger.error(f"❌ task crash: {e}", exc_info=True)
+            try:
+                bot.delete_message(m.chat.id, wait.message_id)
+            except Exception:
+                pass
+            bot.send_message(m.chat.id, f"❌ Errore:\n<code>{html.escape(str(e))}</code>")
+
+    executor.submit(task)
+
+# --- MAIN ---
+if __name__ == "__main__":
+    import time
+    logger.info(f"📐 Avvio ARCHITECT v{VERSION}")
+    server.start()
+    while True:
+        try:
+            bot.infinity_polling(timeout=30, long_polling_timeout=25)
+        except Exception as e:
+            err = str(e)
+            if "409" in err or "Conflict" in err:
+                logger.warning("⚠️ 409 Conflict — altra istanza attiva. Attendo 15s e riprovo...")
+                time.sleep(15)
+            else:
+                logger.error(f"❌ Polling error: {e}")
+                time.sleep(5)

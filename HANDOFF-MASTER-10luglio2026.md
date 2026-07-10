@@ -49,7 +49,7 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 |------|---------|---------------|--------------|-----------|
 | `C_shared100.py` | **2.3.18** | (comune a tutti) | — | — |
 | `Vogue_201.py` | **2.0.1** | colossal-giselle/vogue | `python Vogue_201.py` | 2 |
-| `Architect_206.py` | **2.0.6** | homely-annabelle/thearchitect | `python Architect_206.py` | 1 |
+| `Architect_300.py` | **3.0.0** | homely-annabelle/thearchitect | `python Architect_300.py` | 1 |
 | `Atelier_204.py` | **2.0.4** | flexible-denna/atelier | `python Atelier_204.py` | 5 |
 | `Filtro_200.py` | **2.0.0** | screeching-jobina/filtro | `python Filtro_200.py` | 1 |
 | `Surprise_200.py` | **2.0.0** | surprise1/sorpresa | `python Surprise_200.py` | 1 |
@@ -58,13 +58,49 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 Repository: `valeriacross/Moltbot-Start` — region Frankfurt.
 
-**Nota versioning:** i 5 bot sono partiti da 2.0.0 il 20/06. I file con numero nel nome > 200 sono patch successive. `C_shared100.py` mantiene il nome file invariato — solo la versione interna incrementa.
+**Nota versioning:** i 5 bot sono partiti da 2.0.0 il 20/06. I file con numero nel nome > 200 sono patch successive. `C_shared100.py` mantiene il nome file invariato — solo la versione interna incrementa. **Eccezione 10/07:** Architect è passato a `3.0.0` (da `2.0.6`) per segnalare un cambio di scopo fondamentale, non incrementale — riscrittura completa, non una patch. Il numero nel filename segue comunque la sequenza normale (206→207).
 
 **Nota chiavi (25/06):** una chiave spostata da Architect (2→1) ad Atelier (4→5). `C_shared100.py` ora legge fino a `GOOGLE_API_KEY_5`.
 
 ---
 
-## 2undecies. SESSIONE 10/07/2026 — ARCHITECT 2.0.6, DEBOUNCE /generico RADDOPPIATO
+## 2duodecies. SESSIONE 10/07/2026 (continua) — ARCHITECT RISCRITTO DA ZERO (v2.0.6 → v3.0.0)
+
+Walter ha segnalato che il raddoppio del debounce (2.0.6, sezione 2undecies) non ha risolto nulla — "/generico non funziona, niente da fare" — e ha deciso di cambiare approccio radicalmente invece di continuare a inseguire il sintomo.
+
+**Decisione di Walter, comunicata con 4 punti chiari:**
+1. Rimozione totale del comando `/generico` così com'era.
+2. Nuova funzione: JSON puro e dettagliato di una qualsiasi immagine, **senza alcun DNA Valeria**.
+3. Rimozione della scelta Testo/Foto iniziale — Architect riceve solo foto, genera un'analisi ultra-dettagliata della scena da ogni punto di vista.
+4. Motivazione esplicita: Atelier e Vogue coprono già il lavoro con DNA Valeria — non serve un terzo bot che fa la stessa cosa.
+
+**Prima di scrivere codice, chiarite 4 cose con Walter (tutte confermate):**
+1. Se l'immagine di riferimento è di Valeria, il JSON deve descriverla com'è (barba, occhiali, corpo) — non è un problema, anzi è corretto: nessuna sostituzione, descrizione fedele di qualunque soggetto sia nella foto.
+2. Output come **file .json** scaricabile via Telegram (`bot.send_document()`), non testo in chat — elimina alla radice ogni problema di lunghezza messaggio che ha afflitto `/generico` per 6 versioni (201→206).
+3. Rimozione totale, non solo di `/generico`: anche modalità testo, `generate_monolith_prompt()`, `GENERICO_SYSTEM_PROMPT`, tutto lo stato `pending_generico`/`_generico_state`.
+4. Stesso servizio Koyeb (`homely-annabelle/thearchitect`), stesso token (`TELEGRAM_TOKEN_ARCHITECT`) — non un bot nuovo, lo stesso contenitore ripensato dentro.
+
+**Perché questo risolve il problema alla radice, non solo il sintomo:** ogni fix precedente su `/generico` (201-206, sezioni 2ter/2octies/2undecies) ha inseguito un sintomo diverso senza mai toccare la causa strutturale — Architect faceva analisi e scrittura in un'**unica chiamata Gemini**, senza mai produrre un testo intermedio ispezionabile. Questo è anche il motivo per cui, in sezione 2decies, Architect non ha mai potuto avere la clausola BODY ART condizionale come Vogue/Atelier. Passando a "foto → JSON puro", quel problema strutturale semplicemente non esiste più: il JSON stesso È il testo intermedio ispezionabile, e non c'è più nessun DNA da forzare o da compensare.
+
+**Riscrittura completa: `Architect_206.py` → `Architect_300.py`.** Dato il volume di codice rimosso rispetto a quello nuovo, il file è stato ricreato da zero invece di editato incrementalmente — un diff riga-per-riga contro la 206 non sarebbe stato significativo. Verificato invece: `ast.parse()` superato; nessun riferimento residuo a `VALERIA_*`, `generic`/`GENERICO`, `user_mode`, `get_mode_kb`/`get_after_prompt_kb`, `EDITORIAL_WRAPPER`, `review_and_fix`, `sanitize_user_input`, `analyze_scene`, `build_valeria_identity`, `BODY_ART_EXCEPTION` (verificato via grep, zero occorrenze fuori dai commenti che documentano cosa è stato rimosso); tutti gli import usati almeno una volta nel corpo del file (verificato via `ast.walk`); schema JSON di esempio validato con `json.loads()`.
+
+**Cosa contiene la 207:**
+- `ANALYSIS_PROMPT`: un unico prompt di analisi, autonomo — **non** riusa `analyze_scene()` di shared, perché quella funzione è deliberatamente cieca sul soggetto (per design, dato che negli altri bot il soggetto viene sempre sostituito dal DNA). Qui serve l'esatto opposto: descrizione letterale e completa del soggetto reale (viso, corpo, capelli, espressione, posa) oltre a outfit, accessori, body art, props, sfondo, luce, camera, palette colori, mood.
+- `analyze_image_full(img_bytes)`: chiama Gemini con l'immagine, richiede JSON puro (no markdown fence), fa un secondo tentativo se il primo non produce JSON valido (`json.loads()` fallito), altrimenti ritorna l'errore.
+- `handle_photo()`: unico handler di contenuto — scarica la foto, chiama `analyze_image_full()`, invia il risultato come file `.json` via `bot.send_document()` con `io.BytesIO`.
+- `handle_text()`: risponde con un messaggio guida ("inviami una foto") per chi scrive per abitudine — nessuna modalità testo residua.
+- `/lastjson` (sostituisce `/lastprompt`): reinvia l'ultimo file JSON generato senza rianalizzare la foto.
+- `/start`, `/help`, `/info`, `/shared`: aggiornati al nuovo scopo. `/info` mostra correttamente `gemini-3.5-flash` (motore attuale) — a differenza degli altri 4 bot, qui non c'è nessuna stringa da disallineare perché il file è stato scritto da zero oggi.
+
+**Non ancora testato in produzione.** Da verificare su Koyeb: (a) foto normale → JSON completo e valido ricevuto come file; (b) foto di Valeria → conferma che la descrizione del soggetto include correttamente barba/occhiali/corpo senza intervento di DNA; (c) `/lastjson` dopo una foto → reinvia lo stesso file senza rianalizzare; (d) caso limite — immagine che Gemini rifiuta di analizzare o restituisce JSON non valido anche al secondo tentativo → verificare che il messaggio d'errore sia chiaro all'utente.
+
+**Nota per la prossima sessione:** con Architect ora completamente scollegato dal DNA Valeria, l'unico posto nel progetto dove ancora si menziona `/generico` come pattern di riferimento era la sezione "Nota tecnica importante" del README — corretto in questa sessione. Verificare che non restino altri riferimenti a `/generico` in HANDOFF sezioni precedenti (quelle storiche restano intenzionalmente invariate come registro, non vanno riscritte).
+
+**Correzione (stesso giorno, post-consegna):** il file era stato consegnato inizialmente come `Architect_207.py` (incrementato meccanicamente da 206, seguendo l'abitudine di incrementare di 1 il numero nel nome a ogni modifica) invece di `Architect_300.py`. Walter ha fatto notare che il nome file ha **sempre** corrisposto esattamente alla VERSION interna in ogni bot di questo progetto (es. `Atelier_204.py` → `2.0.4`, `Architect_206.py` → `2.0.6`) — non è un contatore progressivo indipendente come inizialmente spiegato per errore, è una corrispondenza 1:1 nome↔versione. Il salto di versione 2.0.6 → 3.0.0 andava riflesso nel nome come `300`, non come "il prossimo numero della sequenza". Corretto: file rinominato `Architect_300.py`, stesso contenuto, nessuna modifica al codice. **Promemoria per ogni bump di versione futuro, specialmente su salti non incrementali (x.0.0):** il numero nel nome file deve sempre essere i tre cifre della VERSION senza punti, mai un semplice "+1" dal nome precedente.
+
+---
+
+## 2undecies. SESSIONE 10/07/2026 — ARCHITECT 2.0.6, DEBOUNCE /generico RADDOPPIATO (SUPERATO DA 2duodecies)
 
 Walter ha segnalato che `/generico` continua a tagliare i prompt lunghi generati da Atelier, chiedendo di "raddoppiare il numero di caratteri".
 
@@ -316,23 +352,21 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 6. ARCHITECT — STORICO E STATO (v2.0.6)
+## 6. ARCHITECT — STORICO E STATO (v3.0.0)
 
-- **v2.0.6 (10/07):** Walter ha segnalato taglio persistente sui prompt lunghi di /generico, chiedendo di raddoppiare i caratteri — verificato che nessun limite di caratteri esiste nel codice (full_text ricostruisce tutto, max_tokens=8192 in uscita è ampio). Ipotesi più probabile (non confermata da log): con prompt mosaico Atelier molto lunghi, Telegram spezza in 3+ messaggi e il debounce di 1.5s può scattare prima dell'ultimo pezzo. Raddoppiato `_GENERICO_DEBOUNCE` a 3.0s. Vedi sezione 2undecies. **Non ancora testato in produzione — ipotesi da confermare, non certezza.**
-- **v2.0.5 (08/07):** Compensazione tecnica per shared 2.3.18 — la clausola BODY ART arrivava "gratis" tramite `VALERIA_DNA`, condivisa con Vogue. Resa condizionale per Vogue, Architect la manterrebbe persa come effetto collaterale senza questa modifica. Su scelta esplicita di Walter (non può essere condizionale qui — analisi+scrittura in un'unica chiamata Gemini), importata `BODY_ART_EXCEPTION_TEXT` e concatenata dopo `VALERIA_DNA` in entrambi i punti di generazione. **Zero cambio di comportamento** — solo la fonte del testo è cambiata. Vedi sezione 2decies.
-- **v2.0.4 (08/07):** `GENERICO_SYSTEM_PROMPT` esteso per rimuovere body art/tattoo dalla sezione "Reference image analysis" quando genera la versione `/generico` — prima veniva mantenuta insieme a OUTFIT/COLOR PALETTE. Su richiesta di Walter dopo aver spiegato lo scopo reale di `/generico` (prompt riusabile da follower Threads con la propria foto): i tatuaggi appartengono allo specifico soggetto fotografato, stesso trattamento della barba di Valeria. Vedi sezione 2novies. **Non ancora testato in produzione.**
-- **v2.0.3 (07/07):** Causa REALE #2 del bug "/generico" trovata — non bastava il fix 2.0.2. Telegram divide i testi oltre ~4096 caratteri in più messaggi separati; il bot consumava lo stato di attesa al primo pezzo, lasciando il secondo orfano (stessa "Scegli la modalità") e generando solo dal primo pezzo (prompt incompleto/doppio). Fix: `_generico_state` bufferizza i pezzi per uid con debounce 1.5s prima di generare una sola volta. Vedi sezione 2octies.
-- **v2.0.2 (27/06):** Causa REALE del bug "Scegli prima la modalità dopo /generico" trovata: `task_generico` chiamava `send_prompt()`, che allega SEMPRE `get_after_prompt_kb()` ("Nuova foto/Nuovo testo") — bottoni fuori contesto nel flusso /generico. Se premuti, il callback handler legge `user_mode[uid]`, mai impostato in quel flusso, e mostra "Scegli prima la modalità". Fix: `task_generico` non usa più `send_prompt()` — invia il prompt direttamente senza bottoni post-prompt.
-- **v2.0.1 (25/06):** Fix preventivo, poi rivelatosi NON la causa reale (vedi sopra) — introdotto `last_prompt_msg[uid]`; `/generico` nascondeva i bottoni del messaggio precedente; `/start` puliva anche `pending_generico` e `last_prompt_msg`. **1 chiave API** (ridotta da 2 a 1 il 25/06 — una spostata ad Atelier).
-- **v2.0.0 (20/06):** Fix #6 — `analyze_scene()` era chiamata sincrona sul thread di polling in `handle_photo`, bloccando la ricezione di altri messaggi per i 20-30s della chiamata Gemini. Spostata dentro `task_single()` nell'executor.
-- **v1.0.7:** Rimossi pulsanti "Mini caption"/"Mini prompt", callback, import inutilizzati. Keyboard post-prompt ora solo "📸 Nuova foto" / "✏️ Nuovo testo".
-- **v1.0.6:** `/generico` aggiunto a `/help`. **Fix critico:** `make_generic()` ora usa `gemini.generate()` DIRETTAMENTE invece di `review_and_fix()` — quella funzione ignorava completamente le istruzioni di rimozione del DNA Valeria, perché ha un proprio prompt di sistema interno che lo forza sempre.
-- **v1.0.5:** Comando `/generico` introdotto su richiesta di Walter — riceve un prompt (tipicamente generato da Atelier) e lo rende neutro/universale: rimuove ogni riferimento a Valeria Cross (viso 60enne italiano, corpo hourglass, watermark, negative prompt specifici di genere), mantenendo intatti outfit/scena/luce/composizione/mood. Output gender-neutral, usabile da chiunque. 1 call Gemini.
-- **v1.0.1-1.0.4:** `detect_mime_type` spostato a import top-level, caption automatica rimossa.
+- **v3.0.0 (10/07):** RISCRITTURA COMPLETA su richiesta di Walter — `/generico` rimosso interamente (mai stato affidabile in 6 versioni, 201→206, causa strutturale mai risolvibile con patch: analisi+scrittura in un'unica chiamata Gemini, nessun testo intermedio ispezionabile). Nuovo scopo: riceve una foto, restituisce un file `.json` con analisi completa e fedele — soggetto reale incluso, **nessun DNA Valeria**. Vedi sezione 2duodecies per il dettaglio completo. **Non ancora testato in produzione.**
+- **v2.0.6 (10/07) — SUPERATO da v3.0.0, storico:** raddoppiato `_GENERICO_DEBOUNCE` a 3.0s ipotizzando un problema di tempistica sui chunk Telegram. Non ha risolto — Walter ha deciso di riscrivere il bot invece di continuare a patchare. Vedi sezione 2undecies.
+- **v2.0.5 (08/07) — storico, codice rimosso in v3.0.0:** Compensazione tecnica per shared 2.3.18 — la clausola BODY ART arrivava "gratis" tramite `VALERIA_DNA`, condivisa con Vogue. Vedi sezione 2decies.
+- **v2.0.4 (08/07) — storico, codice rimosso in v3.0.0:** `GENERICO_SYSTEM_PROMPT` esteso per rimuovere body art/tattoo dalla sezione "Reference image analysis". Vedi sezione 2novies.
+- **v2.0.3 (07/07) — storico, codice rimosso in v3.0.0:** Causa REALE #2 del bug "/generico" trovata — Telegram divide i testi lunghi in più messaggi; il bot consumava lo stato al primo pezzo. Fix: buffer con debounce. Vedi sezione 2octies.
+- **v2.0.2 (27/06) — storico, codice rimosso in v3.0.0:** Causa REALE del bug "Scegli prima la modalità dopo /generico" — `task_generico` chiamava `send_prompt()` fuori contesto.
+- **v2.0.1 (25/06) — storico:** Fix preventivo, poi rivelatosi NON la causa reale.
+- **v2.0.0 (20/06) — storico:** Fix #6 — `analyze_scene()` spostata nell'executor.
+- **v1.0.5-1.0.7 — storico:** introduzione e affinamento di `/generico`, ora completamente rimosso.
 
-**Flusso `/generico`:** utente invia `/generico`, poi nel messaggio SUCCESSIVO incolla il prompt da neutralizzare (testo libero, non in stesso messaggio del comando). Bot intercetta in `handle_text` tramite stato `pending_generico[uid]`, bufferizzando eventuali pezzi multipli (testi lunghi divisi da Telegram) con debounce prima di generare.
+**Flusso attuale (v3.0.0):** utente invia una foto → Architect analizza con `analyze_image_full()` → restituisce un file `.json` scaricabile con la scena completa (soggetto reale, outfit, accessori, body art, sfondo, luce, palette, mood) — nessun DNA, nessuna sostituzione identitaria. Nessuna modalità da scegliere, nessun testo da inviare. `/lastjson` reinvia l'ultimo file senza rianalizzare.
 
-**Comandi:** `/start` · `/help` · `/info` · `/lastprompt` · `/generico` · `/shared`
+**Comandi (v3.0.0):** `/start` · `/help` · `/info` · `/lastjson` · `/shared`
 
 ---
 
@@ -415,10 +449,9 @@ Pool locale di location (~260) e outfit, zero `analyze_scene` (non richiede foto
 4. Mai agire senza "Vai" esplicito, anche per fix che sembrano banali
 5. **Bug noti rimasti volutamente aperti** (vedi sezione 2bis): #1 (lock mancante su `_call_counts`/`_key_index` in `GeminiClient.generate()`), #4 (`_active_cid` globale non per-utente in Vogue/Atelier), #7 (`_is_duplicate_callback` non thread-safe in Surprise). Tutti e tre diventano rilevanti SOLO se in futuro si introduce un secondo utente in whitelist o si passa da polling a webhook — da riconsiderare se cambia quel contesto.
 6. **TODO ancora aperto:** il callback `on_key_use` passa `self._total_calls` (contatore globale di tutte le chiavi sommate) invece di `self._call_counts[self._key_index]` (contatore per-chiave). Il messaggio `🔑 Key N · call #N` mostra quindi il totale globale, non le call di quella specifica chiave. Da correggere in `C_shared100.py` (riga ~708) e aggiornare il commento a riga ~632 (`"call_count cumulativo per quella chiave"` è sbagliato). Anche README e HANDOFF vanno aggiornati di conseguenza.
-7. **TODO aperto (04/07) — priorità alta, da fare al prossimo giro di modifiche sui bot:** allineare le stringhe `/info` dei 5 bot al modello reale (`gemini-3.5-flash`, o quello effettivo se nel frattempo si è passati al fallback). Dettaglio righe da toccare in sezione 2quinquies, punto 2. Va fatto **insieme** all'incremento di versione file per ciascun bot toccato e al conseguente aggiornamento di README/HANDOFF/Excel — non come fix isolato.
+7. **TODO aperto (04/07), ridotto il 10/07 — priorità alta:** allineare le stringhe `/info` di Vogue, Filtro, Atelier, Surprise al modello reale (`gemini-3.5-flash`, o quello effettivo se nel frattempo si è passati al fallback). **Architect è già corretto** dal 10/07 (riscritto da zero, `/info` mostra `gemini-3.5-flash` di suo). Dettaglio righe da toccare per gli altri 4 in sezione 2quinquies, punto 2. Va fatto **insieme** all'incremento di versione file per ciascun bot toccato e al conseguente aggiornamento di README/HANDOFF/Excel — non come fix isolato.
 8. **TODO aperto (04/07):** foglio `VERSIONI_BOT.xlsx` ha 2 celle contaminate (presunta 3ª chiave Vogue, presunta 2ª chiave Architect — in realtà copie della 4ª/5ª chiave di Atelier). Segnalato a Walter, correzione rimandata su sua richiesta esplicita — chiedere se procedere.
-9. **Bug `/generico` Architect — causa reale trovata e corretta (07/07), poi debounce raddoppiato (10/07), NON ancora testato in produzione dopo nessuna delle due modifiche.** Causa base: Telegram divide i testi oltre ~4096 caratteri in più messaggi, il bot consumava lo stato al primo pezzo lasciando il secondo orfano. Fix 2.0.3: buffer con debounce (originariamente 1.5s, ora 3.0s dal 10/07 — vedi punto 13). Walter deve testarlo su Koyeb con un testo/prompt Atelier abbastanza lungo da riprodurre il bug originale — vedi sezioni 2octies e 2undecies.
-10. **Clausola "BODY ART EXCEPTION" — risolta (08/07).** Non era testo morto solo in teoria: analisi bot-per-bot ha confermato che Filtro/Surprise non erano nemmeno toccati dal problema (import morti / nessuna analisi foto), mentre Vogue/Atelier ora la ricevono condizionalmente e Architect la mantiene sempre (non può essere condizionale). Vedi sezione 2decies per il dettaglio completo e la complicazione tecnica risolta (VALERIA_DNA condivisa tra Vogue e Architect).
-11. **TODO aperto (08/07):** `Architect_204.py` → `205.py` → `206.py` (rimozione body art da `/generico` + compensazione BODY_ART_EXCEPTION_TEXT) non ancora testato in produzione. Vedi sezione 2novies e 2decies.
-12. **TODO aperto (08/07) — test da fare prima della prossima sessione:** nessuno dei 3 file toccati per la clausola BODY ART (`Vogue_201.py`, `Atelier_204.py`, `Architect_206.py`) è stato provato su Koyeb. Da verificare: (a) foto senza tatuaggi su Vogue/Atelier → prompt più corto, clausola assente; (b) foto con tatuaggi (es. quella del 07/07) su Vogue/Atelier → clausola presente, fedeltà come già vista su Atelier 203; (c) Architect → comportamento identico a prima, clausola sempre presente.
-13. **TODO aperto (10/07) — priorità alta, ipotesi non confermata:** `Architect_206.py` ha il debounce `/generico` raddoppiato a 3.0s per risolvere il taglio dei prompt lunghi di Atelier segnalato da Walter. Nessun limite di caratteri esiste nel codice — la spiegazione è un'ipotesi plausibile (timing tra chunk Telegram), non confermata da log. **Se il taglio persiste anche con 3s, NON raddoppiare ulteriormente alla cieca:** aggiungere prima un log con timestamp per ogni chunk ricevuto in `handle_text()` per misurare il ritardo reale. Vedi sezione 2undecies.
+9. **Bug `/generico` Architect — SUPERATO il 10/07, non più rilevante.** Sei versioni di fix (201→206, sezioni 2ter/2octies/2undecies) non hanno mai risolto il problema alla radice — causa strutturale (analisi+scrittura in un'unica chiamata Gemini). Walter ha deciso di rimuovere `/generico` interamente e riscrivere Architect da zero come analizzatore JSON puro. Vedi sezione 2duodecies. Nessun'azione di follow-up su questo punto — è chiuso per rimozione, non per fix.
+10. **Clausola "BODY ART EXCEPTION" — risolta (08/07) per shared/Vogue/Atelier; il punto su Architect è SUPERATO il 10/07.** Analisi bot-per-bot aveva confermato che Filtro/Surprise non erano toccati dal problema, mentre Vogue/Atelier la ricevono condizionalmente. Il compromesso trovato per Architect (mantenerla sempre presente tramite `BODY_ART_EXCEPTION_TEXT`, sezione 2decies) è stato rimosso insieme a tutto il resto del DNA nella riscrittura v3.0.0 — Architect ora non ha alcun concetto di DNA/body-art da gestire. Vedi sezione 2decies per il contesto storico e 2duodecies per la rimozione.
+11. **TODO aperto (08/07) — test da fare per Vogue e Atelier, NON per Architect (superato):** nessuno dei 2 file toccati per la clausola BODY ART (`Vogue_201.py`, `Atelier_204.py`) è stato provato su Koyeb. Da verificare: (a) foto senza tatuaggi → prompt più corto, clausola assente; (b) foto con tatuaggi (es. quella del 07/07) → clausola presente, fedeltà come già vista su Atelier 203.
+12. **TODO aperto (10/07) — priorità alta, da fare prima di ogni altra cosa su Architect:** `Architect_300.py` (riscrittura completa a JSON puro, sezione 2duodecies) non è mai stato testato in produzione. Verificare su Koyeb: (a) foto normale → JSON valido ricevuto come file `.json`; (b) foto di Valeria → conferma che il soggetto descritto include barba/occhiali/corpo correttamente, senza intervento di DNA (dato che non ce n'è più); (c) `/lastjson` dopo una foto → reinvia lo stesso file; (d) caso limite — JSON non valido anche al secondo tentativo → messaggio d'errore chiaro all'utente, non un crash silenzioso.
