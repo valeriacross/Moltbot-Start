@@ -6,6 +6,6 @@
 # tornare a ==4.31.0 e verificare il changelog ufficiale per breaking change.
 pyTelegramBotAPI==4.34.0
 flask==3.1.3
-Pillow>=12.2.0
-google-genai>=2.6.0
+Pillow>=12.3.0
+google-genai>=2.11.0
 openpyxl>=3.1.5
