@@ -52,7 +52,7 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 | `Architect_302.py` | **3.0.2** | homely-annabelle/thearchitect | `python Architect_302.py` | 1 |
 | `Atelier_204.py` | **2.0.4** | flexible-denna/atelier | `python Atelier_204.py` | 5 |
 | `Filtro_200.py` | **2.0.0** | screeching-jobina/filtro | `python Filtro_200.py` | 1 |
-| `Surprise_200.py` | **2.0.0** | surprise1/sorpresa | `python Surprise_200.py` | 1 |
+| `Surprise_201.py` | **2.0.1** | surprise1/sorpresa | `python Surprise_201.py` | 1 |
 
 **Totale chiavi API: 10** (Atelier 5 + Vogue 2 + Architect 1 + Filtro 1 + Surprise 1) — tutte e 10 confermate su progetti Google Cloud distinti il 04/07 (vedi sezione 2quinquies). Prima di quella verifica, Filtro e Surprise condividevano la stessa chiave fisica per un errore di assegnazione: risolto.
 
@@ -61,6 +61,24 @@ Repository: `valeriacross/Moltbot-Start` — region Frankfurt.
 **Nota versioning (corretta il 10/07):** il numero nel nome file **corrisponde sempre esattamente** alla VERSION interna, senza punti (es. `2.0.4` → `Atelier_204.py`, `3.0.2` → `Architect_302.py`) — non è un contatore progressivo indipendente. Su un salto di versione non incrementale (es. `2.0.6` → `3.0.0`), il nome file deve riflettere il nuovo numero di versione per intero, non "il prossimo della sequenza". Vedi sezione 2duodecies per il dettaglio dell'errore fatto e corretto in questa data.
 
 **Nota chiavi (25/06):** una chiave spostata da Architect (2→1) ad Atelier (4→5). `C_shared100.py` ora legge fino a `GOOGLE_API_KEY_5`.
+
+---
+
+## 2quindecies. SESSIONE 12/07/2026 (continua) — SURPRISE 2.0.1, ANALISI LOCATION DETTAGLIATA
+
+Walter ha segnalato che l'analisi location da foto di Surprise (`handle_location_photo`) genera un testo "estremamente breve e non dettagliato" — mostrando come esempio una descrizione da 200 caratteri, e chiedendo che il livello di analisi sia uguale a quello di Architect.
+
+**Causa trovata:** `location_prompt` chiedeva esplicitamente *"Return a single concise paragraph of maximum 50 words"* — non era un problema del messaggio di conferma, era la generazione stessa a essere volutamente corta. In più, il messaggio di conferma troncava comunque a 200 caratteri (`location_text[:200]`) qualunque cosa venisse generata — un secondo taglio sopra il primo.
+
+**Modifiche applicate: `Surprise_200.py` → `Surprise_201.py`.**
+1. `location_prompt` riscritto con la stessa struttura a sezioni di `ANALYSIS_PROMPT` in Architect — `BACKGROUND:`, `LIGHTING:`, `CAMERA:`, `MOOD:` — ma **senza** `SUBJECT:`/`OUTFIT:`/`ACCESSORIES:`/`BODY ART:`, esclusi di proposito: questa funzione serve solo a catturare la location, l'outfit lo genera Surprise stesso in modo casuale altrove nel bot, non ha senso descriverlo qui. Tolto il limite di 50 parole.
+2. `max_tokens` aumentato da default (3000) a 2048 esplicito — in realtà il default era già sufficiente, ma esplicitato per chiarezza dato l'output più lungo atteso.
+3. Messaggio di conferma: non più troncato a 200 caratteri — ora mostra il testo intero, a pezzi da 3800 caratteri se necessario (stesso pattern di Vogue/Architect).
+4. **Colto anche un bug adiacente non segnalato da Walter:** `mime_type` era hardcoded a `"image/jpeg"` invece di rilevato con `detect_mime_type()` — corretto, ora supporta correttamente anche PNG/WebP come gli altri bot. Segnalato esplicitamente nel changelog come fix aggiuntivo, non richiesto ma a rischio minimo e coerente con lo standard degli altri bot.
+
+`ast.parse()` superato. Diff verificato riga per riga contro l'originale — solo il blocco `handle_location_photo` toccato (prompt, mime detection, messaggio di conferma), nessun'altra parte di Surprise modificata (scenario random, `/pride`, `/flag` invariati).
+
+**Non ancora testato in produzione.** Da verificare su Koyeb: (a) upload di una foto location → le 4 sezioni arrivano complete e dettagliate in chat, non più il paragrafo generico di prima; (b) il testo completo (non più troncato) si comporta bene con chat lunghe, chunking se necessario; (c) foto in formato PNG/WebP (non solo JPEG) → confermare che il fix mime_type funzioni.
 
 ---
 
@@ -449,11 +467,12 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 9. SURPRISE — STATO (v2.0.0)
+## 9. SURPRISE — STATO (v2.0.1)
 
+- **v2.0.1 (12/07):** analisi location da foto (`handle_location_photo`) era limitata a un paragrafo di massimo 50 parole — troppo corta secondo Walter, che voleva lo stesso livello di dettaglio di Architect. Riscritto `location_prompt` con la stessa struttura a sezioni (BACKGROUND/LIGHTING/CAMERA/MOOD, senza SUBJECT/OUTFIT — esclusi di proposito, l'outfit lo genera Surprise altrove). Messaggio di conferma non più troncato a 200 caratteri. Colto anche un bug adiacente: `mime_type` hardcoded a `"image/jpeg"` → sostituito con `detect_mime_type()`. Vedi sezione 2quindecies. **Non ancora testato in produzione.**
 - **v2.0.0 (20/06):** Fix #8, il bug più grave trovato in questa sessione di audit — `idx` nel `callback_data` di location/outfit era risolto contro il pool COMPLETO, ma la tastiera mostrata usa un pool FILTRATO (esclude voci già usate in sessione). Dal secondo giro in sessione, il bot selezionava silenziosamente una location/outfit diversa da quella cliccata — nessun crash, nessun errore visibile. Fix: introdotto `shown_pool[uid][step]`, applicato sia alla selezione che al cambio pagina (`pg_`). Aggiunto guard esplicito contro `IndexError` su tastiere obsolete.
 
-Pool locale di location (~260) e outfit, zero `analyze_scene` (non richiede foto). `/pride` + `/flag` per mosaici Pride a 6 pannelli, zero call Gemini per quei comandi specifici. Pipeline normale: pool random → `review_and_fix` (1 call) → prompt.
+Pool locale di location (~260) e outfit per la generazione principale (zero call Gemini per la selezione in sé). C'è anche una funzione opzionale per acquisire una location da foto (`handle_location_photo`, non `analyze_scene()` di shared — un prompt dedicato solo scena/ambiente, vedi v2.0.1) usata quando l'utente vuole una location specifica invece del pool random. `/pride` + `/flag` per mosaici Pride a 6 pannelli, zero call Gemini per quei comandi specifici. Pipeline normale: pool random → `review_and_fix` (1 call) → prompt.
 
 **Comandi:** `/start` · `/flag` · `/pride` · `/help` · `/info` · `/shared` · `/lastprompt`
 
@@ -503,6 +522,7 @@ Pool locale di location (~260) e outfit, zero `analyze_scene` (non richiede foto
 9. **Bug `/generico` Architect — SUPERATO il 10/07, non più rilevante.** Sei versioni di fix (201→206, sezioni 2ter/2octies/2undecies) non hanno mai risolto il problema alla radice — causa strutturale (analisi+scrittura in un'unica chiamata Gemini). Walter ha deciso di rimuovere `/generico` interamente e riscrivere Architect da zero come analizzatore JSON puro. Vedi sezione 2duodecies. Nessun'azione di follow-up su questo punto — è chiuso per rimozione, non per fix.
 10. **Clausola "BODY ART EXCEPTION" — risolta (08/07) per shared/Vogue/Atelier; il punto su Architect è SUPERATO il 10/07.** Analisi bot-per-bot aveva confermato che Filtro/Surprise non erano toccati dal problema, mentre Vogue/Atelier la ricevono condizionalmente. Il compromesso trovato per Architect (mantenerla sempre presente tramite `BODY_ART_EXCEPTION_TEXT`, sezione 2decies) è stato rimosso insieme a tutto il resto del DNA nella riscrittura v3.0.0 — Architect ora non ha alcun concetto di DNA/body-art da gestire. Vedi sezione 2decies per il contesto storico e 2duodecies per la rimozione.
 11. **TODO aperto (08/07) — test da fare per Vogue e Atelier, NON per Architect (superato):** nessuno dei 2 file toccati per la clausola BODY ART (`Vogue_201.py`, `Atelier_204.py`) è stato provato su Koyeb. Da verificare: (a) foto senza tatuaggi → prompt più corto, clausola assente; (b) foto con tatuaggi (es. quella del 07/07) → clausola presente, fedeltà come già vista su Atelier 203.
-13. **TODO aperto (11/07) — SUPERATO nella stessa giornata dal cambio di consegna:** il punto sul file `.txt` di Architect 3.0.1 non è più rilevante — l'output ora è testo diretto in chat, non un file. Vedi punto 14.
-14. **TODO aperto (11/07) — priorità alta, da fare prima di ogni altra cosa su Architect:** `Architect_302.py` (testo in chat invece di file, sezione 2quaterdecies) non è mai stato testato in produzione. Verificare su Koyeb: (a) foto normale → testo con le 10 sezioni etichettate ricevuto in chat, chunk multipli se >3800 caratteri; (b) foto di Valeria → conferma che SUBJECT descriva correttamente barba/occhiali/corpo senza intervento di DNA; (c) `/lastprompt` dopo una foto → reinvia lo stesso testo; (d) verificare a occhio che Gemini rispetti il formato richiesto — senza un parser che lo validi, una deviazione dal formato passerebbe inosservata finché qualcuno non legge il testo.
-15. **TODO aperto (11/07):** `requirements.txt` aggiornato (Pillow→12.3.0, google-genai→2.11.0) non ancora testato con un deploy Koyeb reale — stesso tipo di cautela già in nota per `pyTelegramBotAPI` 4.34.0 (bump testato solo a livello di changelog, non su questo stack specifico). Se un deploy si rompe dopo questo bump, vedi il commento in testa a `requirements.txt` per il sospetto principale.
+13. **TODO aperto (12/07) — SUPERATO nella stessa giornata dal cambio di consegna:** il punto sul file `.txt` di Architect 3.0.1 non è più rilevante — l'output ora è testo diretto in chat, non un file. Vedi punto 14.
+14. **TODO aperto (12/07) — priorità alta, da fare prima di ogni altra cosa su Architect:** `Architect_302.py` (testo in chat invece di file, sezione 2quaterdecies) non è mai stato testato in produzione. Verificare su Koyeb: (a) foto normale → testo con le 10 sezioni etichettate ricevuto in chat, chunk multipli se >3800 caratteri; (b) foto di Valeria → conferma che SUBJECT descriva correttamente barba/occhiali/corpo senza intervento di DNA; (c) `/lastprompt` dopo una foto → reinvia lo stesso testo; (d) verificare a occhio che Gemini rispetti il formato richiesto — senza un parser che lo validi, una deviazione dal formato passerebbe inosservata finché qualcuno non legge il testo.
+15. **TODO aperto (12/07):** `requirements.txt` aggiornato (Pillow→12.3.0, google-genai→2.11.0) non ancora testato con un deploy Koyeb reale — stesso tipo di cautela già in nota per `pyTelegramBotAPI` 4.34.0 (bump testato solo a livello di changelog, non su questo stack specifico). Se un deploy si rompe dopo questo bump, vedi il commento in testa a `requirements.txt` per il sospetto principale.
+16. **TODO aperto (12/07):** `Surprise_201.py` (analisi location a sezioni, ex 50 parole) non ancora testato in produzione. Verificare su Koyeb: (a) foto location → le 4 sezioni (BACKGROUND/LIGHTING/CAMERA/MOOD) arrivano complete in chat, non più il paragrafo generico; (b) messaggio di conferma senza troncamento si comporta bene con testi lunghi; (c) foto PNG/WebP (non solo JPEG) → confermare che il fix `detect_mime_type()` funzioni. Vedi sezione 2quindecies.
