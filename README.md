@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 12/07/2026
+**Ultimo aggiornamento:** 13/07/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -10,11 +10,11 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 | Bot | File | Versione | Koyeb | Chiavi |
 |-----|------|---------|-------|--------|
-| VogueBot | `Vogue_201.py` | 2.0.1 | colossal-giselle/vogue | 2 |
+| VogueBot | `Vogue_202.py` | 2.0.2 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_302.py` | 3.0.2 | homely-annabelle/thearchitect | 1 |
-| AtelierBot | `Atelier_204.py` | 2.0.4 | flexible-denna/atelier | 5 |
-| FiltroBot | `Filtro_200.py` | 2.0.0 | screeching-jobina/filtro | 1 |
-| SurpriseBot | `Surprise_201.py` | 2.0.1 | surprise1/sorpresa | 1 |
+| AtelierBot | `Atelier_205.py` | 2.0.5 | flexible-denna/atelier | 5 |
+| FiltroBot | `Filtro_201.py` | 2.0.1 | screeching-jobina/filtro | 1 |
+| SurpriseBot | `Surprise_202.py` | 2.0.2 | surprise1/sorpresa | 1 |
 
 **Shared:** `C_shared100.py` v2.3.18 · **10 API key totali**
 
@@ -24,11 +24,11 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 ```
 C_shared100.py       # Libreria condivisa
-Vogue_201.py         # Analisi foto/testo → prompt Flow
+Vogue_202.py         # Analisi foto/testo → prompt Flow
 Architect_302.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
-Atelier_204.py       # Outfit analysis → prompt con filtri (filtro persistente)
-Filtro_200.py        # 7 categorie + LEGO + Mosaic + Scarabocchio
-Surprise_201.py      # Location + outfit random + /pride + /flag
+Atelier_205.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Filtro_201.py        # 7 categorie + LEGO + Mosaic + Scarabocchio
+Surprise_202.py      # Location + outfit random + /pride + /flag
 requirements.txt
 README.md
 ```
@@ -83,7 +83,9 @@ openpyxl>=3.1.5
 
 ---
 
-## Fix robustezza (20/06/2026 → 12/07/2026)
+## Fix robustezza (20/06/2026 → 13/07/2026)
+
+Il 13/07: allineamento stringhe `/info` al motore reale `gemini-3.5-flash` — Vogue (201→202), Atelier (204→205), Surprise (201→202). Filtro (200→201) non aveva la stringa da correggere (verificato via grep: `MODEL_ID`/`MODEL_TEXT_ID` erano dead code, mai mostrate all'utente), rimosse come pulizia. Colto in Surprise un conteggio errato adiacente ("200 location" contro le 254 reali di `LOCATION_POOL`) — corretto con `len()` invece di un numero fisso, per evitare che torni a disallinearsi in futuro.
 
 Audit completo il 20/06, fix puntuali il 25/06 e 27/06. Modifiche principali: reset giornaliero contatori reso resiliente (shared 2.3.12), `analyze_scene()` ora cattura prop interattivi con campo dedicato `PROPS & ACTIONS` (shared 2.3.13), 5ª chiave API aggiunta per Atelier (shared 2.3.14), rimozione ratio/count e miglioramento fedeltà scena in Atelier (202). Il 01/07: pulizia documentale — requirements (README/xlsx/requirements.txt) riallineati, commento obsoleto corretto in shared (2.3.15). Il 04/07: modello Gemini aggiornato da `gemini-3-flash-preview` a `gemini-3.5-flash` (shared 2.3.16) per risolvere 503 diffusi legati ai limiti del livello preview; corrette 3 assegnazioni chiave errate su Koyeb (Atelier/Surprise/Filtro condividevano/scambiavano chiavi per errore, ora ciascuno ha la propria su progetto Google Cloud distinto). Il 07/07, in due step concordati con Walter dopo test su Atelier con foto a body art elaborato: **step 1** — Atelier (203), blocco "OUTFIT DETAIL LOCK" per contrastare la semplificazione di outfit elaborati, verificato con esito positivo; **step 2** — shared (2.3.17), nuovo campo `BODY ART` in `_ANALYZE_PROMPT` e clausola condizionale "BODY ART EXCEPTION" in `VALERIA_BODY_STRONG`/`SAFE`, **verificato con esito positivo da Walter** (tatuaggi riprodotti fedelmente, zero drift identità). Il secondo 08/07: risolto il testo morto della clausola "BODY ART EXCEPTION" — analisi bot-per-bot ha rivelato che solo Vogue e Atelier hanno un campo BODY ART reale da controllare (Filtro non usa mai il DNA Valeria nei suoi prompt, Surprise non analizza mai foto). Rimossa da `VALERIA_BODY_STRONG`/`SAFE` (shared 2.3.18), isolata in `BODY_ART_EXCEPTION_TEXT` + nuova funzione `body_art_clause()` che la include solo se la scena ha body art reale — applicata a Vogue (201) e Atelier (204). Il 12/07: controllo versioni `requirements.txt` contro PyPI — Pillow e google-genai aggiornati (12.2.0→12.3.0 patch di sicurezza CVE-2026-4775; 2.6.0→2.11.0 dopo verifica del changelog ufficiale, zero breaking change nel range per l'uso che ne fanno questi bot); Architect passato da JSON (3.0.0) a prompt testuale (3.0.1, su richiesta di Walter — il JSON era "ingestibile e non pubblicabile") a testo diretto in chat invece di file scaricabile (3.0.2, coerente con gli altri 4 bot); Surprise (201) — analisi location da foto era limitata a 50 parole, riscritta con lo stesso livello di dettaglio e la stessa struttura a sezioni di Architect (BACKGROUND/LIGHTING/CAMERA/MOOD, senza SUBJECT/OUTFIT dato che qui serve solo la location), messaggio di conferma non più troncato a 200 caratteri, mime_type corretto da hardcoded a rilevato automaticamente.
 
@@ -93,13 +95,13 @@ Dettagli storici in `HANDOFF-MASTER`, sezioni 2bis, 2ter, 2quater, 2quinquies, 2
 
 **TODO aperto:** il contatore `🔑 Key N · call #N` mostrato dai bot è in realtà globale (somma di tutte le chiavi), non per-chiave come il nome suggerisce — bug noto in `C_shared100.py`, lasciato volutamente intatto finora su scelta esplicita di Walter. Da correggere in una prossima sessione.
 
-**TODO aperto (04/07), ridotto il 10/07:** le stringhe `/info` di Vogue (`MODEL_TEXT`), Filtro (`MODEL_TEXT_ID`), Atelier e Surprise (testo inline) mostrano ancora `gemini-3-flash-preview` nonostante il motore reale sia passato a `gemini-3.5-flash` in shared 2.3.16 — sono costanti locali ai singoli bot, non lette da `C_shared100.py`. Architect è **già corretto** dal 10/07 (riscritto da zero con `/info` aggiornato). Restano da allineare Vogue, Filtro, Atelier, Surprise al prossimo giro di modifiche, insieme all'incremento di versione file per ciascuno.
+**Risolto il 13/07:** le stringhe `/info` di Vogue (`MODEL_TEXT`), Atelier e Surprise (inline) mostravano ancora `gemini-3-flash-preview` — allineate a `gemini-3.5-flash` (motore reale, shared 2.3.16). **Filtro non aveva bisogno del fix**: verificato via grep che `MODEL_ID`/`MODEL_TEXT_ID` non erano mai referenziate fuori dalla propria dichiarazione — `/info` di Filtro non mostra alcuna stringa modello. Le due costanti morte sono state rimosse (Filtro 2.0.0 → 2.0.1). Colto anche un bug adiacente in Surprise: `/info` dichiarava "200 location" mentre `LOCATION_POOL` ne contiene realmente 254 — corretto usando `len(LOCATION_POOL)` invece di un numero scritto a mano, per non disallinearsi più in futuro se il pool cambia. Vogue → 2.0.2, Atelier → 2.0.5, Surprise → 2.0.2.
 
 **TODO aperto (08/07):** fix Vogue (201) e Atelier (204) per la clausola BODY ART condizionale non ancora testati in produzione — Walter deve verificare con foto con/senza tatuaggi prima di considerarli definitivi.
 
 **TODO aperto (12/07):** `Architect_302.py` (prompt testuale in chat, senza più file) non ancora testato in produzione — Walter deve verificare su Koyeb che il testo arrivi correttamente in chat (chunk multipli se >3800 caratteri) e sia effettivamente pubblicabile/usabile come prompt. Da testare anche con una foto di Valeria, per confermare che la descrizione del soggetto reale includa correttamente barba/occhiali/corpo senza alcun intervento di DNA.
 
-**TODO aperto (12/07):** `Surprise_201.py` (analisi location dettagliata, ex 50 parole) non ancora testato in produzione — Walter deve verificare su Koyeb che l'analisi location a sezioni (BACKGROUND/LIGHTING/CAMERA/MOOD) sia effettivamente più utile della versione breve precedente, e che il messaggio di conferma (ora senza troncamento) si comporti bene in chat.
+**TODO aperto (12/07):** analisi location dettagliata (BACKGROUND/LIGHTING/CAMERA/MOOD, ex 50 parole), ora in `Surprise_202.py`, non ancora testata in produzione — Walter deve verificare su Koyeb che sia effettivamente più utile della versione breve precedente, e che il messaggio di conferma (senza troncamento) si comporti bene in chat.
 
 ## Nota tecnica importante
 
