@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 13/07/2026
+**Ultimo aggiornamento:** 14/07/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -12,7 +12,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 |-----|------|---------|-------|--------|
 | VogueBot | `Vogue_202.py` | 2.0.2 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_302.py` | 3.0.2 | homely-annabelle/thearchitect | 1 |
-| AtelierBot | `Atelier_206.py` | 2.0.6 | flexible-denna/atelier | 5 |
+| AtelierBot | `Atelier_208.py` | 2.0.8 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_201.py` | 2.0.1 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_202.py` | 2.0.2 | surprise1/sorpresa | 1 |
 
@@ -26,7 +26,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 C_shared100.py       # Libreria condivisa
 Vogue_202.py         # Analisi foto/testo → prompt Flow
 Architect_302.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
-Atelier_206.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Atelier_208.py       # Outfit analysis → prompt con filtri (filtro persistente)
 Filtro_201.py        # 7 categorie + LEGO + Mosaic + Scarabocchio
 Surprise_202.py      # Location + outfit random + /pride + /flag
 requirements.txt
@@ -49,7 +49,7 @@ README.md
 
 ## Contatori chiave
 
-Ogni bot con `on_key_use` mostra `🔑 Key N · call #N` ad ogni chiamata Gemini — contatore PER CHIAVE, non globale. Si azzera:
+Ogni bot con `on_key_use` mostra `🔑 Key N · call #N` ad ogni chiamata Gemini. Nota: `call #N` è un contatore GLOBALE (somma di tutte le chiavi), non per-chiave nonostante l'etichetta — comportamento confermato e voluto da Walter il 14/07/2026, non più considerato un bug. Si azzera:
 - Automaticamente ogni giorno alle **08:00 ora di Lisbona** (07:00 UTC)
 - Su `/start` (Atelier, Vogue)
 - Al riavvio del servizio Koyeb
@@ -83,7 +83,13 @@ openpyxl>=3.1.5
 
 ---
 
-## Fix robustezza (20/06/2026 → 13/07/2026)
+## Fix robustezza (20/06/2026 → 14/07/2026)
+
+**Chiusura sessione 14/07** — Walter ha testato in produzione e confermato funzionanti: Architect (testo in chat), allineamento `/info` sui 4 bot, ampliamento pool mosaico Atelier, HAIR LOCK v2.0.8, clausola BODY ART Vogue/Atelier, analisi location Surprise, bump `requirements.txt`. Decisioni: contatore `🔑 Key N` resta globale non per-chiave (preferenza esplicita, non più considerato bug); le 5 location con IP Disney nel pool restano invariate (rischio accettato). Corrette anche le 2 celle contaminate nell'Excel (presunta 3ª chiave Vogue/2ª chiave Architect → erano davvero la 4ª/5ª chiave di Atelier, ora nella posizione corretta). Trovato per caso durante quest'ultimo fix e non ancora chiuso: la chiave Google di Surprise e quella di Filtro nell'Excel risultano identiche — da verificare se è un refuso o una condivisione reale su Koyeb; e la cella REQUIREMENTS del foglio BOT riporta ancora le versioni pre-bump di Pillow/google-genai. Dettagli in HANDOFF, sezione 12, punti 22-23.
+
+Il 14/07, ancora sullo stesso punto: il fix del 13/07 (v2.0.7) era incompleto — proteggeva solo un lato (anti-calvizie), non l'altro. Walter ha mostrato output Flow reali (mosaico 4 scatti) con capelli lunghi mossi oltre le spalle, in tutti e 4 gli scatti — coerente, non casuale: con la calvizie bloccata dal negative prompt e nessuna protezione sul lato opposto, Flow è scivolato verso l'altro estremo. HAIR LOCK riscritto in tutte e 3 le funzioni con descrizione quantitativa della lunghezza ("short on the sides and back, nape and ears visible, ending well above the shoulders") + negative prompt esteso su entrambi i lati (bald/shaved/buzzcut/receding hairline E long/shoulder-length/flowing/wavy) (Atelier 207→208). Stesso scope della sessione precedente, solo Atelier.
+
+Sempre il 13/07, terzo giro sullo stesso bot in giornata: Walter ha mostrato output Flow reali (mosaico 4 scatti) con testa completamente calva, nonostante l'identità descriva "short silver-grey hair". Causa verificata nel codice: la descrizione capelli non aveva alcuna protezione da negative prompt in nessuna delle 3 funzioni che costruiscono i prompt di Atelier — a differenza della barba, protetta sia da un blocco MANDATORY nello shared sia da negative prompt locali. Aggiunto "⚠️ HAIR LOCK — ABSOLUTE PRIORITY" + termini negative (bald, shaved head, buzzcut, receding hairline, missing hair, hair loss) in tutte e 3 le funzioni (Atelier 206→207). Scope limitato ad Atelier per scelta esplicita — Vogue usa la stessa identity via shared ma non è stato toccato.
 
 Sempre il 13/07, dopo il giro precedente: Walter ha segnalato — con prompt ed esempi di output Flow alla mano — che il mosaico di 4 scatti di Atelier produceva spesso pose/inquadrature quasi identiche tra loro. Causa reale: le 4 liste di varietà nel ramo mosaic di `build_shooting_prompt()` (pose/framing/expression/angle) avevano solo 4 opzioni ciascuna, una delle quali vaga ("etc."). Ampliate a 10-12 opzioni concrete per categoria (Atelier 205→206). Nessuna modifica al ramo single (un solo scatto, non serve enumerare varietà) né al numero di scatti richiesti (resta fisso a 4 lato prompt — quanti Flow ne restituisca davvero è fuori dal controllo del bot).
 
