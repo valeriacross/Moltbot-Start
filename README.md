@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 14/07/2026
+**Ultimo aggiornamento:** 15/07/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -12,7 +12,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 |-----|------|---------|-------|--------|
 | VogueBot | `Vogue_202.py` | 2.0.2 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_302.py` | 3.0.2 | homely-annabelle/thearchitect | 1 |
-| AtelierBot | `Atelier_208.py` | 2.0.8 | flexible-denna/atelier | 5 |
+| AtelierBot | `Atelier_209.py` | 2.0.9 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_201.py` | 2.0.1 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_202.py` | 2.0.2 | surprise1/sorpresa | 1 |
 
@@ -26,7 +26,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 C_shared100.py       # Libreria condivisa
 Vogue_202.py         # Analisi foto/testo → prompt Flow
 Architect_302.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
-Atelier_208.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Atelier_209.py       # Outfit analysis → prompt con filtri (filtro persistente)
 Filtro_201.py        # 7 categorie + LEGO + Mosaic + Scarabocchio
 Surprise_202.py      # Location + outfit random + /pride + /flag
 requirements.txt
@@ -83,7 +83,9 @@ openpyxl>=3.1.5
 
 ---
 
-## Fix robustezza (20/06/2026 → 14/07/2026)
+## Fix robustezza (20/06/2026 → 15/07/2026)
+
+**Il 15/07 — fix generale, non un altro patch puntuale sui capelli.** Walter ha mostrato un mosaico con 2 scatti su 4 ancora calvi nonostante HAIR LOCK v2.0.8. Verificato sulla documentazione ufficiale Google Cloud (prompting guide Nano Banana): il modello dietro Flow non ha un campo negativePrompt indipendente — è un'architettura multimodale end-to-end, non un diffusion model con sottrazione vettoriale come Stable Diffusion/Midjourney/Imagen. Google raccomanda esplicitamente "positive framing, not negative" come principio di prodotto per questo modello. Rimossi tutti i blocchi "NEGATIVE PROMPT" in Atelier — nelle 3 funzioni principali (build_full_prompt, build_shooting_prompt single e mosaic) e nei 14 preset del dizionario FILTERS — riscritti in positivo puro: COLOR LOCK, OUTFIT DETAIL LOCK, HAIR LOCK, BACKGROUND LOCK, più un nuovo blocco locale IDENTITY LOCK (barba/occhiali/corpo) che prima esisteva solo come lista negativa, senza rinforzo positivo equivalente (Atelier 208→209). Non toccato: `VALERIA_FACE` nello shared ha ancora frasi negative ("DO NOT shave it") — stesso principio si applicherebbe, ma è condiviso anche con Vogue, fuori scope per questa sessione. Non elimina la varianza (Flow resta non deterministico), ma allinea l'approccio a quanto Google dice funzionare meglio su questo modello specifico.
 
 **Chiusura sessione 14/07** — Walter ha testato in produzione e confermato funzionanti: Architect (testo in chat), allineamento `/info` sui 4 bot, ampliamento pool mosaico Atelier, HAIR LOCK v2.0.8, clausola BODY ART Vogue/Atelier, analisi location Surprise, bump `requirements.txt`. Decisioni: contatore `🔑 Key N` resta globale non per-chiave (preferenza esplicita, non più considerato bug); le 5 location con IP Disney nel pool restano invariate (rischio accettato). Corrette anche le 2 celle contaminate nell'Excel (presunta 3ª chiave Vogue/2ª chiave Architect → erano davvero la 4ª/5ª chiave di Atelier, ora nella posizione corretta). Trovato per caso durante quest'ultimo fix e non ancora chiuso: la chiave Google di Surprise e quella di Filtro nell'Excel risultano identiche — da verificare se è un refuso o una condivisione reale su Koyeb; e la cella REQUIREMENTS del foglio BOT riporta ancora le versioni pre-bump di Pillow/google-genai. Dettagli in HANDOFF, sezione 12, punti 22-23.
 
