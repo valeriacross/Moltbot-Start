@@ -1,9 +1,42 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.3.18
+Versione: 2.4.0
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.0 (17/07/2026):
+  - Fix generale, non un patch puntuale. Verificato sulla documentazione
+    ufficiale Google Cloud (prompting guide Nano Banana) che il modello
+    dietro Flow NON ha un campo negativePrompt indipendente — architettura
+    multimodale end-to-end, non diffusion con sottrazione vettoriale come
+    Stable Diffusion/Midjourney/Imagen. Google raccomanda esplicitamente
+    "positive framing, not negative" per questo modello. Causa scatenante:
+    HAIR LOCK v2.0.7 e v2.0.8 su Atelier (basati su negative prompt, vedi
+    HANDOFF) non hanno retto a test successivi — calvizie ricomparsa
+    nonostante due round di negative prompt via via più estesi. Rimosso
+    l'intero meccanismo negative prompt dall'impianto DNA condiviso:
+    VALERIA_FACE e VALERIA_BODY_STRONG/SAFE riscritte in positivo puro
+    (tolte le frasi "DO NOT shave it", "DO NOT GENERATE A MALE PHYSIQUE",
+    ecc. — il contenuto informativo resta identico, cambia solo il framing).
+    VALERIA_NEGATIVE eliminata interamente (era usata da Vogue via
+    VALERIA_DNA e 3 volte in Surprise) — le due garanzie generiche che
+    portava (mani corrette, nessun testo sovrapposto) spostate in positivo
+    dentro VALERIA_DNA. review_and_fix(): punto 3 (scansione sezione
+    negative) rimosso perché non più applicabile; punto 8 (BODY HAIR
+    ENFORCEMENT) riscritto per richiedere solo l'affermazione positiva,
+    tolta la riga che reiniettava "NEGATIVE PROMPT — BODY" nel testo
+    finale — prima questo passaggio avrebbe vanificato qualunque pulizia
+    fatta a monte nei singoli bot, dato che è l'ultimo step prima
+    dell'invio a Flow. Vogue (203) e Surprise (203) aggiornati in
+    parallelo per rimuovere i loro negative prompt locali — vedi
+    changelog di ciascun bot. Atelier (209, sessione precedente) già
+    allineato. Filtro (202) aveva import morti di VALERIA_FACE/BODY_STRONG/
+    BODY_SAFE/NEGATIVE mai usati nei suoi prompt (confermato via grep —
+    Filtro non inietta mai il DNA Valeria), ma aveva 3 negative prompt
+    locali propri (editorial underwater, LEGO, wrapper "DO NOT ALTER")
+    non collegati al DNA — corretti anche quelli nello stesso giro.
+    Vedi HANDOFF sezione 2septendecies per il dettaglio completo.
 
 CHANGELOG 2.3.18 (08/07/2026):
   - Risolto: la clausola "BODY ART EXCEPTION" (2.3.17) compariva in OGNI
@@ -149,7 +182,7 @@ from google.genai import types as genai_types
 __all__ = [
     'GeminiClient', 'CaptionGenerator', 'HealthServer', 'is_allowed',
     'VALERIA_FACE', 'VALERIA_BODY_STRONG', 'VALERIA_BODY_SAFE',
-    'VALERIA_WATERMARK', 'VALERIA_NEGATIVE',
+    'VALERIA_WATERMARK',
     'VALERIA_DNA', 'EDITORIAL_WRAPPER',
     'build_valeria_identity', 'generate_caption', 'generate_mini_caption', 'generate_mini_prompt',
     'review_and_fix', 'sanitize_user_input',
@@ -163,8 +196,8 @@ MODEL = "gemini-3.5-flash"
 
 # Versione
 VERSION = "2.3.18"
-SHARED_VERSION = "2.3.18"   # aggiornare ad ogni modifica
-SHARED_DATE    = "08/07/2026"  # aggiornare ad ogni modifica
+SHARED_VERSION = "2.4.0"   # aggiornare ad ogni modifica
+SHARED_DATE    = "17/07/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -196,55 +229,44 @@ def is_allowed(uid: int) -> bool:
 # ============================================================
 
 VALERIA_FACE = (
-    "**⚠️ FACE IDENTITY LOCK — ABSOLUTE PRIORITY — DO NOT OVERRIDE — DO NOT SIMPLIFY:**\n"
+    "**⚠️ FACE IDENTITY LOCK — ABSOLUTE PRIORITY — HELD EXACTLY AS DESCRIBED, IN FULL DETAIL:**\n"
     "60-year-old Italian male face, oval-rectangular shape. "
     "Ultra-detailed mature skin with visible pores, deep character wrinkles, crow's feet. "
     "Calm half-smile, no teeth shown. "
-    "Thin octagonal Vogue Havana dark tortoiseshell frame eyeglasses — MANDATORY, always present, never removed.\n"
+    "Thin octagonal Vogue Havana dark tortoiseshell frame eyeglasses — MANDATORY, always present.\n"
     "**Hair:** Short silver-grey Italian cut, slightly voluminous top, nape exposed.\n"
     "**⚠️ BEARD — MANDATORY — NON-NEGOTIABLE:** "
-    "Full silver-grey beard approximately 6-7cm, perfectly groomed, dense and uniform, following the jawline. "
-    "The beard MUST be clearly visible in EVERY shot. "
-    "DO NOT shave it. DO NOT reduce it. DO NOT replace it with stubble. "
-    "A clean-shaven face is a generation FAILURE. The beard is part of the identity lock.\n"
+    "Full silver-grey beard approximately 6-7cm, perfectly groomed, dense and uniform, following the jawline, "
+    "clearly visible in every shot. The beard is a permanent, unchanging part of the identity lock.\n"
     "**Rendering:** Subsurface Scattering, Global Illumination, Ambient Occlusion, Fresnel Effect. "
     "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
 )
 
 VALERIA_BODY_STRONG = (
-    "**MANDATORY BODY — NOT A MALE BODY — OVERRIDE ALL DEFAULTS:**\n"
+    "**MANDATORY BODY — FEMININE SILHOUETTE, HELD EXACTLY AS DESCRIBED:**\n"
     "**Feminine hourglass proportions, 180cm, 85kg. FULL D-CUP BUST — prominent, natural, clearly visible. "
-    "Wide rounded hips, defined waist, full thighs. THIS BODY IS FEMININE. DO NOT GENERATE A MALE PHYSIQUE.**\n"
-    "Completely hairless body — NO body hair, NO chest hair, NO arm hair, NO leg hair on ALL surfaces. "
+    "Wide rounded hips, defined waist, full thighs.**\n"
+    "Completely smooth, hairless skin on the torso, arms and legs. "
     "Smooth porcelain skin. PHOTOGRAPHIC UNITY: skin tone, warmth and texture perfectly continuous "
     "from face → neck → shoulders → chest → arms.\n"
-    "**⚠️ COEXISTENCE RULE — CRITICAL:** The silver-grey beard on the male face AND the feminine body "
-    "are NOT a contradiction. They MUST coexist in the same image. The beard stays. The feminine body stays. "
-    "Both are mandatory. Do NOT resolve this by removing the beard. "
-    "Do NOT resolve this by masculinizing the body. Keep both exactly as described.\n\n"
+    "**⚠️ COEXISTENCE — CRITICAL:** The silver-grey beard on the face and the feminine body coexist "
+    "together in the same image, exactly as described — the beard stays exactly as specified above, "
+    "the body stays exactly as specified here, both simultaneously, unchanged.\n\n"
 )
 
 VALERIA_BODY_SAFE = (
-    "**MANDATORY BODY — NOT A MALE BODY — OVERRIDE ALL DEFAULTS:**\n"
+    "**MANDATORY BODY — FEMININE SILHOUETTE, HELD EXACTLY AS DESCRIBED:**\n"
     "**Feminine hourglass silhouette, 180cm, 85kg. Soft feminine proportions — defined waist, "
-    "wide rounded hips, full figure. THIS BODY IS FEMININE. DO NOT GENERATE A MALE PHYSIQUE.**\n"
-    "Completely hairless body — NO body hair, NO chest hair, NO arm hair, NO leg hair on ALL surfaces. "
+    "wide rounded hips, full figure.**\n"
+    "Completely smooth, hairless skin on the torso, arms and legs. "
     "Smooth porcelain skin. PHOTOGRAPHIC UNITY: skin tone, warmth and texture perfectly continuous "
     "from face → neck → shoulders → chest → arms.\n"
-    "**⚠️ COEXISTENCE RULE — CRITICAL:** The silver-grey beard on the male face AND the feminine body "
-    "are NOT a contradiction. They MUST coexist in the same image. The beard stays. The feminine body stays. "
-    "Both are mandatory. Do NOT resolve this by removing the beard. "
-    "Do NOT resolve this by masculinizing the body. Keep both exactly as described.\n\n"
+    "**⚠️ COEXISTENCE — CRITICAL:** The silver-grey beard on the face and the feminine body coexist "
+    "together in the same image, exactly as described — the beard stays exactly as specified above, "
+    "the body stays exactly as specified here, both simultaneously, unchanged.\n\n"
 )
 
 VALERIA_WATERMARK = "feat. Valeria Cross 👠"
-
-VALERIA_NEGATIVE = (
-    "shaved face, clean-shaven, no beard, missing beard, beard removed, stubble instead of beard, "
-    "female face, young face, missing glasses, face drift, body hair, chest hair, arm hair, leg hair, "
-    "male physique, flat chest, masculine body, desaturated colors, color shift, "
-    "extra fingers, JSON output, text overlay."
-)
 
 # BODY ART EXCEPTION — introdotta in 2.3.17, spostata fuori dai blocchi BODY
 # statici in 2.3.18. Testo unico condiviso, usato in due modi diversi:
@@ -282,17 +304,24 @@ def body_art_clause(scene_description: str) -> str:
         return ""
     return BODY_ART_EXCEPTION_TEXT
 
-# DNA completo assemblato — usato da Vogue e Architect. NOTA 2.3.18: non
-# include più BODY_ART_EXCEPTION_TEXT (era qui via VALERIA_BODY_STRONG fino
-# alla 2.3.17). Vogue ora aggiunge body_art_clause(scene_description) dopo
-# questa costante; Architect aggiunge BODY_ART_EXCEPTION_TEXT direttamente,
-# sempre, per non perdere la capacità di preservare body art che aveva dal
-# 07/07 — Architect non può renderla condizionale (vedi nota sopra).
+# DNA completo assemblato — usato da Vogue. NOTA 2.4.0: Architect non lo
+# usa più dalla riscrittura v3.0.0 (10/07) — nessun DNA, analisi pura del
+# soggetto reale. Il commento precedente ("usato da Vogue e Architect") era
+# rimasto stale da prima di quella riscrittura, corretto qui. NOTA 2.3.18:
+# non include più BODY_ART_EXCEPTION_TEXT (era qui via VALERIA_BODY_STRONG
+# fino alla 2.3.17). Vogue aggiunge body_art_clause(scene_description) dopo
+# questa costante. NOTA 2.4.0: rimossa la riga "NEGATIVE: {VALERIA_NEGATIVE}"
+# — VALERIA_NEGATIVE eliminata (vedi sezione 2septendecies in HANDOFF: il
+# modello dietro Flow non ha un campo negativePrompt indipendente, la guida
+# ufficiale Google raccomanda framing solo positivo). Le due garanzie generiche
+# che VALERIA_NEGATIVE portava (mani anatomicamente corrette, nessun testo
+# sovrapposto oltre al watermark) sono ora espresse in positivo qui sotto.
 VALERIA_DNA = (
     f"{VALERIA_FACE}"
     f"{VALERIA_BODY_STRONG}"
     f"WATERMARK: '{VALERIA_WATERMARK}' — elegant champagne cursive, very small, bottom center, 90% opacity.\n"
-    f"NEGATIVE: {VALERIA_NEGATIVE}"
+    f"The output is a single photorealistic image. Hands are anatomically correct, five fingers each. "
+    f"No text appears anywhere in the image beyond the watermark specified above.\n"
 )
 
 # Wrapper editoriale — apre tutti i prompt di Atelier
@@ -497,9 +526,7 @@ def review_and_fix(prompt: str, client: 'GeminiClient') -> str:
             "Also ensure 'no glasses' does NOT appear anywhere in the prompt.\n\n"
             "2b. GLASSES POSE REMOVAL: Remove ANY description of hands or fingers touching, adjusting, holding or "
             "raising to the glasses or temple area. The glasses are simply worn — no hand interaction with them.\n\n"
-            "3. NEGATIVE PROMPTS CONFLICTS: Scan the negative prompts section. "
-            "Remove from negatives any term that contradicts a positive element in the prompt.\n\n"
-            "3b. MIRROR SELFIE RULE: ONLY if the prompt explicitly contains 'mirror selfie' or both 'selfie' AND 'mirror' together — "
+            "3. MIRROR SELFIE RULE: ONLY if the prompt explicitly contains 'mirror selfie' or both 'selfie' AND 'mirror' together — "
             "then smartphone held in hand IS a required prop. "
             "Do NOT add smartphone for decorative mirrors, antique mirrors, historical scenes, artistic reflections, "
             "or any mirror that is not a selfie context.\n\n"
@@ -512,10 +539,9 @@ def review_and_fix(prompt: str, client: 'GeminiClient') -> str:
             "6. NAME REMOVAL: Remove any occurrence of 'Valeria Cross' or 'DNA of Valeria Cross' from the prompt body.\n\n"
             "7. KEEP INTACT: scene, outfit, lighting, environment, pose, mood, camera settings, "
             "photographic style, watermark spec, all creative elements not related to the subject's identity.\n\n"
-            "8. BODY HAIR ENFORCEMENT: Ensure Subject body section explicitly states: "
-            "'completely hairless body', 'no body hair, no chest hair, no arm hair, no leg hair', "
-            "'soft feminine hourglass silhouette'. "
-            "In NEGATIVE PROMPT — BODY ensure: 'body hair, chest hair, arm hair, leg hair, hairy torso, hairy arms'.\n\n"
+            "8. BODY STATEMENT: Ensure the Subject body section explicitly states, in positive terms: "
+            "'completely smooth, hairless skin on the torso, arms and legs', "
+            "'soft feminine hourglass silhouette'.\n\n"
             f"PROMPT TO REVIEW:\n\n{prompt}"
         )
         logger.info("🔍 review_and_fix: avviata")

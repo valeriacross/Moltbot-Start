@@ -1,0 +1,314 @@
+import os, logging, telebot, html, time, threading
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from C_shared100 import GeminiClient, HealthServer, is_allowed, genai_types, analyze_scene
+from C_shared100 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_WATERMARK
+from C_shared100 import VALERIA_DNA, generate_caption, review_and_fix, sanitize_user_input, SHARED_VERSION, SHARED_DATE, body_art_clause
+
+# --- VERSIONE ---
+# CHANGELOG 2.1.0 (17/07/2026): cambio di motore, non un patch — versione
+# alzata di conseguenza su richiesta esplicita di Walter (da 2.0.3 a 2.1.0).
+# Rimosso il negative prompt locale in build_prompt() ("NEGATIVE: wrong
+# background, studio backdrop..."), tolto import morto di VALERIA_NEGATIVE
+# (eliminata da shared 2.4.0). Causa: verificato che il modello dietro
+# Flow non ha un campo negativePrompt indipendente — fix generale esteso a
+# tutto l'impianto DNA condiviso dopo che due round di negative prompt su
+# Atelier (v2.0.7/2.0.8) non hanno retto a test successivi. Il contenuto
+# informativo (outfit fedele, location invariata) resta lo stesso,
+# riscritto in positivo puro. Il DNA stesso (VALERIA_FACE/BODY_STRONG,
+# shared) è stato riscritto in positivo nella stessa sessione — Vogue lo
+# eredita automaticamente da VALERIA_DNA, nessun'altra modifica necessaria
+# qui oltre alla riga locale. Vedi HANDOFF sezione 2septendecies.
+# CHANGELOG 2.0.2 (13/07/2026): MODEL_TEXT allineato al motore reale —
+# "gemini-3-flash-preview" → "gemini-3.5-flash". La costante era locale al
+# bot (non letta da C_shared100), quindi era rimasta disallineata dal
+# passaggio a gemini-3.5-flash fatto in shared 2.3.16 (04/07). Mostrata
+# in /info. Nessun'altra modifica.
+# CHANGELOG 2.0.1 (08/07/2026): build_prompt() ora inserisce
+# body_art_clause(scene_description) subito dopo VALERIA_DNA — la
+# clausola "BODY ART EXCEPTION" (introdotta in shared 2.3.17, dentro
+# VALERIA_BODY_STRONG) compariva in OGNI prompt anche quando la foto non
+# aveva tatuaggi (BODY ART: None), come testo condizionale inerte. Ora è
+# stata tolta da VALERIA_DNA e viene aggiunta qui solo se analyze_scene()
+# ha davvero trovato body art nella foto. Sul percorso testo (handle_text,
+# nessuna foto analizzata) body_art_clause() restituisce sempre stringa
+# vuota, comportamento invariato. Vedi C_shared100.py 2.3.18 e HANDOFF
+# sezione 2decies.
+# CHANGELOG 2.0.0 (20/06/2026): bump di allineamento al nuovo ciclo versioni
+# (Vogue, Architect, Atelier, Surprise → 2.0.0). Nessuna modifica funzionale
+# in questo bot in questa sessione — i bug noti (#4, _active_cid globale) sono
+# stati lasciati invariati su richiesta esplicita (uso singolo utente).
+VERSION = "2.1.0"
+
+# --- LOGGING ---
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# --- CONFIGURAZIONE ---
+TOKEN      = os.environ.get("TELEGRAM_TOKEN")
+MODEL_TEXT = "gemini-3.5-flash"
+
+gemini = GeminiClient()
+server = HealthServer("VOGUE", VERSION)
+
+# Notifica cambio API key — invia messaggio all'utente attivo
+_active_cid: int | None = None
+
+def _notify_key_use(key_num: int, call_count: int):
+    if _active_cid:
+        try:
+            bot.send_message(_active_cid, f"🔑 <b>Key {key_num}</b> · call #{call_count}", parse_mode="HTML")
+        except Exception:
+            pass
+
+gemini.on_key_use(_notify_key_use)
+
+bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
+
+# --- STATO ---
+pending_photo   = {}   # uid → bytes foto in attesa
+last_prompt     = {}   # uid → ultimo prompt generato
+pending_caption = {}   # uid → True se in attesa foto per /caption
+_caption_timers = {}   # uid → threading.Timer — scade dopo 60s
+
+_active_cid_lock = threading.Lock()
+_active_cid: int | None = None
+
+def _expire_caption(uid: int):
+    """Callback del timer: rimuove il flag /caption scaduto."""
+    if pending_caption.pop(uid, False):
+        logger.info(f"⏱️ /caption scaduto per uid={uid}")
+
+# --- ANALISI FOTO — usa analyze_scene() centralizzata da C_shared100 ---
+def analyze_photo(img_bytes):
+    """Wrapper su analyze_scene() — interfaccia invariata per il resto del bot."""
+    result, err = analyze_scene(img_bytes, client=gemini)
+    if result:
+        return result, None
+    return None, err or "⚠️ Analisi immagine non disponibile."
+
+# --- COSTRUZIONE PROMPT ---
+def build_prompt(scene_description):
+    """Assembla il prompt completo con DNA Valeria + descrizione scena."""
+    prompt = (
+        f"{VALERIA_DNA}\n\n"
+        f"{body_art_clause(scene_description)}"
+        f"--- SCENE REFERENCE ---\n"
+        f"{scene_description}\n\n"
+        f"--- GENERATION INSTRUCTIONS ---\n"
+        f"Generate a single editorial photograph of the described subject in the scene above.\n"
+        f"Preserve ALL outfit details, colors and fabrics exactly as described, with full fidelity.\n"
+        f"The exact location and background from the scene reference above is the setting of the image.\n"
+    )
+    return prompt
+
+# --- KEYBOARD POST-PROMPT ---
+def get_after_prompt_keyboard():
+    markup = InlineKeyboardMarkup()
+    markup.row(
+        InlineKeyboardButton("📸 Nuova foto", callback_data="vogue_new"),
+        InlineKeyboardButton("🏠 Home",       callback_data="vogue_home"),
+    )
+    return markup
+
+# --- /start ---
+@bot.message_handler(commands=['start'])
+def cmd_start(m):
+    uid = m.from_user.id
+    if not is_allowed(uid):
+        logger.warning(f"🚫 /start non autorizzato: uid={uid} username={m.from_user.username}")
+        return
+    username = m.from_user.username or m.from_user.first_name
+    pending_photo.pop(uid, None)
+    last_prompt.pop(uid, None)
+    gemini.reset_counters()  # azzera contatori call ad ogni /start
+    logger.info(f"👠 /start da {username} (id={uid})")
+    bot.send_message(m.chat.id,
+        f"<b>👠 VOGUE v{VERSION}</b>\n\n"
+        f"Inviami una foto e genero il prompt per Flow con il DNA di Valeria Cross."
+    )
+
+# --- /info ---
+@bot.message_handler(commands=['info'])
+def cmd_info(m):
+    api_status = "✅ Configurata" if gemini.available else "❌ Mancante"
+    bot.send_message(m.chat.id,
+        f"<b>ℹ️ VOGUE v{VERSION}</b>\n\n"
+        f"Modello: <code>{MODEL_TEXT}</code>\n"
+        f"API Key: {api_status}\n\n"
+        f"<i>Genera prompt testuali per Flow — nessuna immagine generata dal bot.</i>"
+    )
+
+# --- /shared ---
+@bot.message_handler(commands=['shared'])
+def cmd_shared(m):
+    bot.send_message(m.chat.id,
+        f"📦 <b>C_shared100.py</b> v{SHARED_VERSION} — {SHARED_DATE}"
+    )
+
+# --- /dna ---
+@bot.message_handler(commands=['dna'])
+def cmd_dna(m):
+    bot.send_message(m.chat.id,
+        f"<b>🧬 DNA Valeria Cross:</b>\n\n<code>{html.escape(VALERIA_DNA)}</code>"
+    )
+
+# --- /caption ---
+@bot.message_handler(commands=['caption'])
+def cmd_caption(m):
+    uid = m.from_user.id
+    if not is_allowed(uid):
+        logger.warning(f"🚫 /caption non autorizzato: uid={uid} username={m.from_user.username}")
+        return
+    # Cancella eventuale timer precedente ancora attivo
+    if uid in _caption_timers:
+        _caption_timers[uid].cancel()
+    pending_caption[uid] = True
+    t = threading.Timer(60.0, _expire_caption, args=(uid,))
+    t.daemon = True
+    t.start()
+    _caption_timers[uid] = t
+    logger.info(f"📝 /caption da {m.from_user.username or m.from_user.first_name} (id={uid})")
+    bot.send_message(m.chat.id, "📸 Inviami la foto per la caption. (60 secondi)")
+
+# --- CALLBACK POST-PROMPT ---
+@bot.callback_query_handler(func=lambda call: call.data.startswith("vogue_"))
+def handle_vogue_callback(call):
+    uid = call.from_user.id
+    if not is_allowed(uid):
+        logger.warning(f"🚫 Callback non autorizzato: uid={uid}")
+        return
+    cid = call.message.chat.id
+    data = call.data
+    try: bot.answer_callback_query(call.id)
+    except Exception: pass
+    try: bot.edit_message_reply_markup(cid, call.message.message_id, reply_markup=None)
+    except Exception: pass
+
+    if data == "vogue_new":
+        last_prompt.pop(uid, None)
+        bot.send_message(cid, "📸 Inviami una nuova foto.")
+
+    elif data == "vogue_home":
+        last_prompt.pop(uid, None)
+        bot.send_message(cid,
+            f"<b>👠 VOGUE v{VERSION}</b>\n\nInviami una foto."
+        )
+
+# --- HANDLER FOTO ---
+@bot.message_handler(content_types=['photo'])
+def handle_photo(m):
+    uid = m.from_user.id
+    if not is_allowed(uid):
+        logger.warning(f"🚫 Foto non autorizzata: uid={uid} username={m.from_user.username}")
+        return
+    global _active_cid
+    with _active_cid_lock:
+        _active_cid = m.chat.id
+    username = m.from_user.username or m.from_user.first_name
+    logger.info(f"📸 Foto ricevuta da {username} (id={uid})")
+
+    try:
+        file_info = bot.get_file(m.photo[-1].file_id)
+        img_bytes = bot.download_file(file_info.file_path)
+    except Exception as e:
+        bot.send_message(m.chat.id, f"❌ Errore download foto: {html.escape(str(e))}")
+        return
+
+    # --- flusso /caption ---
+    if pending_caption.pop(uid, False):
+        # Cancella il timer di scadenza — la foto è arrivata in tempo
+        t = _caption_timers.pop(uid, None)
+        if t:
+            t.cancel()
+        wait = bot.send_message(m.chat.id, "✍️ <b>Genero la caption...</b>")
+        caption, err = generate_caption(img_bytes, gemini)
+        try: bot.delete_message(m.chat.id, wait.message_id)
+        except Exception: pass
+        if not caption:
+            bot.send_message(m.chat.id, err or "❌ Caption fallita. Riprova.", parse_mode="HTML")
+        else:
+            bot.send_message(m.chat.id, caption)
+        logger.info(f"✅ Caption generata per {username}")
+        return
+
+    # --- flusso normale: genera prompt Flow ---
+    wait = bot.send_message(m.chat.id, "🔍 <b>Analizzo la foto...</b>")
+
+    scene_desc, err = analyze_photo(img_bytes)
+
+    try: bot.delete_message(m.chat.id, wait.message_id)
+    except Exception: pass
+
+    if not scene_desc:
+        bot.send_message(m.chat.id, err or "❌ Analisi fallita. Riprova.", parse_mode="HTML")
+        return
+
+    prompt = review_and_fix(build_prompt(scene_desc), gemini)
+    last_prompt[uid] = prompt
+
+    bot.send_message(m.chat.id, "✅ <b>Prompt Flow-ready</b>\n\nCopia e incolla su Flow:")
+    CHUNK = 3800
+    chunks = [prompt[i:i+CHUNK] for i in range(0, len(prompt), CHUNK)]
+    for idx, chunk in enumerate(chunks):
+        header = "" if len(chunks) == 1 else f"<i>({idx+1}/{len(chunks)})</i>\n"
+        if idx == len(chunks) - 1:
+            bot.send_message(m.chat.id, f"{header}<code>{html.escape(chunk)}</code>",
+                reply_markup=get_after_prompt_keyboard())
+        else:
+            bot.send_message(m.chat.id, f"{header}<code>{html.escape(chunk)}</code>")
+
+
+    logger.info(f"✅ Prompt generato per {username} ({len(prompt)} chars)")
+
+# --- HANDLER TESTO ---
+@bot.message_handler(content_types=['text'])
+def handle_text(m):
+    if m.text and m.text.startswith('/'):
+        return
+    uid = m.from_user.id
+    if not is_allowed(uid):
+        logger.warning(f"🚫 Testo non autorizzato: uid={uid} username={m.from_user.username}")
+        return
+    global _active_cid
+    with _active_cid_lock:
+        _active_cid = m.chat.id
+    text = m.text.strip()
+    wait = bot.send_message(m.chat.id, "🚀 <b>Generazione in corso...</b>\n⏳ Attendi qualche secondo.")
+    text = sanitize_user_input(text, gemini)
+    prompt = review_and_fix(build_prompt(f"SCENE DESCRIBED BY USER:\n{text}"), gemini)
+    last_prompt[uid] = prompt
+    try:
+        bot.delete_message(m.chat.id, wait.message_id)
+    except Exception:
+        pass
+    last_prompt[uid] = prompt
+    bot.send_message(m.chat.id, "✅ <b>Prompt Flow-ready</b>\n\nCopia e incolla su Flow:")
+    CHUNK = 3800
+    chunks = [prompt[i:i+CHUNK] for i in range(0, len(prompt), CHUNK)]
+    for idx, chunk in enumerate(chunks):
+        header = "" if len(chunks) == 1 else f"<i>({idx+1}/{len(chunks)})</i>\n"
+        if idx == len(chunks) - 1:
+            bot.send_message(m.chat.id, f"{header}<code>{html.escape(chunk)}</code>",
+                reply_markup=get_after_prompt_keyboard())
+        else:
+            bot.send_message(m.chat.id, f"{header}<code>{html.escape(chunk)}</code>")
+    logger.info(f"📝 Prompt da testo per {uid} ({len(prompt)} chars)")
+
+# --- MAIN ---
+if __name__ == '__main__':
+    import time
+    logger.info(f"👠 VOGUE v{VERSION} — avvio")
+    server.start()
+    if not gemini.available:
+        logger.warning("⚠️ GOOGLE_API_KEY non configurata — analisi foto disabilitata")
+    while True:
+        try:
+            bot.infinity_polling(timeout=30, long_polling_timeout=25)
+        except Exception as e:
+            err = str(e)
+            if "409" in err or "Conflict" in err:
+                logger.warning("⚠️ 409 Conflict — altra istanza attiva. Attendo 15s e riprovo...")
+                time.sleep(15)
+            else:
+                logger.error(f"❌ Polling error: {e}")
+                time.sleep(5)
