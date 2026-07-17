@@ -195,7 +195,7 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3.5-flash"
 
 # Versione
-VERSION = "2.3.18"
+VERSION = "2.4.0"
 SHARED_VERSION = "2.4.0"   # aggiornare ad ogni modifica
 SHARED_DATE    = "17/07/2026"  # aggiornare ad ogni modifica
 
