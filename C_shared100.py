@@ -1,9 +1,49 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.0
+Versione: 2.4.1
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.1 (22/07/2026):
+  - VALERIA_FACE conteneva descrizioni hardcoded di occhiali ("Thin octagonal
+    Vogue Havana dark tortoiseshell frame") e barba ("approximately 6-7cm,
+    perfectly groomed, dense and uniform") che confermate in contraddizione
+    diretta con la foto di riferimento reale che Walter allega di volta in
+    volta al prompt in Flow (occhiali rotondi/spessi/scuri nella foto vs.
+    ottagonali/sottili/tartarugato nel testo; barba visibilmente più lunga e
+    meno uniforme nella foto vs. 6-7cm curata nel testo). Su conferma
+    esplicita di Walter, la foto allegata è sempre autorevole su questi due
+    punti — il testo non deve più specificare forma/lunghezza, deve rimandare
+    alla foto. Aggiunta anche una riga di priorità esplicita in apertura del
+    blocco ("the photo wins" in caso di conflitto) — prima non esisteva
+    alcun riferimento testuale all'immagine allegata, il modello non aveva
+    modo di sapere che la foto va trattata come autorità sopra il testo.
+    Non toccato: sezione Hair (nessuna contraddizione accertata, solo un
+    dubbio dovuto a una foto di riferimento particolarmente ventosa) e
+    VALERIA_BODY_STRONG/SAFE (fuori scope, non discussi in questa sessione).
+
+    Il fix su VALERIA_FACE da solo era inutile: review_and_fix() (usata da
+    Vogue 2x e Atelier 3x, ultimo step prima di Flow) e sanitize_user_input()
+    (usata da Vogue sul testo utente) avevano la STESSA specifica hardcoded
+    ("thin octagonal Vogue Havana dark tortoiseshell", "beard 6-7cm") in
+    punti indipendenti — regola 2 (GLASSES MANDATORY) e regola 4 (SUBJECT
+    BLEED) di review_and_fix(), più la lista "IMMUTABLE traits" di
+    sanitize_user_input(). Reiniettavano la vecchia specifica anche dopo la
+    correzione di VALERIA_FACE. Corrette anche queste tre, stessa logica di
+    rimando alla foto allegata. Non toccati in questa sessione (su richiesta
+    esplicita di Walter, rimandati): i 3 blocchi "IDENTITY LOCK" locali di
+    Atelier (build_full_prompt, build_shooting_prompt singolo e mosaico) con
+    lo stesso testo "tortoiseshell glasses" hardcoded indipendentemente da
+    shared — stesso fix, stessa sessione di lavoro del 17/07 che ha
+    introdotto quei blocchi. TODO aperto per la prossima sessione. WALTER_DNA
+    in Surprise (feature Pride) e il testo LEGO in Filtro: esplicitamente
+    fuori scope, Walter non usa questi due bot al momento.
+
+    Ipotesi di lavoro, non certezza: questo fix riduce ma non elimina la
+    percentuale di generazioni che ignorano il volto — resta un limite
+    architetturale del modello (sampling probabilistico), non risolvibile
+    al 100% solo col prompt.
 
 CHANGELOG 2.4.0 (17/07/2026):
   - Fix generale, non un patch puntuale. Verificato sulla documentazione
@@ -195,9 +235,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3.5-flash"
 
 # Versione
-VERSION = "2.4.0"
-SHARED_VERSION = "2.4.0"   # aggiornare ad ogni modifica
-SHARED_DATE    = "17/07/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.1"
+SHARED_VERSION = "2.4.1"   # aggiornare ad ogni modifica
+SHARED_DATE    = "22/07/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -229,15 +269,18 @@ def is_allowed(uid: int) -> bool:
 # ============================================================
 
 VALERIA_FACE = (
-    "**⚠️ FACE IDENTITY LOCK — ABSOLUTE PRIORITY — HELD EXACTLY AS DESCRIBED, IN FULL DETAIL:**\n"
+    "**⚠️ FACE IDENTITY LOCK — ABSOLUTE PRIORITY:** The attached reference photo shows the exact face "
+    "to reproduce. The reference photo is authoritative for the face, eyeglasses and beard — if anything "
+    "below conflicts with it, the photo wins.\n"
     "60-year-old Italian male face, oval-rectangular shape. "
     "Ultra-detailed mature skin with visible pores, deep character wrinkles, crow's feet. "
-    "Calm half-smile, no teeth shown. "
-    "Thin octagonal Vogue Havana dark tortoiseshell frame eyeglasses — MANDATORY, always present.\n"
+    "Calm half-smile, no teeth shown.\n"
+    "**Eyeglasses:** Exactly as shown in the attached reference photo — same shape, color and frame "
+    "thickness. Always present.\n"
     "**Hair:** Short silver-grey Italian cut, slightly voluminous top, nape exposed.\n"
-    "**⚠️ BEARD — MANDATORY — NON-NEGOTIABLE:** "
-    "Full silver-grey beard approximately 6-7cm, perfectly groomed, dense and uniform, following the jawline, "
-    "clearly visible in every shot. The beard is a permanent, unchanging part of the identity lock.\n"
+    "**⚠️ BEARD — MANDATORY — NON-NEGOTIABLE:** Exactly as shown in the attached reference photo — same "
+    "length, density, texture and shape, clearly visible in every shot. The beard is a permanent part of "
+    "the identity lock, matching the reference image precisely.\n"
     "**Rendering:** Subsurface Scattering, Global Illumination, Ambient Occlusion, Fresnel Effect. "
     "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
 )
@@ -520,10 +563,10 @@ def review_and_fix(prompt: str, client: 'GeminiClient') -> str:
             "flowing hair, loose waves, slicked back long hair, wet long hair, hair falling on shoulders, "
             "hair spread around head, hair fanned out, dark flowing locks, wavy dark hair, hair against background. "
             "Replace with: short silver Italian cut, slightly voluminous top, nape exposed.\n\n"
-            "2. GLASSES MANDATORY: Valeria Cross ALWAYS wears thin octagonal Vogue Havana dark tortoiseshell glasses. "
-            "If the prompt does NOT mention glasses or eyeglasses, ADD this phrase in the Facial identity section: "
-            "'thin octagonal Vogue Havana dark tortoiseshell frame eyeglasses (MANDATORY, always present)'. "
-            "Also ensure 'no glasses' does NOT appear anywhere in the prompt.\n\n"
+            "2. GLASSES MANDATORY: Valeria Cross ALWAYS wears eyeglasses, exactly as shown in the attached "
+            "reference photo. If the prompt does NOT mention glasses or eyeglasses, ADD this phrase in the "
+            "Facial identity section: 'eyeglasses exactly as shown in the attached reference photo "
+            "(MANDATORY, always present)'. Also ensure 'no glasses' does NOT appear anywhere in the prompt.\n\n"
             "2b. GLASSES POSE REMOVAL: Remove ANY description of hands or fingers touching, adjusting, holding or "
             "raising to the glasses or temple area. The glasses are simply worn — no hand interaction with them.\n\n"
             "3. MIRROR SELFIE RULE: ONLY if the prompt explicitly contains 'mirror selfie' or both 'selfie' AND 'mirror' together — "
@@ -531,8 +574,8 @@ def review_and_fix(prompt: str, client: 'GeminiClient') -> str:
             "Do NOT add smartphone for decorative mirrors, antique mirrors, historical scenes, artistic reflections, "
             "or any mirror that is not a selfie context.\n\n"
             "4. SUBJECT BLEED: Remove any physical description belonging to the original reference subject. "
-            "Valeria Cross DNA: Male Italian face 60yo, silver beard 6-7cm, octagonal Vogue glasses, "
-            "silver short hair, hourglass body, smooth skin.\n\n"
+            "Valeria Cross DNA: Male Italian face 60yo, beard and eyeglasses exactly as shown in the attached "
+            "reference photo, silver short hair, hourglass body, smooth skin.\n\n"
             "5. WATERMARK TEXT: Must read exactly: 'feat. Valeria Cross 👠' "
             "in elegant champagne cursive, very small, bottom center/left, 90% opacity. "
             "Replace any other watermark text with the exact text above.\n\n"
@@ -569,7 +612,7 @@ def sanitize_user_input(text: str, client: 'GeminiClient') -> str:
             "You are a pre-processing filter for an AI image generation system. "
             "The subject of every image is a fixed character with these IMMUTABLE traits:\n"
             "- Male Italian face, ~60 years old, silver/grey short hair (max 15cm, nape exposed)\n"
-            "- Silver/grey beard 6-7cm, thin octagonal dark glasses (ALWAYS present)\n"
+            "- Beard and eyeglasses exactly as shown in the attached reference photo (ALWAYS present)\n"
             "- NO makeup of any kind (no eyeshadow, no eyeliner, no lipstick, no contour, no mascara)\n"
             "- NO long hair, NO dark hair, NO brown/black/blonde hair\n"
             "- Hourglass feminine body, smooth skin\n\n"
