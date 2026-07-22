@@ -1,9 +1,25 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.2
+Versione: 2.4.3
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.3 (22/07/2026):
+  - Il fix 2.4.2 sul campo BACKGROUND aveva un solo esempio illustrativo
+    ("e.g. 'approximately a dozen vintage clocks...'"), specifico dello
+    scenario di test (stanza tea-party con orologi) usato per diagnosticare
+    il problema — a differenza di OUTFIT, che non ha esempi e resta
+    puramente definizionale. Walter ha chiesto se il fix generalizza a
+    scene non fatte di oggetti discreti (es. una giungla) — risposta: il
+    meccanismo sì (nessun riferimento hardcoded al caso specifico), ma
+    l'unico esempio presente era sbilanciato verso scene "da collezione di
+    oggetti", rischio concreto di bias sottile su scene organiche. Aggiunto
+    un secondo esempio parallelo per contenuto naturale/organico (fogliame,
+    fauna) accanto a quello originale per contenuto man-made, così
+    l'istruzione resta domain-agnostic invece di implicitamente orientata
+    verso interni con oggetti numerabili. Non ancora testato in produzione
+    su nessuno dei due tipi di scena.
 
 CHANGELOG 2.4.2 (22/07/2026):
   - Campo BACKGROUND di _ANALYZE_PROMPT era una singola riga generica
@@ -254,8 +270,8 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3.5-flash"
 
 # Versione
-VERSION = "2.4.2"
-SHARED_VERSION = "2.4.2"   # aggiornare ad ogni modifica
+VERSION = "2.4.3"
+SHARED_VERSION = "2.4.3"   # aggiornare ad ogni modifica
 SHARED_DATE    = "22/07/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -683,12 +699,14 @@ _ANALYZE_PROMPT = (
     "If no markings are present on the skin: 'None.']\n\n"
     "COLOR PALETTE: [Dominant HEX codes with label.]\n\n"
     "BACKGROUND: [Every distinct background element as a standalone object — furniture, wall decor, "
-    "hanging or suspended objects, shelved or displayed items, architectural features — with "
-    "approximate count or density where multiple similar objects repeat (e.g. 'approximately a dozen "
-    "vintage clocks of varying sizes, mounted on the wall and suspended from the ceiling on cords'), "
-    "color with HEX where relevant, and spatial layering (foreground/midground/background). Do not "
-    "summarize repeated elements into a single category — enumerate their approximate quantity and "
-    "variety.]\n\n"
+    "hanging or suspended objects, shelved or displayed items, architectural features, natural elements "
+    "(plants, foliage, terrain, animals) — with approximate count or density where multiple similar "
+    "elements repeat, for man-made scenes (e.g. 'approximately a dozen vintage clocks of varying sizes, "
+    "mounted on the wall and suspended from the ceiling on cords') as well as organic/natural scenes "
+    "(e.g. 'dense fern undergrowth filling the foreground, a dozen orchid clusters scattered through the "
+    "mid-ground, three birds perched at different heights and depths'), color with HEX where relevant, "
+    "and spatial layering (foreground/midground/background). Do not summarize repeated elements into a "
+    "single category — enumerate their approximate quantity and variety.]\n\n"
     "LIGHTING: [Light source, direction, quality, color temperature, mood — 1-2 sentences.]\n\n"
     "CAMERA: [Framing. Describe how the subjects/garments are positioned in frame.]\n\n"
     "MOOD: [Overall atmosphere, color grade, cinematic style — 1 sentence.]\n\n"
