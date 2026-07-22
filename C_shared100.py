@@ -1,9 +1,28 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.1
+Versione: 2.4.2
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.2 (22/07/2026):
+  - Campo BACKGROUND di _ANALYZE_PROMPT era una singola riga generica
+    ("Exact location, architecture, surfaces, props, environment — be
+    specific"), l'unico campo del prompt di analisi senza richiesta di
+    enumerazione oggetto-per-oggetto — a differenza di OUTFIT/ACCESSORIES/
+    BODY ART/PROPS & ACTIONS, tutti esplicitamente "every X as a standalone
+    object" con HEX. Causa trovata confrontando un mosaico Atelier reale
+    con la foto originale (Walter, sfondo tea-party surrealista denso di
+    orologi/lanterne/porcellane sospese): l'analisi generata riassumeva
+    tutto in poche frasi di categoria ("shelves packed with...", "numerous
+    vintage clocks...") invece di elencare quantità/densità reali — nessun
+    lock in fase di generazione può recuperare un dettaglio mai catturato
+    nel testo. Riscritto BACKGROUND con lo stesso trattamento esaustivo di
+    OUTFIT: enumerazione per oggetto, conteggio/densità approssimativa per
+    elementi ripetuti, HEX dove rilevante, profondità spaziale
+    (foreground/midground/background). Vedi anche Atelier 2.5.2 per la
+    seconda metà del fix (BACKGROUND LOCK lato generazione).
+    Non ancora testato in produzione.
 
 CHANGELOG 2.4.1 (22/07/2026):
   - VALERIA_FACE conteneva descrizioni hardcoded di occhiali ("Thin octagonal
@@ -235,8 +254,8 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3.5-flash"
 
 # Versione
-VERSION = "2.4.1"
-SHARED_VERSION = "2.4.1"   # aggiornare ad ogni modifica
+VERSION = "2.4.2"
+SHARED_VERSION = "2.4.2"   # aggiornare ad ogni modifica
 SHARED_DATE    = "22/07/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -663,7 +682,13 @@ _ANALYZE_PROMPT = (
     "Describe it as a standalone visual design, independent of the wearer. "
     "If no markings are present on the skin: 'None.']\n\n"
     "COLOR PALETTE: [Dominant HEX codes with label.]\n\n"
-    "BACKGROUND: [Exact location, architecture, surfaces, props, environment — be specific.]\n\n"
+    "BACKGROUND: [Every distinct background element as a standalone object — furniture, wall decor, "
+    "hanging or suspended objects, shelved or displayed items, architectural features — with "
+    "approximate count or density where multiple similar objects repeat (e.g. 'approximately a dozen "
+    "vintage clocks of varying sizes, mounted on the wall and suspended from the ceiling on cords'), "
+    "color with HEX where relevant, and spatial layering (foreground/midground/background). Do not "
+    "summarize repeated elements into a single category — enumerate their approximate quantity and "
+    "variety.]\n\n"
     "LIGHTING: [Light source, direction, quality, color temperature, mood — 1-2 sentences.]\n\n"
     "CAMERA: [Framing. Describe how the subjects/garments are positioned in frame.]\n\n"
     "MOOD: [Overall atmosphere, color grade, cinematic style — 1 sentence.]\n\n"
