@@ -12,11 +12,11 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 |-----|------|---------|-------|--------|
 | VogueBot | `Vogue_210.py` | 2.1.0 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_302.py` | 3.0.2 | homely-annabelle/thearchitect | 1 |
-| AtelierBot | `Atelier_251.py` | 2.5.1 | flexible-denna/atelier | 5 |
+| AtelierBot | `Atelier_253.py` | 2.5.3 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_210.py` | 2.1.0 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_210.py` | 2.1.0 | surprise1/sorpresa | 1 |
 
-**Shared:** `C_shared100.py` v2.4.1 · **10 API key totali**
+**Shared:** `C_shared100.py` v2.4.3 · **10 API key totali**
 
 ---
 
@@ -26,7 +26,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 C_shared100.py       # Libreria condivisa
 Vogue_210.py         # Analisi foto/testo → prompt Flow
 Architect_302.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
-Atelier_251.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Atelier_253.py       # Outfit analysis → prompt con filtri (filtro persistente)
 Filtro_210.py        # 7 categorie + LEGO + Mosaic + Scarabocchio
 Surprise_210.py      # Location + outfit random + /pride + /flag
 requirements.txt
@@ -85,7 +85,11 @@ openpyxl>=3.1.5
 
 ## Fix robustezza (20/06/2026 → 22/07/2026)
 
-**Il 22/07 — foto di riferimento resa autorevole su occhiali e barba, shared + Atelier.** Causa: Walter ha segnalato che circa il 20-25% delle generazioni Flow ignorava la foto di riferimento reale su occhiali/barba. Verifica diretta (confronto testo-vs-foto allegata da Walter): `VALERIA_FACE` (shared) descriveva occhiali "thin octagonal Vogue Havana dark tortoiseshell" e barba "6-7cm, perfectly groomed" — in contraddizione esplicita con la foto reale (occhiali rotondi/spessi/scuri, barba più lunga e meno uniforme). Su conferma di Walter che la foto è sempre autorevole su questi due punti: rimossa la specifica hardcoded da `VALERIA_FACE`, sostituita con rimando esplicito alla foto allegata + istruzione di priorità in apertura del blocco. Trovato che la stessa specifica era duplicata, indipendentemente, in altri 4 punti: `review_and_fix()` (regole GLASSES MANDATORY e SUBJECT BLEED) e `sanitize_user_input()` in shared — entrambe reiniettavano la vecchia specifica come ultimo step prima di Flow, vanificando il fix su `VALERIA_FACE` — corrette nella stessa sessione (shared 2.4.1); e i 3 blocchi locali `IDENTITY LOCK` di Atelier (`build_full_prompt`, `build_shooting_prompt` singolo e mosaico), corretti il giorno dopo con lo stesso criterio (Atelier 2.5.1). Trovato anche, per caso, un disallineamento indipendente in shared: la costante `VERSION` era rimasta a `2.3.18` mentre `SHARED_VERSION` (quella davvero esportata e mostrata da `/shared`) era già a `2.4.0` dal bump del 17/07 — corretto allineando entrambe. Esplicitamente fuori scope su richiesta di Walter: `WALTER_DNA` in Surprise (feature Pride) e il testo LEGO minifig in Filtro — stessa specifica hardcoded lì, non toccata, Walter non usa questi due bot al momento. **Non ancora testato in produzione.** Dettagli completi in HANDOFF, sezione 2duodevicies.
+**Il 22/07 (continua) — rimossa un'opzione di framing su richiesta diretta di Walter.** Atelier 2.5.3: tolta "extreme close-up on face" dalla lista "Framing options" del task mosaico a 4 scatti — unica occorrenza nel file, solo ramo mosaico. Nessuna motivazione richiesta né fornita, esecuzione diretta.
+
+**Il 22/07 (continua) — sfondi generati troppo poveri di dettaglio rispetto alla foto originale.** Walter ha allegato foto originale + generazione Flow + prompt completo (caso: tea-party surrealista pieno di orologi/lanterne/porcellane sospese) — soggetto, pose e mosaico corretti, ma sfondo molto più semplice e con palette diversa dall'originale. Causa: campo BACKGROUND di `_ANALYZE_PROMPT` (shared) era l'unico senza richiesta di enumerazione oggetto-per-oggetto con conteggio/densità, a differenza di OUTFIT/ACCESSORIES/BODY ART/PROPS — la compressione avveniva già in fase di analisi della foto, prima che Flow disegnasse qualunque cosa. Riscritto (shared 2.4.2) con lo stesso trattamento esaustivo di OUTFIT. Aggiunta anche una clausola di densità in `BACKGROUND LOCK` lato Atelier (2.5.2), che prima imponeva solo coerenza tra i 4 scatti, non fedeltà di densità rispetto all'originale. Walter ha poi chiesto se il fix generalizzasse a scene non fatte di oggetti discreti (es. una giungla) — risposta: il meccanismo è generico, ma l'unico esempio illustrativo nel campo BACKGROUND era sbilanciato verso scene "da collezione di oggetti"; aggiunto un secondo esempio parallelo per contenuto organico/naturale per restare domain-agnostic (shared 2.4.3).
+
+**Il 22/07 — foto di riferimento resa autorevole su occhiali e barba, shared + Atelier.** Causa: Walter ha segnalato che circa il 20-25% delle generazioni Flow ignorava la foto di riferimento reale su occhiali/barba. Verifica diretta (confronto testo-vs-foto allegata da Walter): `VALERIA_FACE` (shared) descriveva occhiali "thin octagonal Vogue Havana dark tortoiseshell" e barba "6-7cm, perfectly groomed" — in contraddizione esplicita con la foto reale (occhiali rotondi/spessi/scuri, barba più lunga e meno uniforme). Su conferma di Walter che la foto è sempre autorevole su questi due punti: rimossa la specifica hardcoded da `VALERIA_FACE`, sostituita con rimando esplicito alla foto allegata + istruzione di priorità in apertura del blocco. Trovato che la stessa specifica era duplicata, indipendentemente, in altri 4 punti: `review_and_fix()` (regole GLASSES MANDATORY e SUBJECT BLEED) e `sanitize_user_input()` in shared — entrambe reiniettavano la vecchia specifica come ultimo step prima di Flow, vanificando il fix su `VALERIA_FACE` — corrette nella stessa sessione (shared 2.4.1); e i 3 blocchi locali `IDENTITY LOCK` di Atelier (`build_full_prompt`, `build_shooting_prompt` singolo e mosaico), corretti il giorno dopo con lo stesso criterio (Atelier 2.5.1). Trovato anche, per caso, un disallineamento indipendente in shared: la costante `VERSION` era rimasta a `2.3.18` mentre `SHARED_VERSION` (quella davvero esportata e mostrata da `/shared`) era già a `2.4.0` dal bump del 17/07 — corretto allineando entrambe. Esplicitamente fuori scope su richiesta di Walter: `WALTER_DNA` in Surprise (feature Pride) e il testo LEGO minifig in Filtro — stessa specifica hardcoded lì, non toccata, Walter non usa questi due bot al momento. **Segnale positivo parziale:** un mosaico mostrato da Walter dopo il fix ha identità stabile sui 4 scatti — un solo campione, non conclusivo su un modello non deterministico. Dettagli completi in HANDOFF, sezione 2duodevicies.
 
 **Il 17/07 — cambio di motore, non un patch puntuale sui capelli. Tutto l'ecosistema, non solo Atelier.** Causa: Walter ha mostrato un mosaico con 2 scatti su 4 ancora calvi nonostante HAIR LOCK v2.0.8. Verificato sulla documentazione ufficiale Google Cloud (prompting guide Nano Banana): il modello dietro Flow non ha un campo negativePrompt indipendente — è un'architettura multimodale end-to-end, non un diffusion model con sottrazione vettoriale come Stable Diffusion/Midjourney/Imagen. Google raccomanda esplicitamente "positive framing, not negative" come principio di prodotto per questo modello.
 
@@ -117,7 +121,7 @@ Dettagli storici in `HANDOFF-MASTER`, sezioni 2bis, 2ter, 2quater, 2quinquies, 2
 
 **TODO aperto (12/07):** analisi location dettagliata (BACKGROUND/LIGHTING/CAMERA/MOOD, ex 50 parole), ora in `Surprise_202.py`, non ancora testata in produzione — Walter deve verificare su Koyeb che sia effettivamente più utile della versione breve precedente, e che il messaggio di conferma (senza troncamento) si comporti bene in chat.
 
-**TODO aperto (22/07):** shared 2.4.1 e Atelier 2.5.1 (foto di riferimento autorevole su occhiali/barba) non ancora testati in produzione — Walter deve verificare su Flow, con più generazioni reali, se la frequenza di derive su occhiali/barba è genuinely diminuita. Nota permanente: il fix riduce ma non elimina la variabilità — Flow resta non deterministico, nessun seed disponibile.
+**TODO aperto (22/07):** shared 2.4.2/2.4.3 e Atelier 2.5.2 (densità sfondo) non ancora testati in produzione — in particolare mai testati su scene organiche/naturali (nessuna foto tipo giungla mostrata finora, solo il caso "stanza piena di oggetti"). Atelier 2.5.3 (rimozione framing option) non richiede validazione visiva specifica. shared 2.4.1/Atelier 2.5.1 (foto autorevole su occhiali/barba) hanno un segnale positivo su un solo mosaico — non conclusivo. Nota permanente: tutti questi fix riducono ma non eliminano la variabilità — Flow resta non deterministico, nessun seed disponibile.
 
 ## Nota tecnica importante
 
