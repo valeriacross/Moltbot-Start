@@ -83,13 +83,13 @@ logger = logging.getLogger(__name__)
 #   aggiunto negative prompt "clothing added where none exists, garments
 #   invented from color palette"
 # CHANGELOG 2.0.0 (20/06/2026): fix #5 — _process() ora avvolto in try/except.
-# CHANGELOG 2.5.3 (22/07/2026): rimossa l'opzione "extreme close-up on
+# CHANGELOG 2.5.3 (25/07/2026): rimossa l'opzione "extreme close-up on
 # face" dalla lista "Framing options" del task mosaico a 4 scatti (unica
 # occorrenza nel file — la lista esiste solo nel ramo mosaico di
 # build_shooting_prompt, il ramo single-shot non ce l'ha). Su richiesta
 # esplicita di Walter, nessun altro dettaglio fornito sul motivo — nessuna
 # altra modifica.
-# CHANGELOG 2.5.2 (22/07/2026): "⚠️ CRITICAL — BACKGROUND LOCK" (entrambi
+# CHANGELOG 2.5.2 (25/07/2026): "⚠️ CRITICAL — BACKGROUND LOCK" (entrambi
 # i rami di build_shooting_prompt, single e mosaico) imponeva solo che lo
 # sfondo restasse identico tra i 4 scatti — nessuna istruzione di densità
 # rispetto alla scena originale, a differenza di OUTFIT DETAIL LOCK che
@@ -105,7 +105,7 @@ logger = logging.getLogger(__name__)
 # fedeltà anche con un'analisi migliore. Fix in due parti, stesso giorno:
 # shared 2.4.2 (causa principale, analisi) + questo (rinforzo lato
 # generazione). Non ancora testato in produzione.
-# CHANGELOG 2.5.1 (22/07/2026): i 3 blocchi "⚠️ IDENTITY LOCK" locali
+# CHANGELOG 2.5.1 (25/07/2026): i 3 blocchi "⚠️ IDENTITY LOCK" locali
 # (build_full_prompt, build_shooting_prompt singolo e mosaico) dicevano
 # "tortoiseshell glasses always present, exactly as described above" —
 # stessa contraddizione già corretta in shared 2.4.1 il giorno prima: la

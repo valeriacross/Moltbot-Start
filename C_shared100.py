@@ -5,7 +5,7 @@ Versione: 2.4.3
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
 
-CHANGELOG 2.4.3 (22/07/2026):
+CHANGELOG 2.4.3 (25/07/2026):
   - Il fix 2.4.2 sul campo BACKGROUND aveva un solo esempio illustrativo
     ("e.g. 'approximately a dozen vintage clocks...'"), specifico dello
     scenario di test (stanza tea-party con orologi) usato per diagnosticare
@@ -21,7 +21,7 @@ CHANGELOG 2.4.3 (22/07/2026):
     verso interni con oggetti numerabili. Non ancora testato in produzione
     su nessuno dei due tipi di scena.
 
-CHANGELOG 2.4.2 (22/07/2026):
+CHANGELOG 2.4.2 (25/07/2026):
   - Campo BACKGROUND di _ANALYZE_PROMPT era una singola riga generica
     ("Exact location, architecture, surfaces, props, environment — be
     specific"), l'unico campo del prompt di analisi senza richiesta di
@@ -40,7 +40,7 @@ CHANGELOG 2.4.2 (22/07/2026):
     seconda metà del fix (BACKGROUND LOCK lato generazione).
     Non ancora testato in produzione.
 
-CHANGELOG 2.4.1 (22/07/2026):
+CHANGELOG 2.4.1 (25/07/2026):
   - VALERIA_FACE conteneva descrizioni hardcoded di occhiali ("Thin octagonal
     Vogue Havana dark tortoiseshell frame") e barba ("approximately 6-7cm,
     perfectly groomed, dense and uniform") che confermate in contraddizione
@@ -272,7 +272,7 @@ MODEL = "gemini-3.5-flash"
 # Versione
 VERSION = "2.4.3"
 SHARED_VERSION = "2.4.3"   # aggiornare ad ogni modifica
-SHARED_DATE    = "22/07/2026"  # aggiornare ad ogni modifica
+SHARED_DATE    = "25/07/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
