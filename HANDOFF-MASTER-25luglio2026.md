@@ -50,7 +50,7 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 | `C_shared100.py` | **2.4.3** | (comune a tutti) | — | — |
 | `Vogue_210.py` | **2.1.0** | colossal-giselle/vogue | `python Vogue_210.py` | 2 |
 | `Architect_302.py` | **3.0.2** | homely-annabelle/thearchitect | `python Architect_302.py` | 1 |
-| `Atelier_253.py` | **2.5.3** | flexible-denna/atelier | `python Atelier_253.py` | 5 |
+| `Atelier_254.py` | **2.5.4** | flexible-denna/atelier | `python Atelier_254.py` | 5 |
 | `Filtro_210.py` | **2.1.0** | screeching-jobina/filtro | `python Filtro_210.py` | 1 |
 | `Surprise_210.py` | **2.1.0** | surprise1/sorpresa | `python Surprise_210.py` | 1 |
 
@@ -97,7 +97,9 @@ Chiesto esplicitamente a Walter chi avesse ragione tra testo e foto: **la foto �
 
 **Fix Atelier 2.5.3:** rimossa, su richiesta esplicita di Walter senza motivazione fornita, l'opzione "extreme close-up on face" dalla lista "Framing options" del task mosaico a 4 scatti (unica occorrenza nel file, solo ramo mosaico).
 
-**Non ancora testato in produzione:** i fix 2.4.2/2.4.3 (densità sfondo) e 2.5.3 (framing). Ipotesi di lavoro, non certezza, per tutti i fix di questa sessione: riducono ma non eliminano la variabilità — resta un limite architetturale del modello (sampling probabilistico, nessun seed disponibile su Flow), non risolvibile al 100% solo col prompt.
+**Fix Atelier 2.5.4 (26/07/2026):** il 2.5.3 non bastava — Walter ha mostrato 5 mosaici post-2.5.3, in ognuno almeno uno scatto restava un primo piano stretto sul volto. Causa: "close-up bust" rimasta nella stessa lista, framing quasi indistinguibile da quello già tolto, sovra-pescata probabilmente per il peso testuale di `IDENTITY LOCK`. Rimossa anche questa.
+
+**Non ancora testato in produzione:** i fix 2.4.2/2.4.3 (densità sfondo) e 2.5.3/2.5.4 (framing). Ipotesi di lavoro, non certezza, per tutti i fix di questa sessione: riducono ma non eliminano la variabilità — resta un limite architetturale del modello (sampling probabilistico, nessun seed disponibile su Flow), non risolvibile al 100% solo col prompt.
 
 ---
 
@@ -540,8 +542,9 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 7. ATELIER — STORICO E STATO (v2.5.3)
+## 7. ATELIER — STORICO E STATO (v2.5.4)
 
+- **v2.5.4 (26/07/2026):** "close-up bust" rimossa dalla lista "Framing options" (mosaico) — il fix 2.5.3 aveva tolto solo "extreme close-up on face", non bastava: 5 mosaici mostrati da Walter post-2.5.3 avevano tutti almeno uno scatto di primo piano stretto sul volto. Non ancora testato.
 - **v2.5.3 (25/07/2026):** rimossa, su richiesta esplicita di Walter senza motivazione fornita, l'opzione "extreme close-up on face" dalla lista "Framing options" del task mosaico a 4 scatti (unica occorrenza nel file, solo ramo mosaico di `build_shooting_prompt`).
 - **v2.5.2 (25/07/2026):** `⚠️ CRITICAL — BACKGROUND LOCK` (entrambi i rami, single e mosaico) non aveva istruzione di densità rispetto alla scena originale, a differenza di `OUTFIT DETAIL LOCK` — aggiunta la stessa clausola di densità. Causa principale del problema (sfondi generati poveri di dettaglio) era comunque a monte, in shared 2.4.2 (analisi). Vedi sezione 2duodevicies.
 
