@@ -12,7 +12,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 |-----|------|---------|-------|--------|
 | VogueBot | `Vogue_210.py` | 2.1.0 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_302.py` | 3.0.2 | homely-annabelle/thearchitect | 1 |
-| AtelierBot | `Atelier_253.py` | 2.5.3 | flexible-denna/atelier | 5 |
+| AtelierBot | `Atelier_254.py` | 2.5.4 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_210.py` | 2.1.0 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_210.py` | 2.1.0 | surprise1/sorpresa | 1 |
 
@@ -26,7 +26,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 C_shared100.py       # Libreria condivisa
 Vogue_210.py         # Analisi foto/testo → prompt Flow
 Architect_302.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
-Atelier_253.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Atelier_254.py       # Outfit analysis → prompt con filtri (filtro persistente)
 Filtro_210.py        # 7 categorie + LEGO + Mosaic + Scarabocchio
 Surprise_210.py      # Location + outfit random + /pride + /flag
 requirements.txt
@@ -85,7 +85,9 @@ openpyxl>=3.1.5
 
 ## Fix robustezza (20/06/2026 → 25/07/2026)
 
-**Il 25/07 (continua) — rimossa un'opzione di framing su richiesta diretta di Walter.** Atelier 2.5.3: tolta "extreme close-up on face" dalla lista "Framing options" del task mosaico a 4 scatti — unica occorrenza nel file, solo ramo mosaico. Nessuna motivazione richiesta né fornita, esecuzione diretta.
+**Il 26/07 — seconda rimozione dalla stessa lista, "close-up bust".** Il fix 2.5.3 (sotto) non bastava: Walter ha mostrato 5 mosaici generati con la 2.5.3 attiva, in ognuno almeno uno scatto restava un primo piano stretto sul volto. Causa: "close-up bust" era rimasta nella lista "Framing options", framing quasi indistinguibile da quello già tolto — con `IDENTITY LOCK` che dedica più testo a volto/barba/occhiali di ogni altro elemento, il modello sembrava sovra-pescarla. Rimossa anche questa (Atelier 2.5.4). Non verificato se le opzioni rimaste diano lo stesso problema — nessun segnale finora.
+
+**Il 25/07 — rimossa un'opzione di framing su richiesta diretta di Walter.** Atelier 2.5.3: tolta "extreme close-up on face" dalla lista "Framing options" del task mosaico a 4 scatti — unica occorrenza nel file, solo ramo mosaico. Nessuna motivazione richiesta né fornita, esecuzione diretta.
 
 **Il 25/07 (continua) — sfondi generati troppo poveri di dettaglio rispetto alla foto originale.** Walter ha allegato foto originale + generazione Flow + prompt completo (caso: tea-party surrealista pieno di orologi/lanterne/porcellane sospese) — soggetto, pose e mosaico corretti, ma sfondo molto più semplice e con palette diversa dall'originale. Causa: campo BACKGROUND di `_ANALYZE_PROMPT` (shared) era l'unico senza richiesta di enumerazione oggetto-per-oggetto con conteggio/densità, a differenza di OUTFIT/ACCESSORIES/BODY ART/PROPS — la compressione avveniva già in fase di analisi della foto, prima che Flow disegnasse qualunque cosa. Riscritto (shared 2.4.2) con lo stesso trattamento esaustivo di OUTFIT. Aggiunta anche una clausola di densità in `BACKGROUND LOCK` lato Atelier (2.5.2), che prima imponeva solo coerenza tra i 4 scatti, non fedeltà di densità rispetto all'originale. Walter ha poi chiesto se il fix generalizzasse a scene non fatte di oggetti discreti (es. una giungla) — risposta: il meccanismo è generico, ma l'unico esempio illustrativo nel campo BACKGROUND era sbilanciato verso scene "da collezione di oggetti"; aggiunto un secondo esempio parallelo per contenuto organico/naturale per restare domain-agnostic (shared 2.4.3).
 
@@ -121,7 +123,7 @@ Dettagli storici in `HANDOFF-MASTER`, sezioni 2bis, 2ter, 2quater, 2quinquies, 2
 
 **TODO aperto (12/07):** analisi location dettagliata (BACKGROUND/LIGHTING/CAMERA/MOOD, ex 50 parole), ora in `Surprise_202.py`, non ancora testata in produzione — Walter deve verificare su Koyeb che sia effettivamente più utile della versione breve precedente, e che il messaggio di conferma (senza troncamento) si comporti bene in chat.
 
-**TODO aperto (25/07):** shared 2.4.2/2.4.3 e Atelier 2.5.2 (densità sfondo) non ancora testati in produzione — in particolare mai testati su scene organiche/naturali (nessuna foto tipo giungla mostrata finora, solo il caso "stanza piena di oggetti"). Atelier 2.5.3 (rimozione framing option) non richiede validazione visiva specifica. shared 2.4.1/Atelier 2.5.1 (foto autorevole su occhiali/barba) hanno un segnale positivo su un solo mosaico — non conclusivo. Nota permanente: tutti questi fix riducono ma non eliminano la variabilità — Flow resta non deterministico, nessun seed disponibile.
+**TODO aperto:** shared 2.4.2/2.4.3 e Atelier 2.5.2 (densità sfondo) non ancora testati in produzione — in particolare mai testati su scene organiche/naturali. Atelier 2.5.3/2.5.4 (rimozione framing options) non richiedono validazione visiva specifica. shared 2.4.1/Atelier 2.5.1 (foto autorevole su occhiali/barba) hanno un segnale positivo su un solo mosaico — non conclusivo. Nota permanente: tutti questi fix riducono ma non eliminano la variabilità — Flow resta non deterministico, nessun seed disponibile.
 
 ## Nota tecnica importante
 
