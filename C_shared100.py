@@ -1,9 +1,27 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.3
+Versione: 2.4.4
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.4 (27/07/2026):
+  - Walter ha segnalato scostamento tra un mosaico generato da Atelier e la
+    foto originale: il pattern del bodysuit (mosaico a frammenti fini, tipo
+    specchio infranto) era diventato nel generato un pattern "arlecchino" a
+    grandi rombi piatti — la scala/densità del pattern non teneva. Prima
+    ipotesi (negative prompt sul pattern arlecchino) scartata su richiesta
+    esplicita di Walter: Gemini non considera i negative prompt in
+    generazione (confermato anche dall'audit 2.4.0/2septendecies). Aggiunta
+    una nuova costante generica VALERIA_TEXTURE_LOCK — non legata a questa
+    scena/foto specifica, vale per qualsiasi pattern/texture/sfondo/
+    abbigliamento — interamente in positivo (nessun "not/never"), che
+    richiede granularità fine (decine/centinaia di unità piccole) per
+    qualunque pattern descritto nella scena. Inserita sia in VALERIA_DNA
+    (usato da Vogue) sia dentro build_valeria_identity() (usato da Atelier)
+    — verificato che Atelier NON passa mai da VALERIA_DNA nonostante lo
+    importi, quindi mettere il fix solo lì non sarebbe arrivato ad Atelier.
+    Non ancora testato in produzione.
 
 CHANGELOG 2.4.3 (25/07/2026):
   - Il fix 2.4.2 sul campo BACKGROUND aveva un solo esempio illustrativo
@@ -257,7 +275,7 @@ from google.genai import types as genai_types
 __all__ = [
     'GeminiClient', 'CaptionGenerator', 'HealthServer', 'is_allowed',
     'VALERIA_FACE', 'VALERIA_BODY_STRONG', 'VALERIA_BODY_SAFE',
-    'VALERIA_WATERMARK',
+    'VALERIA_WATERMARK', 'VALERIA_TEXTURE_LOCK',
     'VALERIA_DNA', 'EDITORIAL_WRAPPER',
     'build_valeria_identity', 'generate_caption', 'generate_mini_caption', 'generate_mini_prompt',
     'review_and_fix', 'sanitize_user_input',
@@ -270,9 +288,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3.5-flash"
 
 # Versione
-VERSION = "2.4.3"
-SHARED_VERSION = "2.4.3"   # aggiornare ad ogni modifica
-SHARED_DATE    = "25/07/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.4"
+SHARED_VERSION = "2.4.4"   # aggiornare ad ogni modifica
+SHARED_DATE    = "27/07/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -382,6 +400,23 @@ def body_art_clause(scene_description: str) -> str:
         return ""
     return BODY_ART_EXCEPTION_TEXT
 
+# TEXTURE & PATTERN FIDELITY LOCK — introdotta in 2.4.4. Generica, non legata
+# a una scena/foto specifica: si applica a qualunque pattern, texture o
+# superficie descritta (mosaico, tessuto, marmo, stampa, ecc.), su qualunque
+# bot. Interamente in positivo — nessun "not/never" — coerente con l'audit
+# negative-prompt di 2.4.0 (Flow/Gemini non considera i negative prompt in
+# generazione). Va SEMPRE inserita sia in VALERIA_DNA (Vogue) sia dentro
+# build_valeria_identity() (Atelier) — Atelier importa VALERIA_DNA ma non lo
+# usa mai nel codice, quindi va aggiunta esplicitamente in entrambi i punti.
+VALERIA_TEXTURE_LOCK = (
+    "**⚠️ TEXTURE & PATTERN FIDELITY LOCK — ABSOLUTE PRIORITY:** Any pattern, texture, print, weave, "
+    "marbling or faceted surface described in the scene reference must be reproduced at fine, "
+    "small-scale granularity — dozens to hundreds of individual small units (tiles, facets, threads, "
+    "scales) visible across any single limb, panel or surface, matching the density and fragmentation "
+    "shown in the reference photograph. Each unit follows the contours of the body or object "
+    "continuously, exactly as a real photographed material would.\n\n"
+)
+
 # DNA completo assemblato — usato da Vogue. NOTA 2.4.0: Architect non lo
 # usa più dalla riscrittura v3.0.0 (10/07) — nessun DNA, analisi pura del
 # soggetto reale. Il commento precedente ("usato da Vogue e Architect") era
@@ -397,6 +432,7 @@ def body_art_clause(scene_description: str) -> str:
 VALERIA_DNA = (
     f"{VALERIA_FACE}"
     f"{VALERIA_BODY_STRONG}"
+    f"{VALERIA_TEXTURE_LOCK}"
     f"WATERMARK: '{VALERIA_WATERMARK}' — elegant champagne cursive, very small, bottom center, 90% opacity.\n"
     f"The output is a single photorealistic image. Hands are anatomically correct, five fingers each. "
     f"No text appears anywhere in the image beyond the watermark specified above.\n"
@@ -412,9 +448,9 @@ EDITORIAL_WRAPPER = (
 
 
 def build_valeria_identity(safe: bool = False) -> str:
-    """Assembla FACE + BODY (strong o safe) — usato da Atelier nei prompt."""
+    """Assembla FACE + BODY (strong o safe) + TEXTURE LOCK — usato da Atelier nei prompt."""
     body = VALERIA_BODY_SAFE if safe else VALERIA_BODY_STRONG
-    return VALERIA_FACE + body
+    return VALERIA_FACE + body + VALERIA_TEXTURE_LOCK
 
 # ============================================================
 # GENERATE_CAPTION — CAPTION SOCIAL UNIFICATA
