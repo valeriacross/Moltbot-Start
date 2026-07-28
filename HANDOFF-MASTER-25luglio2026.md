@@ -1,5 +1,5 @@
 # HANDOFF MASTER — Valeria Cross AI · Moltbot
-**Generato:** 25/07/2026, fine sessione (aggiornato da versione 17/07)
+**Generato:** 28/07/2026, fine sessione (aggiornato da versione 25/07)
 **Da:** Walter Caponi
 **Per:** prossima sessione Claude
 
@@ -40,14 +40,15 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 9. Modifiche a shared: aggiornare VERSION, SHARED_VERSION, SHARED_DATE, docstring iniziale con "Versione: X.X.X"
 10. **`review_and_fix()` in C_shared FORZA il DNA Valeria nel suo prompt di sistema interno — non è bypassabile passando istruzioni diverse.** Per qualsiasi task che richiede rimuovere/alterare quel DNA, usare `gemini.generate()` direttamente con un prompt di sistema dedicato (vedi esempio `/generico` in Architect)
 11. **Prima di ogni bump di versione, verificare con `grep "^VERSION"` la versione REALE nel file su cui si sta lavorando** — non fidarsi della cronologia HANDOFF, perché può essere disallineata dal file effettivamente caricato dall'utente
+12. **Consegnare sempre i file in zip, anche quando è un solo file**
 
 ---
 
-## 2. STATO FILE ATTUALE (25/07/2026)
+## 2. STATO FILE ATTUALE (28/07/2026)
 
 | File | Versione | Koyeb service | Run command | Chiavi API |
 |------|---------|---------------|--------------|-----------|
-| `C_shared100.py` | **2.4.3** | (comune a tutti) | — | — |
+| `C_shared100.py` | **2.4.5** | (comune a tutti) | — | — |
 | `Vogue_210.py` | **2.1.0** | colossal-giselle/vogue | `python Vogue_210.py` | 2 |
 | `Architect_302.py` | **3.0.2** | homely-annabelle/thearchitect | `python Architect_302.py` | 1 |
 | `Atelier_254.py` | **2.5.4** | flexible-denna/atelier | `python Atelier_254.py` | 5 |
@@ -61,6 +62,40 @@ Repository: `valeriacross/Moltbot-Start` — region Frankfurt.
 **Nota versioning (corretta il 10/07):** il numero nel nome file **corrisponde sempre esattamente** alla VERSION interna, senza punti (es. `2.0.4` → `Atelier_204.py`, `3.0.2` → `Architect_302.py`) — non è un contatore progressivo indipendente. Su un salto di versione non incrementale (es. `2.0.6` → `3.0.0`), il nome file deve riflettere il nuovo numero di versione per intero, non "il prossimo della sequenza". Vedi sezione 2duodecies per il dettaglio dell'errore fatto e corretto in questa data.
 
 **Nota chiavi (25/06):** una chiave spostata da Architect (2→1) ad Atelier (4→5). `C_shared100.py` ora legge fino a `GOOGLE_API_KEY_5`.
+
+---
+
+## 2vicies. SESSIONE 28/07/2026 — BUST VOLUME / SILHOUETTE SEMPRE VISIBILE (TUTTO L'ECOSISTEMA)
+
+**Punto di partenza:** Walter ha allegato un mosaico poolside generato da Atelier — volto/barba/occhiali corretti in tutti e 4 gli scatti, ma il torso reso completamente maschile (peloso, piatto, nessun seno) nonostante FULL D-CUP BUST e la clausola COEXISTENCE già presenti nel BODY block, e nonostante i PROPS del prompt menzionassero esplicitamente "breasts". Diversamente dal caso mosaico/cristallo (corpo interamente coperto da tuta), qui il torso era nudo/scoperto (costume da bagno, contesto piscina) — nessun tessuto a mediare la forma.
+
+**Confermato da Walter:** non un caso isolato — il pattern si ripete spesso su scene a torso nudo/scoperto (spiaggia, doccia, ecc.).
+
+**Segnalata da Walter una correlazione, annotata ma non azionabile lato codice:** il problema capita molto più spesso quando genera con la variante Gemini "nano pro" dentro Flow, molto meno con "nano 2" o "nano light". Verificato con Walter: è una sua scelta manuale nell'interfaccia di Flow al momento di incollare il prompt, non un parametro letto dal codice dei bot — nessuna leva qui.
+
+**Richiesta esplicita di Walter:** il rinforzo deve essere incondizionato — vale sempre, in ogni immagine, non solo nelle scene a pelle scoperta (coerente con la richiesta ricorrente di non ottimizzare mai su un caso puntuale).
+
+**Fix shared 2.4.5:** aggiunta una riga dopo la clausola COEXISTENCE, sia in `VALERIA_BODY_STRONG` ("⚠️ BUST VOLUME — ALWAYS VISIBLE") sia in `VALERIA_BODY_SAFE` ("⚠️ SILHOUETTE — ALWAYS VISIBLE") — ereditata automaticamente ovunque questi due blocchi sono già usati (Vogue via `VALERIA_DNA`, Atelier via `build_valeria_identity()`), nessun nuovo import necessario.
+
+**Non toccato:** `Atelier_254.py` — stesso ragionamento della sezione precedente, nessuna modifica di codice.
+
+**Non ancora testato in produzione.** Nota onesta data a Walter prima del "Vai": come da nota permanente già in HANDOFF, questi rinforzi riducono ma non eliminano la variabilità di Flow — non è garantito al 100%, specie se la causa reale fosse in parte legata alla variante "nano pro" più che al wording del prompt.
+
+---
+
+## 2undevicies. SESSIONE 27/07/2026 — TEXTURE & PATTERN FIDELITY LOCK (TUTTO L'ECOSISTEMA)
+
+**Punto di partenza:** Walter ha allegato foto originale + mosaico generato da Atelier per un caso "cristallo/specchio infranto" — il bodysuit nell'originale è un mosaico denso di centinaia di piccoli frammenti irregolari; nel generato è diventato un pattern "arlecchino" a pochi grandi rombi piatti. Sfondo (marmo, medaglione, cristalli) reso correttamente nei 4 scatti — il problema era solo scala/densità del pattern del capo.
+
+**Prima ipotesi, scartata su richiesta esplicita di Walter:** aggiungere un negative prompt esplicito contro pattern arlecchino/a blocchi. Walter ha ricordato che Gemini non considera i negative prompt in generazione — coerente con l'audit 2.4.0/2septendecies (cambio già fatto da negative a positive-only framing su tutto l'ecosistema).
+
+**Richiesta esplicita di Walter, ricorrente in questa e nella sessione successiva:** niente fix mirato su questa singola foto/scena — serve un'istruzione generica valida per qualsiasi sfondo, texture, abbigliamento.
+
+**Fix shared 2.4.4:** nuova costante `VALERIA_TEXTURE_LOCK`, interamente in positivo (nessun "not/never"), che richiede granularità fine (decine/centinaia di unità piccole — tessere, sfaccettature, fili, squame) per qualunque pattern/texture/superficie descritta nella scena, a prescindere dal soggetto. **Verificato prima di implementare:** Atelier importa `VALERIA_DNA` ma non lo usa mai nel codice — usa solo `build_valeria_identity()` (FACE+BODY). Mettere il fix solo in `VALERIA_DNA` non sarebbe arrivato ad Atelier, il bot che ha generato il caso segnalato. Inserita quindi la nuova costante in entrambi i punti: dentro l'assemblaggio di `VALERIA_DNA` (usato da Vogue) e dentro `build_valeria_identity()` (usato da Atelier).
+
+**Non toccato:** `Atelier_254.py` — nessuna modifica di codice necessaria, eredita il fix automaticamente tramite `build_valeria_identity()`, interfaccia invariata.
+
+**Confermato in produzione (28/07):** Walter ha mostrato un nuovo mosaico generato da Atelier dopo il fix — pattern a frammenti fini, coerente con l'originale in tutti e 4 gli scatti.
 
 ---
 
@@ -670,3 +705,9 @@ Pool locale di location (254, verificato via `len(LOCATION_POOL)` — l'etichett
 29. **RISOLTO il 25/07, non testato (modifica cosmetica, non richiede validazione visiva).** Atelier 2.5.3: rimossa l'opzione "extreme close-up on face" dalla lista "Framing options" del task mosaico a 4 scatti, su richiesta esplicita di Walter — nessuna motivazione fornita, nessuna registrata.
 
 30. **Non un TODO, osservazione per la prossima sessione:** il watermark "feat. Valeria Cross" ha mostrato un refuso di rendering testo su un mosaico ("Valeria Crosa") — non è un problema di prompt, è un limite noto di Flow/Nano Banana sul rendering di testo piccolo su mosaici multi-pannello. Se ricorre spesso, si può provare a rinforzare l'istruzione watermark (es. spelling esplicito lettera per lettera), ma tenere aspettative basse — è un limite del modello, non del nostro prompt.
+
+31. **RISOLTO e CONFERMATO in produzione il 28/07.** shared 2.4.4: nuova costante `VALERIA_TEXTURE_LOCK`, generica e in positivo, per la fedeltà di scala/densità di qualunque pattern/texture descritta (caso di test: mosaico "specchio infranto" reso come pochi rombi piatti). Prima ipotesi (negative prompt) scartata su richiesta di Walter — Gemini non li considera. Inserita sia in `VALERIA_DNA` sia in `build_valeria_identity()`, perché verificato che Atelier non passa mai da `VALERIA_DNA` nonostante lo importi. Walter ha confermato su un mosaico successivo: pattern a frammenti fini, coerente con l'originale.
+
+32. **RISOLTO il 28/07, non ancora testato in produzione.** shared 2.4.5: torso reso completamente maschile (peloso, senza seno) su scene a pelle scoperta (costume da bagno, contesto piscina), nonostante FULL D-CUP BUST e COEXISTENCE già presenti — confermato da Walter come pattern ricorrente su scene simili (spiaggia, doccia), non isolato. Aggiunta una riga incondizionata dopo COEXISTENCE sia in `VALERIA_BODY_STRONG` ("BUST VOLUME — ALWAYS VISIBLE") sia in `VALERIA_BODY_SAFE` ("SILHOUETTE — ALWAYS VISIBLE"), su richiesta esplicita di Walter di non legarla a scene specifiche. Nessuna garanzia — vedi anche punto 33.
+
+33. **Osservazione permanente di Walter (28/07), non azionabile lato codice:** le derive corpo maschile/senza seno capitano molto più spesso quando genera con la variante Gemini "nano pro" dentro Flow, molto meno con "nano 2" o "nano light". È una scelta manuale di Walter nell'interfaccia di Flow al momento di incollare il prompt — nessun parametro nel codice dei bot la controlla. Utile da tenere a mente per diagnosi future: se una deriva è frequente e concentrata, vale la pena chiedere a Walter quale variante nano stava usando prima di assumere che sia solo un problema di prompt wording.

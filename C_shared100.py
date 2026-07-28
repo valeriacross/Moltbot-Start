@@ -1,9 +1,29 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.4
+Versione: 2.4.5
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.5 (28/07/2026):
+  - Walter ha segnalato un pattern ricorrente su scene a pelle scoperta
+    (torso nudo/scoperto: piscina, spiaggia, doccia, ecc.): il corpo generato
+    torna maschile (peloso, senza seno) nonostante FULL D-CUP BUST e
+    COEXISTENCE già presenti — non un caso isolato, confermato ricorrente.
+    Segnalata anche una correlazione con la variante Gemini usata in Flow:
+    capita molto più spesso con "nano pro" che con "nano 2" o "nano light" —
+    annotato per riferimento, ma è una scelta manuale di Walter dentro Flow
+    al momento di incollare il prompt, non un parametro del codice dei bot:
+    nessuna leva qui lato codice per quella parte. Aggiunto un rinforzo
+    INCONDIZIONATO (vale in ogni immagine, non solo a pelle scoperta, su
+    richiesta esplicita di Walter — niente di legato a una scena specifica)
+    dopo la clausola COEXISTENCE sia in VALERIA_BODY_STRONG ("BUST VOLUME —
+    ALWAYS VISIBLE") sia in VALERIA_BODY_SAFE ("SILHOUETTE — ALWAYS
+    VISIBLE"), ereditato automaticamente ovunque questi due blocchi sono già
+    usati (Vogue via VALERIA_DNA, Atelier via build_valeria_identity()).
+    Non garantito al 100%: nota permanente già in HANDOFF, questi rinforzi
+    riducono ma non eliminano la variabilità di Flow. Non ancora ritestato
+    in produzione dopo questo fix.
 
 CHANGELOG 2.4.4 (27/07/2026):
   - Walter ha segnalato scostamento tra un mosaico generato da Atelier e la
@@ -288,9 +308,9 @@ logger = logging.getLogger(__name__)
 MODEL = "gemini-3.5-flash"
 
 # Versione
-VERSION = "2.4.4"
-SHARED_VERSION = "2.4.4"   # aggiornare ad ogni modifica
-SHARED_DATE    = "27/07/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.5"
+SHARED_VERSION = "2.4.5"   # aggiornare ad ogni modifica
+SHARED_DATE    = "28/07/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -347,7 +367,10 @@ VALERIA_BODY_STRONG = (
     "from face → neck → shoulders → chest → arms.\n"
     "**⚠️ COEXISTENCE — CRITICAL:** The silver-grey beard on the face and the feminine body coexist "
     "together in the same image, exactly as described — the beard stays exactly as specified above, "
-    "the body stays exactly as specified here, both simultaneously, unchanged.\n\n"
+    "the body stays exactly as specified here, both simultaneously, unchanged.\n"
+    "**⚠️ BUST VOLUME — ALWAYS VISIBLE:** The full D-cup bust stays fully three-dimensional, rounded and "
+    "clearly visible in every image, under any clothing, framing or pose — never flattened, minimized or "
+    "omitted, identically whether the skin is bare or covered.\n\n"
 )
 
 VALERIA_BODY_SAFE = (
@@ -359,7 +382,10 @@ VALERIA_BODY_SAFE = (
     "from face → neck → shoulders → chest → arms.\n"
     "**⚠️ COEXISTENCE — CRITICAL:** The silver-grey beard on the face and the feminine body coexist "
     "together in the same image, exactly as described — the beard stays exactly as specified above, "
-    "the body stays exactly as specified here, both simultaneously, unchanged.\n\n"
+    "the body stays exactly as specified here, both simultaneously, unchanged.\n"
+    "**⚠️ SILHOUETTE — ALWAYS VISIBLE:** The soft feminine chest and waist silhouette stays fully "
+    "visible in every image, under any clothing, framing or pose — never flattened, minimized or "
+    "omitted, identically whether the skin is bare or covered.\n\n"
 )
 
 VALERIA_WATERMARK = "feat. Valeria Cross 👠"
