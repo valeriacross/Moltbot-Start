@@ -1,9 +1,20 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.6
+Versione: 2.4.7
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.7 (30/07/2026):
+  - Walter ha chiesto di cambiare approccio rispetto alla 2.4.6: niente più
+    soglia di consumo (75 call) per passare a MODEL_LITE — rimossa
+    LITE_FALLBACK_AT. Ora il fallback è reattivo: su un 503/overload si
+    ritenta SUBITO con gemini-3.1-flash-lite sulla stessa chiave, prima
+    ancora di ruotare chiave (la rotazione chiave non serve contro un
+    overload lato server, condiviso da tutte le chiavi). Se anche
+    MODEL_LITE fallisce sulla chiave corrente, si prosegue con la
+    rotazione chiavi esistente ma restando su MODEL_LITE per il resto dei
+    tentativi di quella chiamata. Non ancora testato in produzione.
 
 CHANGELOG 2.4.6 (30/07/2026):
   - Walter segnala errori "Servizio Gemini non disponibile — Sovraccarico
@@ -321,18 +332,18 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 MODEL = "gemini-3.5-flash"
-# Fallback automatico — introdotto in 2.4.6. Piano già concordato nel changelog
-# 2.3.16 (mai attivato finora): oltre una soglia di consumo giornaliero, le
-# chiamate che userebbero il modello di default passano automaticamente al
-# modello lite (quota/capacità separata da gemini-3.5-flash). Non tocca le
-# chiamate che passano esplicitamente un modello diverso (es. MODEL_TEXT_ID
-# per le caption, definito nei singoli bot) — solo quelle sul default MODEL.
+# Fallback automatico — introdotto in 2.4.6 (soglia 75 call/giorno), reso
+# REATTIVO in 2.4.7 su richiesta di Walter: niente più soglia di consumo —
+# su un 503/overload si ritenta SUBITO con MODEL_LITE, in ogni caso, prima
+# ancora di ruotare chiave (vedi generate()). Piano di fallback originale
+# concordato nel changelog 2.3.16. Non tocca le chiamate che passano
+# esplicitamente un modello diverso (es. MODEL_TEXT_ID per le caption,
+# definito nei singoli bot) — solo quelle sul default MODEL.
 MODEL_LITE = "gemini-3.1-flash-lite"
-LITE_FALLBACK_AT = 75  # _total_calls giornalieri — 75% di una quota stimata di 100
 
 # Versione
-VERSION = "2.4.6"
-SHARED_VERSION = "2.4.6"   # aggiornare ad ogni modifica
+VERSION = "2.4.7"
+SHARED_VERSION = "2.4.7"   # aggiornare ad ogni modifica
 SHARED_DATE    = "30/07/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -1021,13 +1032,9 @@ class GeminiClient:
                 _cb(_cur_key, self._total_calls)
             except Exception as _cb_err:
                 logger.warning(f"\u26a0\ufe0f on_key_use callback error: {_cb_err}")
-        # FIX 2.4.6: oltre LITE_FALLBACK_AT call giornaliere, le chiamate sul
-        # modello di default passano a MODEL_LITE — non tocca chi passa un
-        # model esplicito diverso (es. MODEL_TEXT_ID per le caption).
-        effective_model = model
-        if model == MODEL and self._total_calls >= LITE_FALLBACK_AT:
-            effective_model = MODEL_LITE
-            logger.info(f"\U0001f4c9 GeminiClient: soglia {LITE_FALLBACK_AT} call raggiunta ({self._total_calls}) — uso {MODEL_LITE}")
+        # Il fallback su MODEL_LITE è gestito in modo reattivo nel blocco
+        # except sotto (FIX 2.4.7) — qui il primo tentativo usa sempre
+        # il modello richiesto dal chiamante, invariato.
         try:
             if contents:
                 text_part = genai_types.Part.from_text(text=prompt)
@@ -1053,7 +1060,7 @@ class GeminiClient:
                 ),
             ]
             response = self._client.models.generate_content(
-                model=effective_model,
+                model=model,
                 contents=payload,
                 config=genai_types.GenerateContentConfig(
                     safety_settings=safety,
@@ -1097,59 +1104,92 @@ class GeminiClient:
         except Exception as e:
             err_text = str(e)
             logger.error(f"\u274c GeminiClient.generate(): {e}", exc_info=True)
-            # Errori transitori: 429/quota, 503/overload, timeout, rete
-            # -> tenta TUTTE le chiavi rimanenti prima di arrendersi
-            _is_transient = (
-                "429" in err_text
-                or "503" in err_text
-                or "quota" in err_text.lower()
-                or "exhausted" in err_text.lower()
+            # FIX 2.4.7: fallback reattivo, non più su soglia di consumo.
+            # Su 503/overload il problema è il modello saturo sul lato
+            # server — condiviso da tutte le chiavi — quindi ruotare
+            # chiave non aiuta. Si ritenta SUBITO con MODEL_LITE sulla
+            # STESSA chiave, prima ancora di provare a ruotare. Se anche
+            # MODEL_LITE fallisce, si prosegue con la rotazione chiavi
+            # esistente ma restando su MODEL_LITE per tutti i tentativi
+            # successivi di questa chiamata.
+            _is_overload = (
+                "503" in err_text
                 or "unavailable" in err_text.lower()
                 or "overloaded" in err_text.lower()
+            )
+            _is_transient = (
+                _is_overload
+                or "429" in err_text
+                or "quota" in err_text.lower()
+                or "exhausted" in err_text.lower()
                 or "timeout" in err_text.lower()
                 or "timed out" in err_text.lower()
                 or "connection" in err_text.lower()
             )
-            if _is_transient:
-                for _attempt in range(len(self._clients) - 1):
-                    if not self._rotate_key():
-                        break
-                    logger.info(f"\U0001f504 Ritento con chiave #{self._key_index + 1} (errore transitorio)...")
-                    try:
-                        if contents:
-                            text_part = genai_types.Part.from_text(text=prompt)
-                            payload = list(contents) + [text_part]
-                        else:
-                            payload = prompt
-                        response2 = self._client.models.generate_content(
-                            model=effective_model,
-                            contents=payload,
-                            config=genai_types.GenerateContentConfig(
-                                safety_settings=safety,
-                                max_output_tokens=max_tokens,
-                            )
+            if not _is_transient:
+                raise
+            _current_model = model
+            if _is_overload and model != MODEL_LITE:
+                logger.info(f"\U0001f4c9 GeminiClient: 503/overload su {model} — ritento subito con {MODEL_LITE} (stessa chiave)")
+                try:
+                    if contents:
+                        text_part = genai_types.Part.from_text(text=prompt)
+                        payload = list(contents) + [text_part]
+                    else:
+                        payload = prompt
+                    response_lite = self._client.models.generate_content(
+                        model=MODEL_LITE,
+                        contents=payload,
+                        config=genai_types.GenerateContentConfig(
+                            safety_settings=safety,
+                            max_output_tokens=max_tokens,
                         )
-                        if response2.text:
-                            return response2.text.strip()
-                    except Exception as e2:
-                        err2 = str(e2)
-                        _is_transient2 = (
-                            "429" in err2
-                            or "503" in err2
-                            or "quota" in err2.lower()
-                            or "exhausted" in err2.lower()
-                            or "unavailable" in err2.lower()
-                            or "overloaded" in err2.lower()
-                            or "timeout" in err2.lower()
-                            or "timed out" in err2.lower()
-                            or "connection" in err2.lower()
+                    )
+                    if response_lite.text:
+                        return response_lite.text.strip()
+                except Exception as e_lite:
+                    logger.warning(f"\u26a0\ufe0f {MODEL_LITE} anch'esso fallito sulla chiave corrente: {e_lite}")
+                _current_model = MODEL_LITE  # resta su lite anche nella rotazione chiavi sotto
+            # Tenta TUTTE le chiavi rimanenti prima di arrendersi
+            for _attempt in range(len(self._clients) - 1):
+                if not self._rotate_key():
+                    break
+                logger.info(f"\U0001f504 Ritento con chiave #{self._key_index + 1} (errore transitorio, modello {_current_model})...")
+                try:
+                    if contents:
+                        text_part = genai_types.Part.from_text(text=prompt)
+                        payload = list(contents) + [text_part]
+                    else:
+                        payload = prompt
+                    response2 = self._client.models.generate_content(
+                        model=_current_model,
+                        contents=payload,
+                        config=genai_types.GenerateContentConfig(
+                            safety_settings=safety,
+                            max_output_tokens=max_tokens,
                         )
-                        if _is_transient2:
-                            logger.warning(f"\u26a0\ufe0f Chiave #{self._key_index + 1} transitorio, provo la prossima...")
-                            continue
-                        # Errore non transitorio (SAFETY, parametro errato, ecc.) — stop
-                        logger.error(f"\u274c GeminiClient.generate() chiave {self._key_index+1}: {e2}")
-                        raise e2
+                    )
+                    if response2.text:
+                        return response2.text.strip()
+                except Exception as e2:
+                    err2 = str(e2)
+                    _is_transient2 = (
+                        "429" in err2
+                        or "503" in err2
+                        or "quota" in err2.lower()
+                        or "exhausted" in err2.lower()
+                        or "unavailable" in err2.lower()
+                        or "overloaded" in err2.lower()
+                        or "timeout" in err2.lower()
+                        or "timed out" in err2.lower()
+                        or "connection" in err2.lower()
+                    )
+                    if _is_transient2:
+                        logger.warning(f"\u26a0\ufe0f Chiave #{self._key_index + 1} transitorio, provo la prossima...")
+                        continue
+                    # Errore non transitorio (SAFETY, parametro errato, ecc.) — stop
+                    logger.error(f"\u274c GeminiClient.generate() chiave {self._key_index+1}: {e2}")
+                    raise e2
             raise
 
 
