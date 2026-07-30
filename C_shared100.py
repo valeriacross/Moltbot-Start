@@ -1,9 +1,24 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.5
+Versione: 2.4.6
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.6 (30/07/2026):
+  - Walter segnala errori "Servizio Gemini non disponibile — Sovraccarico
+    temporaneo" ricorrenti da due settimane, tipicamente dalle 12/13 di
+    Lisbona fino a sera tardi. Il retry esistente in generate() ruota le
+    chiavi ma non aiuta contro un vero overload lato server (503) — il
+    modello è saturo per tutte le chiavi contemporaneamente, non è un
+    problema di quota della singola chiave. Attivato il piano di fallback
+    già scritto (ma mai implementato) nel changelog 2.3.16: oltre
+    LITE_FALLBACK_AT (75) call totali giornaliere, le chiamate sul modello
+    di default passano automaticamente a MODEL_LITE
+    ("gemini-3.1-flash-lite"). Non tocca le chiamate con model esplicito
+    diverso (es. MODEL_TEXT_ID per le caption). Non ancora testato in
+    produzione — da verificare se la soglia 75 è quella giusta una volta
+    osservato il comportamento reale.
 
 CHANGELOG 2.4.5 (28/07/2026):
   - Walter ha segnalato un pattern ricorrente su scene a pelle scoperta
@@ -306,11 +321,19 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 MODEL = "gemini-3.5-flash"
+# Fallback automatico — introdotto in 2.4.6. Piano già concordato nel changelog
+# 2.3.16 (mai attivato finora): oltre una soglia di consumo giornaliero, le
+# chiamate che userebbero il modello di default passano automaticamente al
+# modello lite (quota/capacità separata da gemini-3.5-flash). Non tocca le
+# chiamate che passano esplicitamente un modello diverso (es. MODEL_TEXT_ID
+# per le caption, definito nei singoli bot) — solo quelle sul default MODEL.
+MODEL_LITE = "gemini-3.1-flash-lite"
+LITE_FALLBACK_AT = 75  # _total_calls giornalieri — 75% di una quota stimata di 100
 
 # Versione
-VERSION = "2.4.5"
-SHARED_VERSION = "2.4.5"   # aggiornare ad ogni modifica
-SHARED_DATE    = "28/07/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.6"
+SHARED_VERSION = "2.4.6"   # aggiornare ad ogni modifica
+SHARED_DATE    = "30/07/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -998,6 +1021,13 @@ class GeminiClient:
                 _cb(_cur_key, self._total_calls)
             except Exception as _cb_err:
                 logger.warning(f"\u26a0\ufe0f on_key_use callback error: {_cb_err}")
+        # FIX 2.4.6: oltre LITE_FALLBACK_AT call giornaliere, le chiamate sul
+        # modello di default passano a MODEL_LITE — non tocca chi passa un
+        # model esplicito diverso (es. MODEL_TEXT_ID per le caption).
+        effective_model = model
+        if model == MODEL and self._total_calls >= LITE_FALLBACK_AT:
+            effective_model = MODEL_LITE
+            logger.info(f"\U0001f4c9 GeminiClient: soglia {LITE_FALLBACK_AT} call raggiunta ({self._total_calls}) — uso {MODEL_LITE}")
         try:
             if contents:
                 text_part = genai_types.Part.from_text(text=prompt)
@@ -1023,7 +1053,7 @@ class GeminiClient:
                 ),
             ]
             response = self._client.models.generate_content(
-                model=model,
+                model=effective_model,
                 contents=payload,
                 config=genai_types.GenerateContentConfig(
                     safety_settings=safety,
@@ -1092,7 +1122,7 @@ class GeminiClient:
                         else:
                             payload = prompt
                         response2 = self._client.models.generate_content(
-                            model=model,
+                            model=effective_model,
                             contents=payload,
                             config=genai_types.GenerateContentConfig(
                                 safety_settings=safety,
