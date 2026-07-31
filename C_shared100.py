@@ -1,9 +1,21 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.7
+Versione: 2.4.8
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.8 (30/07/2026):
+  - Walter ha mandato il log di un fallimento reale: non era un 503/overload
+    come nei casi precedenti, ma un 429 RESOURCE_EXHAUSTED — quota free tier
+    (20 richieste/giorno per chiave per modello su gemini-3.5-flash) esaurita
+    su tutte e 5 le chiavi nello stesso giro. Il fallback reattivo su
+    MODEL_LITE, introdotto in 2.4.7 solo per il 503, ora scatta per
+    QUALSIASI errore transitorio (503/overload, 429/quota, timeout,
+    connessione) — non solo il 503. Stessa logica: ritenta SUBITO con
+    MODEL_LITE sulla chiave corrente prima di ruotare, perché MODEL_LITE ha
+    una quota separata da gemini-3.5-flash, non ancora toccata. Non ancora
+    testato in produzione.
 
 CHANGELOG 2.4.7 (30/07/2026):
   - Walter ha chiesto di cambiare approccio rispetto alla 2.4.6: niente più
@@ -342,8 +354,8 @@ MODEL = "gemini-3.5-flash"
 MODEL_LITE = "gemini-3.1-flash-lite"
 
 # Versione
-VERSION = "2.4.7"
-SHARED_VERSION = "2.4.7"   # aggiornare ad ogni modifica
+VERSION = "2.4.8"
+SHARED_VERSION = "2.4.8"   # aggiornare ad ogni modifica
 SHARED_DATE    = "30/07/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -1104,24 +1116,30 @@ class GeminiClient:
         except Exception as e:
             err_text = str(e)
             logger.error(f"\u274c GeminiClient.generate(): {e}", exc_info=True)
-            # FIX 2.4.7: fallback reattivo, non più su soglia di consumo.
-            # Su 503/overload il problema è il modello saturo sul lato
-            # server — condiviso da tutte le chiavi — quindi ruotare
-            # chiave non aiuta. Si ritenta SUBITO con MODEL_LITE sulla
-            # STESSA chiave, prima ancora di provare a ruotare. Se anche
-            # MODEL_LITE fallisce, si prosegue con la rotazione chiavi
-            # esistente ma restando su MODEL_LITE per tutti i tentativi
-            # successivi di questa chiamata.
+            # FIX 2.4.8: il fallback reattivo a MODEL_LITE, introdotto in 2.4.7
+            # solo per il 503/overload, ora scatta anche sul 429/quota — la
+            # quota di gemini-3.5-flash è per (chiave, modello): quando è
+            # esaurita su tutte le chiavi (visto nel log del 30/07, tutte e 5
+            # le chiavi in 429 sullo stesso giro), MODEL_LITE ha una quota
+            # tutta sua, non ancora toccata, quindi vale la pena provarci
+            # prima di arrendersi. Si ritenta SUBITO con MODEL_LITE sulla
+            # STESSA chiave, prima ancora di ruotare. Se anche MODEL_LITE
+            # fallisce, si prosegue con la rotazione chiavi esistente ma
+            # restando su MODEL_LITE per tutti i tentativi successivi di
+            # questa chiamata.
             _is_overload = (
                 "503" in err_text
                 or "unavailable" in err_text.lower()
                 or "overloaded" in err_text.lower()
             )
-            _is_transient = (
-                _is_overload
-                or "429" in err_text
+            _is_quota = (
+                "429" in err_text
                 or "quota" in err_text.lower()
                 or "exhausted" in err_text.lower()
+            )
+            _is_transient = (
+                _is_overload
+                or _is_quota
                 or "timeout" in err_text.lower()
                 or "timed out" in err_text.lower()
                 or "connection" in err_text.lower()
@@ -1129,8 +1147,9 @@ class GeminiClient:
             if not _is_transient:
                 raise
             _current_model = model
-            if _is_overload and model != MODEL_LITE:
-                logger.info(f"\U0001f4c9 GeminiClient: 503/overload su {model} — ritento subito con {MODEL_LITE} (stessa chiave)")
+            if _is_transient and model != MODEL_LITE:
+                _reason = "503/overload" if _is_overload else ("429/quota" if _is_quota else "errore transitorio")
+                logger.info(f"\U0001f4c9 GeminiClient: {_reason} su {model} — ritento subito con {MODEL_LITE} (stessa chiave)")
                 try:
                     if contents:
                         text_part = genai_types.Part.from_text(text=prompt)
