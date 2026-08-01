@@ -2,7 +2,7 @@ import os, logging, telebot, html, time, threading
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from C_shared100 import GeminiClient, HealthServer, is_allowed, genai_types, analyze_scene
 from C_shared100 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_WATERMARK
-from C_shared100 import VALERIA_DNA, generate_caption, review_and_fix, sanitize_user_input, SHARED_VERSION, SHARED_DATE, body_art_clause
+from C_shared100 import VALERIA_DNA, generate_caption, review_and_fix, sanitize_user_input, SHARED_VERSION, SHARED_DATE, body_art_clause, multi_subject_clause
 
 # --- VERSIONE ---
 # CHANGELOG 2.1.0 (17/07/2026): cambio di motore, non un patch — versione
@@ -37,7 +37,15 @@ from C_shared100 import VALERIA_DNA, generate_caption, review_and_fix, sanitize_
 # (Vogue, Architect, Atelier, Surprise → 2.0.0). Nessuna modifica funzionale
 # in questo bot in questa sessione — i bug noti (#4, _active_cid globale) sono
 # stati lasciati invariati su richiesta esplicita (uso singolo utente).
-VERSION = "2.1.0"
+# CHANGELOG 2.1.1 (01/08/2026): supporto foto di riferimento con 2+ soggetti
+# distinti (m+f, m+m, f+f...) su richiesta di Walter — rilevamento
+# automatico, non un comando. Import multi_subject_clause() da shared
+# (2.4.9), inserito in build_prompt() subito dopo body_art_clause() — stesso
+# pattern, nessun impatto se la foto ha una sola persona. Rilevamento/analisi
+# (campo FIGURES, outfit per figura) vive interamente in _ANALYZE_PROMPT
+# (shared) — nessuna modifica alla logica di analisi qui. Non ancora testato
+# in produzione.
+VERSION = "2.1.1"
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -92,6 +100,7 @@ def build_prompt(scene_description):
     prompt = (
         f"{VALERIA_DNA}\n\n"
         f"{body_art_clause(scene_description)}"
+        f"{multi_subject_clause(scene_description)}"
         f"--- SCENE REFERENCE ---\n"
         f"{scene_description}\n\n"
         f"--- GENERATION INSTRUCTIONS ---\n"

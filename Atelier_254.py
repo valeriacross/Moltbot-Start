@@ -5,7 +5,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from C_shared100 import GeminiClient, CaptionGenerator, HealthServer, is_allowed, genai_types, analyze_scene, SHARED_VERSION, SHARED_DATE
 from C_shared100 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_BODY_SAFE, VALERIA_WATERMARK
-from C_shared100 import VALERIA_DNA, EDITORIAL_WRAPPER, build_valeria_identity, generate_caption, review_and_fix, body_art_clause
+from C_shared100 import VALERIA_DNA, EDITORIAL_WRAPPER, build_valeria_identity, generate_caption, review_and_fix, body_art_clause, multi_subject_clause
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -164,7 +164,17 @@ logger = logging.getLogger(__name__)
 # corpo del file) rimosso di conseguenza. Non elimina la varianza — Flow
 # resta non deterministico — ma allinea l'approccio a quanto Google stessa
 # dice funzionare meglio su questo modello specifico.
-VERSION = "2.5.4"
+# CHANGELOG 2.5.5 (01/08/2026): supporto foto di riferimento con 2+ soggetti
+# distinti (m+f, m+m, f+f...) su richiesta di Walter — rilevamento
+# automatico, non un comando. Import multi_subject_clause() da shared
+# (2.4.9) e inserito nei 3 punti dove si assembla il prompt finale
+# (build_full_prompt, build_shooting_prompt mode single e mosaico), subito
+# dopo body_art_clause() — stesso pattern, nessun impatto se la foto ha una
+# sola persona. Il rilevamento/analisi (campo FIGURES, outfit per figura)
+# vive interamente in _ANALYZE_PROMPT (shared) — Atelier non tocca la
+# logica di analisi, solo l'inserimento del blocco nel prompt finale. Non
+# ancora testato in produzione.
+VERSION = "2.5.5"
 TOKEN   = os.environ.get("TELEGRAM_TOKEN_CLOSET")
 
 # GeminiClient da C_shared100 v2.2.0 — gestisce nativamente la rotation
@@ -628,6 +638,7 @@ def build_full_prompt(filter_key, outfit_description, scene_override=None, mode=
         f"The outfit's full ornamental complexity is reproduced completely and precisely, with the same "
         f"richness of detail as the reference.\n\n"
         f"{body_art_clause(outfit_description)}"
+        f"{multi_subject_clause(outfit_description)}"
         f"**⚠️ IDENTITY LOCK — ABSOLUTE PRIORITY:** The face stays mature, around 60 years old, with the "
         f"full silver-grey beard and eyeglasses always present, exactly as shown in the attached reference photo, "
         f"identical to the reference identity with zero drift. The body keeps the feminine hourglass "
@@ -671,6 +682,7 @@ def build_shooting_prompt(outfit_desc, mode="mosaic"):
             f"The outfit's full ornamental complexity is reproduced completely and precisely, with the same "
             f"richness of detail as the reference.\n\n"
             f"{body_art_clause(outfit_desc)}"
+            f"{multi_subject_clause(outfit_desc)}"
             f"**⚠️ IDENTITY LOCK — ABSOLUTE PRIORITY:** The face stays mature, around 60 years old, with "
             f"the full silver-grey beard and eyeglasses always present, exactly as shown in the attached "
             f"reference photo, identical to the reference identity with zero drift. The body keeps the feminine "
@@ -722,6 +734,7 @@ def build_shooting_prompt(outfit_desc, mode="mosaic"):
             f"IN ALL 4 SHOTS. The outfit's full ornamental complexity is reproduced completely and precisely "
             f"in every shot, with the same richness of detail as the reference.\n\n"
             f"{body_art_clause(outfit_desc)}"
+            f"{multi_subject_clause(outfit_desc)}"
             f"**⚠️ IDENTITY LOCK — ABSOLUTE PRIORITY:** The face stays mature, around 60 years old, with "
             f"the full silver-grey beard and eyeglasses always present, exactly as shown in the attached "
             f"reference photo, identical to the reference identity with zero drift, in EVERY shot. The body keeps "

@@ -1,9 +1,25 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.8
+Versione: 2.4.9
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.9 (01/08/2026):
+  - Walter ha chiesto di gestire foto di riferimento con 2+ soggetti distinti
+    (m+f, m+m, f+f...): il prompt generato deve presentare una figura
+    multipla, tutte con la stessa identità Valeria (stesso volto/DNA),
+    posizionate/interagenti come nell'originale, ciascuna con il proprio
+    outfit separato (non un outfit unico condiviso). Rilevamento automatico,
+    non un comando esplicito. Aggiunto campo FIGURES a _ANALYZE_PROMPT
+    (conta le persone, posa/posizione/interazione fisica di ciascuna, cieco
+    sull'identità come OUTFIT/PROPS & ACTIONS) e reso OUTFIT/ACCESSORIES/BODY
+    ART strutturabili per figura quando FIGURES rileva 2+ persone (stessa
+    label breve usata in FIGURES). Nuova costante VALERIA_MULTI_SUBJECT_LOCK
+    + funzione multi_subject_clause() — stesso identico pattern di
+    body_art_clause(): nessun impatto sul caso comune (una sola figura).
+    Applicata a Vogue e Atelier (unici bot in scope su richiesta di Walter).
+    Non ancora testato in produzione.
 
 CHANGELOG 2.4.8 (30/07/2026):
   - Walter ha mandato il log di un fallimento reale: non era un 503/overload
@@ -333,10 +349,10 @@ from google.genai import types as genai_types
 __all__ = [
     'GeminiClient', 'CaptionGenerator', 'HealthServer', 'is_allowed',
     'VALERIA_FACE', 'VALERIA_BODY_STRONG', 'VALERIA_BODY_SAFE',
-    'VALERIA_WATERMARK', 'VALERIA_TEXTURE_LOCK',
+    'VALERIA_WATERMARK', 'VALERIA_TEXTURE_LOCK', 'VALERIA_MULTI_SUBJECT_LOCK',
     'VALERIA_DNA', 'EDITORIAL_WRAPPER',
     'build_valeria_identity', 'generate_caption', 'generate_mini_caption', 'generate_mini_prompt',
-    'review_and_fix', 'sanitize_user_input',
+    'review_and_fix', 'sanitize_user_input', 'multi_subject_clause',
     'analyze_scene', 'genai_types', 'MODEL', 'detect_mime_type', 'is_allowed',
     'SHARED_VERSION', 'SHARED_DATE',
 ]
@@ -354,9 +370,9 @@ MODEL = "gemini-3.5-flash"
 MODEL_LITE = "gemini-3.1-flash-lite"
 
 # Versione
-VERSION = "2.4.8"
-SHARED_VERSION = "2.4.8"   # aggiornare ad ogni modifica
-SHARED_DATE    = "30/07/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.9"
+SHARED_VERSION = "2.4.9"   # aggiornare ad ogni modifica
+SHARED_DATE    = "01/08/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -471,6 +487,43 @@ def body_art_clause(scene_description: str) -> str:
     if not val or val.lower().startswith("none"):
         return ""
     return BODY_ART_EXCEPTION_TEXT
+
+# MULTI-SUBJECT LOCK — introdotta in 2.4.9. Generica, non legata a una scena
+# specifica: se la foto di riferimento mostra 2+ persone distinte (rilevato
+# dal campo FIGURES di _ANALYZE_PROMPT), il prompt finale deve generare lo
+# stesso numero di figure, tutte con l'identica identità Valeria — non
+# persone diverse. Ogni figura mantiene il proprio outfit/accessori/body art
+# come descritti separatamente per quella figura in OUTFIT/ACCESSORIES/BODY
+# ART (vedi _ANALYZE_PROMPT — quelle sezioni ora si strutturano per figura
+# quando FIGURES ne rileva 2+). Stesso pattern di body_art_clause(): nessun
+# impatto sul caso comune (una sola figura), nessuna riga aggiunta al
+# prompt in quel caso.
+VALERIA_MULTI_SUBJECT_LOCK = (
+    "**\u26a0\ufe0f MULTI-SUBJECT LOCK — CONDITIONAL:** If the FIGURES section above describes two or more "
+    "distinct people, render that same number of figures in the image — each one sharing the identical "
+    "face, hair, beard, eyeglasses and body identity described above, with zero variation in identity "
+    "between figures (the same person appears multiple times, not different people). Each figure wears "
+    "the outfit, accessories and body art individually described for them in the OUTFIT/ACCESSORIES/BODY "
+    "ART sections above — do not mix garments between figures. Position, pose and physical interaction "
+    "between the figures follow FIGURES exactly as described. If FIGURES describes only one person, this "
+    "does not apply — render a single figure as normal.\n\n"
+)
+
+def multi_subject_clause(scene_description: str) -> str:
+    """Restituisce VALERIA_MULTI_SUBJECT_LOCK SOLO se scene_description contiene un campo
+    FIGURES che descrive 2+ persone (non 'One figure.') — altrimenti stringa vuota, per non
+    appesantire il prompt nel caso comune (una sola persona nella foto). Usare dopo
+    l'identità (VALERIA_DNA o build_valeria_identity()) nei bot che passano da
+    analyze_scene() (Vogue, Atelier). NON usare in Architect — non inietta DNA."""
+    if not scene_description:
+        return ""
+    m = re.search(r'FIGURES:\s*(.+?)(?:\n\n|\Z)', scene_description, re.IGNORECASE | re.DOTALL)
+    if not m:
+        return ""
+    val = m.group(1).strip()
+    if not val or val.lower().startswith("one figure"):
+        return ""
+    return VALERIA_MULTI_SUBJECT_LOCK
 
 # TEXTURE & PATTERN FIDELITY LOCK — introdotta in 2.4.4. Generica, non legata
 # a una scena/foto specifica: si applica a qualunque pattern, texture o
@@ -787,6 +840,15 @@ def sanitize_user_input(text: str, client: 'GeminiClient') -> str:
 _ANALYZE_PROMPT = (
     "Analyze this image. "
     "Return a structured description with these exact sections:\n\n"
+    "FIGURES: [How many distinct people are in the frame — exactly one, or two or more. "
+    "If two or more: describe each one's individual pose, position in the frame (e.g. "
+    "'left figure', 'kneeling figure in front', 'figure standing behind'), and how they "
+    "physically interact with each other — literal and specific, the same way PROPS & "
+    "ACTIONS is described below. Do not describe any physical identity trait of the "
+    "people themselves (no face, gender, hair, body-type details) — only count, position "
+    "and physical interaction. Give each figure a short consistent label (e.g. 'left "
+    "figure', 'right figure', 'kneeling figure') to be reused in OUTFIT/ACCESSORIES/BODY "
+    "ART below. If only one person is present, write 'One figure.']\n\n"
     "OUTFIT: [Every garment as a standalone object — exact name, color with HEX code, fabric, "
     "cut, fit, coverage, embellishments, details. "
     "Describe the garment as if it exists independently — no wearer mentioned.]\n\n"
@@ -823,7 +885,12 @@ _ANALYZE_PROMPT = (
     "— Be precise and detailed on fabrics, colors and environment\n"
     "— For PROPS & ACTIONS: describe physical contact and actions literally, not metaphorically\n"
     "— For BODY ART: describe only markings actually visible on the skin — do not confuse with printed "
-    "patterns on garments (those belong in OUTFIT)"
+    "patterns on garments (those belong in OUTFIT)\n"
+    "— If FIGURES describes two or more people: within OUTFIT, ACCESSORIES and BODY ART, describe each "
+    "figure's garments/accessories/markings SEPARATELY, labeled with the same short label used in FIGURES "
+    "(e.g. 'Left figure: ... Right figure: ...') — never merge different figures' garments into one "
+    "generic description. If FIGURES says 'One figure', describe these sections exactly as before, with "
+    "no figure labeling."
 )
 
 
