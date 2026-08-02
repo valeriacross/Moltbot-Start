@@ -1,9 +1,22 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.9
+Versione: 2.4.10
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.10 (01/08/2026):
+  - Walter ha testato in produzione il multi-soggetto di 2.4.9: Vogue e
+    Atelier modalità singola hanno funzionato bene (identità Valeria su
+    entrambe le figure), il MOSAICO Atelier no — la figura secondaria ha
+    mantenuto il volto reale della foto originale invece del volto di
+    Valeria. Riscritto VALERIA_MULTI_SUBJECT_LOCK per essere esplicito
+    quanto gli altri LOCK (FACE IDENTITY LOCK, HAIR LOCK, ecc.) invece di
+    un rimando indiretto — dice direttamente che la sostituzione vale per
+    OGNI figura, non solo la principale, e che nessun volto originale
+    sopravvive per nessuna figura. Fix di parte 2 in Atelier (2.6.1, vedi
+    changelog lì) sulla riga "Subject identity" del mosaico. Non ancora
+    testato in produzione.
 
 CHANGELOG 2.4.9 (01/08/2026):
   - Walter ha chiesto di gestire foto di riferimento con 2+ soggetti distinti
@@ -370,8 +383,8 @@ MODEL = "gemini-3.5-flash"
 MODEL_LITE = "gemini-3.1-flash-lite"
 
 # Versione
-VERSION = "2.4.9"
-SHARED_VERSION = "2.4.9"   # aggiornare ad ogni modifica
+VERSION = "2.4.10"
+SHARED_VERSION = "2.4.10"   # aggiornare ad ogni modifica
 SHARED_DATE    = "01/08/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -488,25 +501,40 @@ def body_art_clause(scene_description: str) -> str:
         return ""
     return BODY_ART_EXCEPTION_TEXT
 
-# MULTI-SUBJECT LOCK — introdotta in 2.4.9. Generica, non legata a una scena
-# specifica: se la foto di riferimento mostra 2+ persone distinte (rilevato
-# dal campo FIGURES di _ANALYZE_PROMPT), il prompt finale deve generare lo
-# stesso numero di figure, tutte con l'identica identità Valeria — non
-# persone diverse. Ogni figura mantiene il proprio outfit/accessori/body art
-# come descritti separatamente per quella figura in OUTFIT/ACCESSORIES/BODY
-# ART (vedi _ANALYZE_PROMPT — quelle sezioni ora si strutturano per figura
-# quando FIGURES ne rileva 2+). Stesso pattern di body_art_clause(): nessun
+# MULTI-SUBJECT LOCK — introdotta in 2.4.9, rafforzata in 2.4.10 dopo test
+# reali di Walter: Vogue e Atelier in modalità singola hanno funzionato bene
+# (identità Valeria su entrambe le figure), il MOSAICO Atelier no — la
+# figura secondaria ha mantenuto il volto reale della foto originale.
+# Ipotesi: il wording precedente era un rimando indiretto ("sharing the
+# identical face... described above"), una singola frase debole a
+# confronto con FACE IDENTITY LOCK/IDENTITY LOCK/HAIR LOCK/BEARD MANDATORY
+# che nel resto del prompt ribadiscono l'identità della figura principale
+# più volte — sproporzionato contro il prior visivo forte della foto
+# allegata per la figura secondaria. Riscritta per essere esplicita quanto
+# gli altri LOCK: dice direttamente che la sostituzione è totale e vale per
+# OGNI figura, non solo la principale — non un rimando implicito.
+# Generica, non legata a una scena specifica: se la foto di riferimento
+# mostra 2+ persone distinte (rilevato dal campo FIGURES di
+# _ANALYZE_PROMPT), il prompt finale deve generare lo stesso numero di
+# figure, tutte con l'identica identità Valeria — non persone diverse. Ogni
+# figura mantiene il proprio outfit/accessori/body art come descritti
+# separatamente per quella figura in OUTFIT/ACCESSORIES/BODY ART (vedi
+# _ANALYZE_PROMPT — quelle sezioni ora si strutturano per figura quando
+# FIGURES ne rileva 2+). Stesso pattern di body_art_clause(): nessun
 # impatto sul caso comune (una sola figura), nessuna riga aggiunta al
 # prompt in quel caso.
 VALERIA_MULTI_SUBJECT_LOCK = (
-    "**\u26a0\ufe0f MULTI-SUBJECT LOCK — CONDITIONAL:** If the FIGURES section above describes two or more "
-    "distinct people, render that same number of figures in the image — each one sharing the identical "
-    "face, hair, beard, eyeglasses and body identity described above, with zero variation in identity "
-    "between figures (the same person appears multiple times, not different people). Each figure wears "
-    "the outfit, accessories and body art individually described for them in the OUTFIT/ACCESSORIES/BODY "
-    "ART sections above — do not mix garments between figures. Position, pose and physical interaction "
-    "between the figures follow FIGURES exactly as described. If FIGURES describes only one person, this "
-    "does not apply — render a single figure as normal.\n\n"
+    "**\u26a0\ufe0f MULTI-SUBJECT LOCK — ABSOLUTE PRIORITY:** If the FIGURES section above describes two or "
+    "more distinct people, EVERY one of those figures — not just the primary one — is replaced by the "
+    "exact same identity: the mature face with full beard, eyeglasses, and hairstyle described above, and "
+    "the same body identity described above. This replacement is total and applies identically to each "
+    "figure — none of the original people's faces, hair, or body types survive in the output, for any "
+    "figure, including secondary or background figures. All figures are the same person, repeated — zero "
+    "variation in identity between them. Each figure wears the outfit, accessories and body art "
+    "individually described for them in the OUTFIT/ACCESSORIES/BODY ART sections above — do not mix "
+    "garments between figures. Position, pose and physical interaction between the figures follow FIGURES "
+    "exactly as described. If FIGURES describes only one person, this does not apply — render a single "
+    "figure as normal.\n\n"
 )
 
 def multi_subject_clause(scene_description: str) -> str:
