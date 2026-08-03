@@ -1,9 +1,24 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.11
+Versione: 2.4.12
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.12 (03/08/2026):
+  - Walter ha chiesto che, quando scatta il fallback su MODEL_LITE (503 o
+    429), l'utente veda anche il codice errore nell'etichetta del prompt —
+    per capire se conviene riprovare a breve (503, transitorio, il modello
+    può tornare disponibile) o se resterà su lite fino al reset delle 08:00
+    (429, quota esaurita per la giornata, riprovare prima non cambia
+    nulla). Aggiunto GeminiClient.last_fallback_code ("503"/"429"/
+    "transient"/None) impostato dentro generate() nello stesso punto in cui
+    scatta già il fallback (2.4.8) — non si azzera da solo dentro
+    generate(), perché una richiesta utente può fare più chiamate generate()
+    (analisi + review_and_fix) e vogliamo che l'informazione sopravviva a
+    entrambe. Nuovo metodo reset_fallback(), stesso pattern di
+    reset_counters() — il chiamante lo invoca esplicitamente a inizio
+    richiesta. Non ancora testato in produzione.
 
 CHANGELOG 2.4.11 (03/08/2026):
   - Walter ha notato che la riga "Subject identity" del checklist mosaico
@@ -396,8 +411,8 @@ MODEL = "gemini-3.5-flash"
 MODEL_LITE = "gemini-3.1-flash-lite"
 
 # Versione
-VERSION = "2.4.11"
-SHARED_VERSION = "2.4.11"   # aggiornare ad ogni modifica
+VERSION = "2.4.12"
+SHARED_VERSION = "2.4.12"   # aggiornare ad ogni modifica
 SHARED_DATE    = "03/08/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
@@ -1040,6 +1055,14 @@ class GeminiClient:
         self._key_use_callbacks = []        # callback ad ogni chiamata (chiave, count)
         self._call_counts = [0] * len(keys)  # contatore per chiave — si azzera al riavvio
         self._total_calls = 0               # contatore globale — tutte le chiavi sommate
+        # last_fallback_code — introdotto in 2.4.12 su richiesta di Walter: quale errore
+        # ha fatto scattare l'ultimo fallback su MODEL_LITE ("503", "429", "transient") o
+        # None se nessun fallback è avvenuto. NON si azzera da solo dentro generate() —
+        # accumula attraverso più chiamate generate() della stessa richiesta (es. analisi +
+        # review_and_fix), altrimenti una seconda chiamata pulita cancellerebbe l'informazione
+        # della prima. Il chiamante deve azzerarlo esplicitamente con reset_fallback() prima
+        # di iniziare una nuova richiesta utente, stesso pattern di reset_counters().
+        self.last_fallback_code: str | None = None
 
         if not self._clients:
             logger.warning("⚠️ GeminiClient: nessuna GOOGLE_API_KEY configurata.")
@@ -1091,6 +1114,12 @@ class GeminiClient:
         self._call_counts = [0] * len(self._clients)
         self._total_calls = 0
         logger.info("🔄 GeminiClient: contatori call azzerati")
+
+    def reset_fallback(self):
+        """Azzera last_fallback_code — chiamare all'inizio di ogni nuova richiesta utente
+        (es. inizio _process() su una foto), prima delle chiamate generate() di quella
+        richiesta, così last_fallback_code riflette solo i fallback di QUESTA richiesta."""
+        self.last_fallback_code = None
 
     def _schedule_daily_reset(self):
         """Pianifica reset automatico ogni giorno alle 07:00 UTC (= 08:00 Lisbona estate).
@@ -1265,6 +1294,7 @@ class GeminiClient:
             _current_model = model
             if _is_transient and model != MODEL_LITE:
                 _reason = "503/overload" if _is_overload else ("429/quota" if _is_quota else "errore transitorio")
+                self.last_fallback_code = "503" if _is_overload else ("429" if _is_quota else "transient")
                 logger.info(f"\U0001f4c9 GeminiClient: {_reason} su {model} — ritento subito con {MODEL_LITE} (stessa chiave)")
                 try:
                     if contents:
