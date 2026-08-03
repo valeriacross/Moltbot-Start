@@ -1,9 +1,22 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.10
+Versione: 2.4.11
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.11 (03/08/2026):
+  - Walter ha notato che la riga "Subject identity" del checklist mosaico
+    (corretta in 2.4.10 per menzionare ogni figura) era scritta come testo
+    STATICO, sempre identica in ogni prompt — anche quando FIGURES dice
+    "One figure.", cioè quando la frase "if multiple figures are present"
+    non ha alcun senso, testo morto. A differenza di multi_subject_clause(),
+    che è correttamente condizionale. Estratta la logica di rilevamento in
+    una nuova funzione has_multiple_figures() (usata internamente anche da
+    multi_subject_clause(), stessa regex non più duplicata) — usata da
+    Atelier per costruire quella riga del checklist condizionalmente: con
+    una sola figura torna al testo originale senza la parentesi. Non
+    ancora testato in produzione.
 
 CHANGELOG 2.4.10 (01/08/2026):
   - Walter ha testato in produzione il multi-soggetto di 2.4.9: Vogue e
@@ -365,7 +378,7 @@ __all__ = [
     'VALERIA_WATERMARK', 'VALERIA_TEXTURE_LOCK', 'VALERIA_MULTI_SUBJECT_LOCK',
     'VALERIA_DNA', 'EDITORIAL_WRAPPER',
     'build_valeria_identity', 'generate_caption', 'generate_mini_caption', 'generate_mini_prompt',
-    'review_and_fix', 'sanitize_user_input', 'multi_subject_clause',
+    'review_and_fix', 'sanitize_user_input', 'multi_subject_clause', 'has_multiple_figures',
     'analyze_scene', 'genai_types', 'MODEL', 'detect_mime_type', 'is_allowed',
     'SHARED_VERSION', 'SHARED_DATE',
 ]
@@ -383,9 +396,9 @@ MODEL = "gemini-3.5-flash"
 MODEL_LITE = "gemini-3.1-flash-lite"
 
 # Versione
-VERSION = "2.4.10"
-SHARED_VERSION = "2.4.10"   # aggiornare ad ogni modifica
-SHARED_DATE    = "01/08/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.11"
+SHARED_VERSION = "2.4.11"   # aggiornare ad ogni modifica
+SHARED_DATE    = "03/08/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -537,19 +550,27 @@ VALERIA_MULTI_SUBJECT_LOCK = (
     "figure as normal.\n\n"
 )
 
-def multi_subject_clause(scene_description: str) -> str:
-    """Restituisce VALERIA_MULTI_SUBJECT_LOCK SOLO se scene_description contiene un campo
-    FIGURES che descrive 2+ persone (non 'One figure.') — altrimenti stringa vuota, per non
-    appesantire il prompt nel caso comune (una sola persona nella foto). Usare dopo
-    l'identità (VALERIA_DNA o build_valeria_identity()) nei bot che passano da
-    analyze_scene() (Vogue, Atelier). NON usare in Architect — non inietta DNA."""
+def has_multiple_figures(scene_description: str) -> bool:
+    """Restituisce True se scene_description contiene un campo FIGURES che descrive 2+
+    persone (non 'One figure.' o assente/vuoto) — False altrimenti. Introdotta in 2.4.11,
+    estratta da multi_subject_clause() perché serve anche altrove (checklist mosaico
+    Atelier "What stays identical") per evitare di duplicare la stessa regex in più punti —
+    vedi lezione #21 HANDOFF."""
     if not scene_description:
-        return ""
+        return False
     m = re.search(r'FIGURES:\s*(.+?)(?:\n\n|\Z)', scene_description, re.IGNORECASE | re.DOTALL)
     if not m:
-        return ""
+        return False
     val = m.group(1).strip()
-    if not val or val.lower().startswith("one figure"):
+    return bool(val) and not val.lower().startswith("one figure")
+
+def multi_subject_clause(scene_description: str) -> str:
+    """Restituisce VALERIA_MULTI_SUBJECT_LOCK SOLO se has_multiple_figures() è True —
+    altrimenti stringa vuota, per non appesantire il prompt nel caso comune (una sola
+    persona nella foto). Usare dopo l'identità (VALERIA_DNA o build_valeria_identity())
+    nei bot che passano da analyze_scene() (Vogue, Atelier). NON usare in Architect — non
+    inietta DNA."""
+    if not has_multiple_figures(scene_description):
         return ""
     return VALERIA_MULTI_SUBJECT_LOCK
 
