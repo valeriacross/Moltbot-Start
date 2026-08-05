@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 25/07/2026
+**Ultimo aggiornamento:** 05/08/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -10,13 +10,13 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 | Bot | File | Versione | Koyeb | Chiavi |
 |-----|------|---------|-------|--------|
-| VogueBot | `Vogue_210.py` | 2.1.0 | colossal-giselle/vogue | 2 |
-| ArchitectBot | `Architect_302.py` | 3.0.2 | homely-annabelle/thearchitect | 1 |
-| AtelierBot | `Atelier_254.py` | 2.5.4 | flexible-denna/atelier | 5 |
+| VogueBot | `Vogue_220.py` | 2.2.0 | colossal-giselle/vogue | 2 |
+| ArchitectBot | `Architect_310.py` | 3.1.0 | homely-annabelle/thearchitect | 1 |
+| AtelierBot | `Atelier_270.py` | 2.7.0 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_210.py` | 2.1.0 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_210.py` | 2.1.0 | surprise1/sorpresa | 1 |
 
-**Shared:** `C_shared100.py` v2.4.3 · **10 API key totali**
+**Shared:** `C_shared100.py` v2.4.12 · **10 API key totali**
 
 ---
 
