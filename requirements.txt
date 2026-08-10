@@ -19,8 +19,8 @@
 # forma base come fanno questi bot. Se un deploy si rompe dopo questo bump,
 # primo sospetto qui: tornare a >=2.6.0 e controllare il changelog di 2.11.0
 # specificamente, che non era ancora disponibile al momento di questo bump.
-pyTelegramBotAPI==4.34.0
+pyTelegramBotAPI==4.36.0
 flask==3.1.3
 Pillow>=12.3.0
-google-genai>=2.11.0
+google-genai>=2.17.0
 openpyxl>=3.1.5
