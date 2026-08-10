@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 05/08/2026
+**Ultimo aggiornamento:** 10/08/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -10,7 +10,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 | Bot | File | Versione | Koyeb | Chiavi |
 |-----|------|---------|-------|--------|
-| VogueBot | `Vogue_220.py` | 2.2.0 | colossal-giselle/vogue | 2 |
+| VogueBot | `Vogue_310.py` | 3.1.0 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_310.py` | 3.1.0 | homely-annabelle/thearchitect | 1 |
 | AtelierBot | `Atelier_270.py` | 2.7.0 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_210.py` | 2.1.0 | screeching-jobina/filtro | 1 |
@@ -83,7 +83,9 @@ openpyxl>=3.1.5
 
 ---
 
-## Fix robustezza (20/06/2026 → 05/08/2026)
+## Fix robustezza (20/06/2026 → 10/08/2026)
+
+**Il 05-10/08 — supporto video su Vogue (3.0 → 3.1).** Fork indipendente da Vogue 2.2 (`Vogue_300.py`, poi `Vogue_310.py`) — rollback = ridistribuire `Vogue_220.py` senza altre modifiche. Menu esplicito `/start` (Immagine/Video), nuovo `_ANALYZE_PROMPT_VIDEO`/`analyze_video()` isolati in Vogue (shared non toccato), controllo dimensione video prima del download (tetto reale di Telegram: 20MB). Testato da Walter con un video reale: risultato positivo, `PROPS & ACTIONS` cattura bene il momento dinamico della clip invece di una descrizione statica. Vogue 2.2 ora archiviata — Vogue 3.1.0 è la versione di riferimento; tolto "(beta)", aggiunto un terzo pulsante "🎥 Video" alla tastiera post-prompt.
 
 **Il 03-05/08 — rifiniture multi-soggetto, visibilità fallback, incidente di deploy.** Confermato multi-soggetto anche con 4 figure (non solo 2), risultato soddisfacente. Walter ha deciso di non investire su un fix per il mosaico con 3+ figure (a volte smista le figure in modo strano tra i pannelli) — risultati imprevedibili accettati come "simpatici", nessuna modifica. Bug corretto: la riga "Subject identity" del checklist mosaico restava testo statico anche con una sola figura — shared 2.4.11 ha estratto `has_multiple_figures()`, ora condizionale come `multi_subject_clause()`. Nuova funzionalità richiesta da Walter: l'header del prompt mostra ora il codice errore (503/429) quando scatta il fallback su lite, con indicazione se conviene riprovare a breve o se resta su lite fino al reset — shared 2.4.12 + Atelier 2.7.0. Confermato in produzione (log reale) che il fallback reattivo su 503 introdotto settimane fa funziona: recupero in ~2.4 secondi, nessun errore visibile all'utente. Un deploy fallito su Koyeb lo stesso giorno si è rivelato un problema di configurazione (Run command non aggiornato dopo il rename del file), non un bug — codice verificato pulito prima di ipotizzare la causa esterna.
 
