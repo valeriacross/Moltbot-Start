@@ -19,8 +19,25 @@
 # forma base come fanno questi bot. Se un deploy si rompe dopo questo bump,
 # primo sospetto qui: tornare a >=2.6.0 e controllare il changelog di 2.11.0
 # specificamente, che non era ancora disponibile al momento di questo bump.
+#
+# 10/08/2026 — nuovo controllo versioni su PyPI, pacchetto per pacchetto:
+# flask (3.1.3), Pillow (12.3.0) e openpyxl (3.1.5) sono già le versioni più
+# recenti su PyPI: nessuna modifica.
+# google-genai: floor >=2.11.0 già soddisfatta dall'ultima release (2.17.0,
+# 06/08/2026). Changelog controllato da 2.11.0 a 2.17.0: solo aggiunte
+# (nuovi campi API, supporto MCP async, fix vari) e deprecation warning su
+# Imagen legacy args (generate_images/edit_images/generate_videos con
+# prompt/text/image posizionali) — non usati da questi bot. Zero breaking
+# change su generate_content() in forma base. Nessuna modifica al pin.
+# pyTelegramBotAPI: bumpato 4.34.0 -> 4.36.0 su richiesta esplicita (update
+# generale a tutte le ultime versioni). Nel mezzo ci sono 4.35.0 (12/07/2026,
+# Bot API 10.1) e 4.36.0 (18/07/2026, Bot API 10.2) — release notes GitHub
+# identiche nello stile a tutte le precedenti ("Bot API support bumped up to
+# vX"), nessun breaking change dichiarato. NON testato su questo stack (stesso
+# discorso già fatto per il salto precedente 4.31.0->4.34.0). Se un deploy si
+# rompe dopo questo bump, primo sospetto qui: tornare a ==4.34.0.
 pyTelegramBotAPI==4.36.0
 flask==3.1.3
 Pillow>=12.3.0
-google-genai>=2.17.0
+google-genai>=2.11.0
 openpyxl>=3.1.5
