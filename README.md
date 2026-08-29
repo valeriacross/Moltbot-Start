@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 10/08/2026
+**Ultimo aggiornamento:** 29/08/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -10,7 +10,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 | Bot | File | Versione | Koyeb | Chiavi |
 |-----|------|---------|-------|--------|
-| VogueBot | `Vogue_310.py` | 3.1.0 | colossal-giselle/vogue | 2 |
+| VogueBot | `Vogue_430.py` | 4.3.0 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_310.py` | 3.1.0 | homely-annabelle/thearchitect | 1 |
 | AtelierBot | `Atelier_270.py` | 2.7.0 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_210.py` | 2.1.0 | screeching-jobina/filtro | 1 |
@@ -24,9 +24,9 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 ```
 C_shared100.py       # Libreria condivisa
-Vogue_210.py         # Analisi foto/testo → prompt Flow
-Architect_302.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
-Atelier_254.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Vogue_430.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
+Architect_310.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
+Atelier_270.py       # Outfit analysis → prompt con filtri (filtro persistente)
 Filtro_210.py        # 7 categorie + LEGO + Mosaic + Scarabocchio
 Surprise_210.py      # Location + outfit random + /pride + /flag
 requirements.txt
@@ -83,7 +83,9 @@ openpyxl>=3.1.5
 
 ---
 
-## Fix robustezza (20/06/2026 → 10/08/2026)
+## Fix robustezza (20/06/2026 → 14/08/2026)
+
+**L'11-14/08 — Vogue 4.0→4.3: sempre video, mai foto.** Su richiesta di Walter, la modalità Immagine genera ora un prompt VIDEO (movimento inventato) invece di una foto ferma; corretto poi anche il video (V2V), che generava erroneamente un prompt foto — ora entrambe le modalità producono sempre un prompt video, da video copiando il movimento realmente osservato invece di inventarlo. Rimosso del tutto l'input testuale (T2I/T2V) — restano solo I2V e V2V. Diagnosticato e risolto un problema serio di accettazione da Flow (~1/10 su Vogue contro ~9/10 su Atelier per la stessa foto): trovate ed corrette due incoerenze concrete nel codice (mancava l'`EDITORIAL_WRAPPER` che Atelier usa da sempre; il DNA condiviso diceva ancora "single photorealistic image" in un prompt che parla di video), poi isolata la causa dominante con un test diretto di Walter — allegare la foto reale del volto per il video riesce solo ~1/20 volte contro quasi sempre senza, coerente con le policy Veo/Flow che restringono più duramente le rappresentazioni video di persone reali identificabili rispetto alle immagini statiche. Scritta per la prima volta una descrizione testuale completa del volto di Valeria (mai esistita prima — l'identità era sempre stata delegata alla foto), puntando sugli elementi più riconoscibili (montatura occhiali bicolore asimmetrica). Non ancora testato in produzione con questa nuova descrizione. Nessuna di queste modifiche tocca Atelier, dove allegare la foto reale continua a funzionare bene.
 
 **Il 05-10/08 — supporto video su Vogue (3.0 → 3.1).** Fork indipendente da Vogue 2.2 (`Vogue_300.py`, poi `Vogue_310.py`) — rollback = ridistribuire `Vogue_220.py` senza altre modifiche. Menu esplicito `/start` (Immagine/Video), nuovo `_ANALYZE_PROMPT_VIDEO`/`analyze_video()` isolati in Vogue (shared non toccato), controllo dimensione video prima del download (tetto reale di Telegram: 20MB). Testato da Walter con un video reale: risultato positivo, `PROPS & ACTIONS` cattura bene il momento dinamico della clip invece di una descrizione statica. Vogue 2.2 ora archiviata — Vogue 3.1.0 è la versione di riferimento; tolto "(beta)", aggiunto un terzo pulsante "🎥 Video" alla tastiera post-prompt.
 
@@ -131,9 +133,7 @@ Dettagli storici in `HANDOFF-MASTER`, sezioni 2bis, 2ter, 2quater, 2quinquies, 2
 
 **TODO aperto (08/07):** fix Vogue (201) e Atelier (204) per la clausola BODY ART condizionale non ancora testati in produzione — Walter deve verificare con foto con/senza tatuaggi prima di considerarli definitivi.
 
-**TODO aperto (12/07):** `Architect_302.py` (prompt testuale in chat, senza più file) non ancora testato in produzione — Walter deve verificare su Koyeb che il testo arrivi correttamente in chat (chunk multipli se >3800 caratteri) e sia effettivamente pubblicabile/usabile come prompt. Da testare anche con una foto di Valeria, per confermare che la descrizione del soggetto reale includa correttamente barba/occhiali/corpo senza alcun intervento di DNA.
-
-**TODO aperto (12/07):** analisi location dettagliata (BACKGROUND/LIGHTING/CAMERA/MOOD, ex 50 parole), ora in `Surprise_202.py`, non ancora testata in produzione — Walter deve verificare su Koyeb che sia effettivamente più utile della versione breve precedente, e che il messaggio di conferma (senza troncamento) si comporti bene in chat.
+**TODO aperto (12/07):** analisi location dettagliata (BACKGROUND/LIGHTING/CAMERA/MOOD, ex 50 parole), ora in `Surprise_210.py`, non ancora testata in produzione — Walter deve verificare su Koyeb che sia effettivamente più utile della versione breve precedente, e che il messaggio di conferma (senza troncamento) si comporti bene in chat.
 
 **TODO aperto:** shared 2.4.2/2.4.3 e Atelier 2.5.2 (densità sfondo) non ancora testati in produzione — in particolare mai testati su scene organiche/naturali. Atelier 2.5.3/2.5.4 (rimozione framing options) non richiedono validazione visiva specifica. shared 2.4.1/Atelier 2.5.1 (foto autorevole su occhiali/barba) — segnale positivo rafforzato: identità stabile anche nelle due generazioni successive (mosaico 27/07, poolside 28/07), ma resta non una conferma esaustiva su un modello non deterministico. shared 2.4.5 (bust volume/silhouette sempre visibile su scene a pelle scoperta) non ancora testato in produzione. shared 2.4.8 (fallback reattivo su gemini-3.1-flash-lite per 503/429/timeout/connessione) — **confermato in produzione il 05/08 per il caso 503**, tramite log reale (recupero in ~2.4s, nessun errore visibile). shared 2.4.11 (checklist mosaico condizionale) e shared 2.4.12/Atelier 2.7.0 (codice errore nell'header del fallback) non ancora testati in produzione. Nota permanente: tutti questi fix riducono ma non eliminano la variabilità — Flow resta non deterministico, nessun seed disponibile.
 
