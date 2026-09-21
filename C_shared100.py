@@ -1,9 +1,31 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.12
+Versione: 2.4.13
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.13 (21/09/2026):
+  - Walter ha ricevuto un errore Telegram grezzo invece del messaggio amichevole
+    atteso: "Bad Request: can't parse entities: Unsupported start tag
+    'blockedreason.prohibited_content:'". Causa isolata in analyze_scene():
+    quando Gemini blocca l'analisi per PROHIBITED_CONTENT (prompt_feedback,
+    non finish_reason SAFETY), il testo grezzo dell'errore Python contiene
+    parentesi angolari (repr di un enum, es. "<BlockedReason.
+    PROHIBITED_CONTENT: 'PROHIBITED_CONTENT'>") — la classificazione errori
+    non riconosceva PROHIBITED_CONTENT come equivalente a SAFETY, quindi
+    cadeva nel ramo else finale, che mandava il testo grezzo a Telegram in
+    parse_mode HTML SENZA html.escape() — Telegram lo interpretava come un
+    tag HTML non valido e rifiutava l'intero messaggio (l'utente non vedeva
+    nessun errore leggibile, solo il 400 grezzo dell'API Telegram). Fix
+    doppio: (1) PROHIBITED_CONTENT aggiunto alla classificazione SAFETY, ora
+    restituisce il messaggio amichevole già esistente "Immagine bloccata dai
+    filtri Gemini" invece di cadere nel ramo generico; (2) html.escape()
+    aggiunto anche al ramo else finale, come difesa in profondità per
+    qualunque futuro testo di errore non classificato che contenga
+    caratteri HTML speciali. Stesso identico bug e stessa correzione
+    applicata anche a analyze_video() (Vogue, locale). Non ancora testato
+    in produzione.
 
 CHANGELOG 2.4.12 (03/08/2026):
   - Walter ha chiesto che, quando scatta il fallback su MODEL_LITE (503 o
@@ -411,9 +433,9 @@ MODEL = "gemini-3.5-flash"
 MODEL_LITE = "gemini-3.1-flash-lite"
 
 # Versione
-VERSION = "2.4.12"
-SHARED_VERSION = "2.4.12"   # aggiornare ad ogni modifica
-SHARED_DATE    = "03/08/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.13"
+SHARED_VERSION = "2.4.13"   # aggiornare ad ogni modifica
+SHARED_DATE    = "21/09/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
@@ -993,7 +1015,7 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
                     "Le 20 richieste giornaliere di questa chiave sono finite.\n"
                     "Reset alle 08:00 ora Lisbona."
                 )
-        elif "SAFETY" in err_text or "SAFETY BLOCK" in err_text or "sconosciuto" in err_text:
+        elif "SAFETY" in err_text or "SAFETY BLOCK" in err_text or "PROHIBITED_CONTENT" in err_text or "sconosciuto" in err_text:
             friendly = (
                 "⚠️ <b>Immagine bloccata dai filtri Gemini.</b>\n"
                 "Gemini rifiuta questa foto (contenuto sensibile).\n"
@@ -1010,7 +1032,7 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
                 "La risposta ha impiegato troppo tempo. Riprova tra qualche secondo."
             )
         else:
-            friendly = f"❌ <b>Errore API Gemini:</b>\n<code>{err_text}</code>"
+            friendly = f"❌ <b>Errore API Gemini:</b>\n<code>{html.escape(err_text)}</code>"
         return None, friendly
 
 
