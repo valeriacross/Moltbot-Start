@@ -1,9 +1,31 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.13
+Versione: 2.4.14
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.14 (26/09/2026):
+  - Walter ha chiesto di aggiornare i bot al nuovo modello gemini-3.8-flash,
+    dopo aver segnalato 503 persistenti su gemini-3.5-flash (ormai tre
+    generazioni indietro: 3.6/3.7/3.8 già rilasciati). Verificato prima di
+    cambiare nulla: (1) l'ID modello esatto è "gemini-3.8-flash", confermato
+    su più fonti ufficiali Google; (2) il requisito SDK per l'intera
+    famiglia Gemini 3.x (incluso 3.8) è google-genai >=2.0.0 — il pin
+    attuale (>=2.11.0) lo soddisfa ampiamente, nessun aggiornamento
+    requirements.txt necessario; (3) Gemini 3.x rimuove/deprecca
+    temperature/top_p/top_k/candidate_count e sostituisce thinking_budget
+    con thinking_level — verificato che generate() (qui sotto) passa solo
+    safety_settings e max_output_tokens a GenerateContentConfig, nessuno
+    dei parametri deprecati è in uso, quindi nessuna modifica di codice
+    necessaria per compatibilità. Cambiato solo MODEL. MODEL_LITE
+    ("gemini-3.1-flash-lite") NON toccato — fuori dallo scope di questa
+    richiesta, ma segnalato a Walter che esiste anche un
+    "gemini-3.5-flash-lite" più recente, da valutare separatamente se
+    interessa. Non ancora testato in produzione — resta da vedere se il
+    modello più recente riduce davvero i 503 come sperato, oppure se (come
+    successo con gemini-3-flash-preview a suo tempo) un modello nuovo porta
+    con sé i suoi problemi di capacità nelle prime settimane.
 
 CHANGELOG 2.4.13 (21/09/2026):
   - Walter ha ricevuto un errore Telegram grezzo invece del messaggio amichevole
@@ -422,7 +444,7 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-MODEL = "gemini-3.5-flash"
+MODEL = "gemini-3.8-flash"
 # Fallback automatico — introdotto in 2.4.6 (soglia 75 call/giorno), reso
 # REATTIVO in 2.4.7 su richiesta di Walter: niente più soglia di consumo —
 # su un 503/overload si ritenta SUBITO con MODEL_LITE, in ogni caso, prima
@@ -433,9 +455,9 @@ MODEL = "gemini-3.5-flash"
 MODEL_LITE = "gemini-3.1-flash-lite"
 
 # Versione
-VERSION = "2.4.13"
-SHARED_VERSION = "2.4.13"   # aggiornare ad ogni modifica
-SHARED_DATE    = "21/09/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.14"
+SHARED_VERSION = "2.4.14"   # aggiornare ad ogni modifica
+SHARED_DATE    = "26/09/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
