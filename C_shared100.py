@@ -1,9 +1,59 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.14
+Versione: 2.4.15
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.15 (28/09/2026):
+  - Walter ha mandato il log di un fallimento reale (Atelier, ore di
+    "Servizio Gemini non disponibile"): 503 UNAVAILABLE "high demand" sia su
+    gemini-3.8-flash sia su gemini-3.1-flash-lite, identico su tutte e 5 le
+    chiavi (5 progetti Google separati, tutti free tier). Diagnosi: overload
+    lato Google, per MODELLO — non dipende dalla chiave né dal progetto. Il
+    vecchio generate() però reagiva male: dopo il fallback su lite ruotava
+    tutte le altre 4 chiavi sullo stesso modello (4 chiamate su 6 identiche e
+    inutili), senza alcun backoff, con fino a ~20s di attesa per l'utente e
+    catena di due soli modelli entrambi colpiti. Riscritta solo la strategia
+    di retry in generate() (firma e valore di ritorno invariati):
+      * 503/overload → si scorre la catena modelli [richiesto, *MODEL_FALLBACKS]
+        sulla STESSA chiave, SENZA ruotare chiavi. Se tutta la catena fallisce:
+        backoff con jitter (GEMINI_BACKOFF_BASE, ~3-4.5s) e un secondo giro
+        (GEMINI_RETRY_PASSES = 2). Massimo 4 chiamate invece di 6.
+      * 429/quota → la coppia (chiave, modello) è segnata esaurita per quella
+        chiamata; si prova il modello successivo sulla stessa chiave e, se una
+        coppia della chiave è esaurita, si ruota alla chiave successiva (le
+        quote sono per progetto+modello, quindi qui la rotazione ha senso).
+        Se l'errore è solo quota ovunque non si ripete il giro né si dorme.
+      * errori non transitori (SAFETY, parametri, ecc.) → sollevati subito.
+      * tetto di sicurezza GEMINI_MAX_ATTEMPTS = 16 tentativi per chiamata.
+  - NUOVO: variabile d'ambiente opzionale GEMINI_FALLBACK_MODELS (elenco
+    separato da virgole) per aggiungere modelli in coda alla catena
+    (MODEL_FALLBACKS = [MODEL_LITE] + elenco) senza toccare il codice.
+    NESSUN terzo modello è hardcoded: non ho potuto verificare quale
+    risponda ora sul free tier, e le segnalazioni utente indicano 503 su
+    tutta la famiglia flash 3.x. Va provato prima di configurarlo.
+  - Cambi di comportamento collaterali, tutti voluti:
+      * last_fallback_code (2.4.12) viene ora impostato solo quando un
+        modello di fallback ha DAVVERO risposto, non appena il modello
+        richiesto fallisce: prima poteva restare impostato anche se il
+        modello richiesto riusciva al tentativo successivo.
+      * una risposta vuota da MODEL_LITE ora solleva (con il motivo
+        SAFETY/finish_reason) invece di essere ignorata in silenzio.
+      * gli errori transitori non stampano più il traceback completo a ogni
+        tentativo (logger.warning, riga corta); il traceback resta solo per
+        gli errori non transitori.
+      * le chiamate usano self._clients[idx] invece di self._client, per non
+        cambiare chiave a metà chiamata se un altro thread ruota.
+      * la rotazione chiave non scatta più su 503, quindi le callback
+        on_key_rotation si attivano solo su 429/quota e sul round-robin.
+  - Classificazione errori estratta in _classify_gemini_error() (stessi
+    criteri di prima: 503/unavailable/overloaded, 429/quota/exhausted,
+    timeout/connection). Non aggiunti 500/504.
+  - Non ancora testato in produzione. Testato in locale con client finti
+    (10 scenari: 503 ovunque, fallback riuscito, 429 con rotazione, quota
+    ovunque, successo al secondo giro, errore non transitorio, risposta
+    vuota, catena estesa da env).
 
 CHANGELOG 2.4.14 (26/09/2026):
   - Walter ha chiesto di aggiornare i bot al nuovo modello gemini-3.8-flash,
@@ -426,7 +476,7 @@ CHANGELOG 1.0.x (09/05/2026):
     generate_caption(), CaptionGenerator, VALERIA_DNA, EDITORIAL_WRAPPER.
 """
 
-import os, html, logging, threading, flask, re
+import os, html, logging, threading, flask, re, time, random
 from google import genai
 from google.genai import types as genai_types
 
@@ -454,12 +504,25 @@ MODEL = "gemini-3.8-flash"
 # definito nei singoli bot) — solo quelle sul default MODEL.
 MODEL_LITE = "gemini-3.1-flash-lite"
 
-# Versione
-VERSION = "2.4.14"
-SHARED_VERSION = "2.4.14"   # aggiornare ad ogni modifica
-SHARED_DATE    = "26/09/2026"  # aggiornare ad ogni modifica
+# FIX 2.4.15 — catena di fallback modelli e parametri di retry (vedi changelog).
+# MODEL_FALLBACKS: modelli provati in ordine dopo quello richiesto. Si estende
+# senza toccare il codice con la variabile d'ambiente GEMINI_FALLBACK_MODELS
+# (elenco separato da virgole, es. "modello-a,modello-b").
+MODEL_FALLBACKS = [MODEL_LITE] + [
+    _m.strip()
+    for _m in os.environ.get("GEMINI_FALLBACK_MODELS", "").split(",")
+    if _m.strip() and _m.strip() != MODEL_LITE
+]
+GEMINI_RETRY_PASSES = 2      # giri completi sulla catena modelli quando c'è overload (503)
+GEMINI_BACKOFF_BASE = 3.0    # secondi; attesa tra un giro e l'altro = base * 2**giro + jitter 0-1.5s
+GEMINI_MAX_ATTEMPTS = 16     # tetto assoluto di chiamate API per singolo generate()
 
-logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
+# Versione
+VERSION = "2.4.15"
+SHARED_VERSION = "2.4.15"   # aggiornare ad ogni modifica
+SHARED_DATE    = "28/09/2026"  # aggiornare ad ogni modifica
+
+logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
 
 # ============================================================
 # WHITELIST — SICUREZZA
@@ -1058,6 +1121,20 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
         return None, friendly
 
 
+def _classify_gemini_error(err_text: str):
+    """Classifica un errore Gemini dal suo testo (FIX 2.4.15, stessi criteri di prima).
+    Ritorna "overload" (503/unavailable/overloaded), "quota" (429/quota/exhausted),
+    "transient" (timeout/connessione) oppure None se non transitorio."""
+    low = err_text.lower()
+    if "503" in err_text or "unavailable" in low or "overloaded" in low:
+        return "overload"
+    if "429" in err_text or "quota" in low or "exhausted" in low:
+        return "quota"
+    if "timeout" in low or "timed out" in low or "connection" in low:
+        return "transient"
+    return None
+
+
 # ============================================================
 # GeminiClient
 # ============================================================
@@ -1067,6 +1144,7 @@ class GeminiClient:
     Wrapper Singleton attorno a genai.Client con rotation automatica multi-chiave.
     Legge GOOGLE_API_KEY, GOOGLE_API_KEY_2, GOOGLE_API_KEY_3, GOOGLE_API_KEY_4, GOOGLE_API_KEY_5 dall'environment.
     Su 429/quota esaurita ruota automaticamente alla chiave successiva.
+    Su 503/overload ruota i MODELLI (MODEL_FALLBACKS), non le chiavi (2.4.15).
     """
     _instance = None
     _lock = threading.Lock()
@@ -1204,11 +1282,64 @@ class GeminiClient:
     def available(self) -> bool:
         return bool(self._clients)
 
+    @staticmethod
+    def _empty_reason(response) -> str:
+        """Motivo leggibile di una risposta senza testo (finish_reason / prompt_feedback).
+        Estratto da generate() in 2.4.15 — logica invariata."""
+        reason = "sconosciuto"
+        try:
+            candidate = response.candidates[0] if response.candidates else None
+            if candidate:
+                fr = str(candidate.finish_reason)
+                if "SAFETY" in fr:
+                    reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
+                elif "RECITATION" in fr:
+                    reason = "RECITATION — Gemini ha bloccato per potenziale riproduzione di contenuto protetto"
+                elif "MAX_TOKENS" in fr:
+                    reason = "MAX_TOKENS — risposta troncata, output troppo lungo"
+                elif "STOP" in fr:
+                    reason = "STOP — risposta terminata normalmente ma testo vuoto"
+                else:
+                    reason = f"finish_reason: {fr}"
+            else:
+                # Nessun candidato — Gemini ha bloccato l'intera richiesta
+                # Controlla prompt_feedback per il motivo
+                try:
+                    pf = str(response.prompt_feedback) if hasattr(response, "prompt_feedback") else ""
+                    if "SAFETY" in pf or "BLOCK" in pf:
+                        reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
+                    elif pf:
+                        reason = f"prompt_feedback: {pf[:80]}"
+                    else:
+                        reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
+                except Exception:
+                    reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
+        except Exception as fe:
+            reason = f"impossibile leggere finish_reason: {fe}"
+        return reason
+
+    def _call_model(self, idx: int, model: str, payload, safety, max_tokens: int) -> str:
+        """Singola chiamata a (chiave idx, modello). Ritorna il testo oppure solleva.
+        Usa self._clients[idx] direttamente (non self._client) così una rotazione
+        fatta da un altro thread a metà chiamata non cambia la chiave sotto i piedi."""
+        response = self._clients[idx].models.generate_content(
+            model=model,
+            contents=payload,
+            config=genai_types.GenerateContentConfig(
+                safety_settings=safety,
+                max_output_tokens=max_tokens,
+            )
+        )
+        if response.text:
+            return response.text.strip()
+        # Risposta vuota — estrai il motivo reale da finish_reason
+        raise RuntimeError(f"Gemini ha risposto senza testo — {self._empty_reason(response)}")
+
     def generate(self, prompt: str, contents: list = None, model: str = MODEL, max_tokens: int = 3000) -> str | None:
         """
         Genera testo con Gemini.
         contents: lista di Part aggiuntivi (immagini, ecc.) — vengono messi PRIMA del testo.
-        Ritorna il testo generato o None in caso di errore.
+        Ritorna il testo generato; su errore solleva l'ultima eccezione.
 
         FIX 1.2.0: quando contents non è vuoto (es. immagini), il prompt testuale
         viene wrappato come genai_types.Part per garantire compatibilità con l'API.
@@ -1216,6 +1347,17 @@ class GeminiClient:
         silenziosa dell'analisi immagine (Gemini ignora la parte visiva).
         FIX 1.6.0: safety_settings disabilitati — necessario per analisi outfit
         su immagini fashion che altrimenti vengono bloccate dai filtri Gemini.
+
+        FIX 2.4.15 — strategia di retry riscritta (vedi changelog):
+          - 503/overload (capacità del MODELLO, uguale per tutte le chiavi): si
+            scorre la catena [model, *MODEL_FALLBACKS] sulla STESSA chiave, senza
+            ruotare chiavi; se l'intera catena fallisce, backoff con jitter e
+            un secondo giro (GEMINI_RETRY_PASSES).
+          - 429/quota (per progetto+modello): la coppia (chiave, modello) è
+            segnata esaurita per questa chiamata; si prova il modello successivo
+            sulla stessa chiave e, se una qualunque coppia della chiave è in
+            quota esaurita, si ruota alla chiave successiva.
+          - Errori non transitori (SAFETY, parametri, ...): sollevati subito.
         """
         if not self._client:
             logger.error("❌ GeminiClient non disponibile.")
@@ -1233,173 +1375,95 @@ class GeminiClient:
                 _cb(_cur_key, self._total_calls)
             except Exception as _cb_err:
                 logger.warning(f"\u26a0\ufe0f on_key_use callback error: {_cb_err}")
-        # Il fallback su MODEL_LITE è gestito in modo reattivo nel blocco
-        # except sotto (FIX 2.4.7) — qui il primo tentativo usa sempre
-        # il modello richiesto dal chiamante, invariato.
-        try:
-            if contents:
-                text_part = genai_types.Part.from_text(text=prompt)
-                payload = list(contents) + [text_part]
-            else:
-                payload = prompt
-            safety = [
-                genai_types.SafetySetting(
-                    category=genai_types.HarmCategory.HARM_CATEGORY_HARASSMENT,
-                    threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
-                ),
-                genai_types.SafetySetting(
-                    category=genai_types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                    threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
-                ),
-                genai_types.SafetySetting(
-                    category=genai_types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                    threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
-                ),
-                genai_types.SafetySetting(
-                    category=genai_types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                    threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
-                ),
-            ]
-            response = self._client.models.generate_content(
-                model=model,
-                contents=payload,
-                config=genai_types.GenerateContentConfig(
-                    safety_settings=safety,
-                    max_output_tokens=max_tokens,
-                )
-            )
-            if response.text:
-                return response.text.strip()
-            # Risposta vuota — estrai il motivo reale da finish_reason
-            reason = "sconosciuto"
-            try:
-                candidate = response.candidates[0] if response.candidates else None
-                if candidate:
-                    fr = str(candidate.finish_reason)
-                    if "SAFETY" in fr:
-                        reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
-                    elif "RECITATION" in fr:
-                        reason = "RECITATION — Gemini ha bloccato per potenziale riproduzione di contenuto protetto"
-                    elif "MAX_TOKENS" in fr:
-                        reason = "MAX_TOKENS — risposta troncata, output troppo lungo"
-                    elif "STOP" in fr:
-                        reason = "STOP — risposta terminata normalmente ma testo vuoto"
-                    else:
-                        reason = f"finish_reason: {fr}"
-                else:
-                    # Nessun candidato — Gemini ha bloccato l'intera richiesta
-                    # Controlla prompt_feedback per il motivo
-                    try:
-                        pf = str(response.prompt_feedback) if hasattr(response, "prompt_feedback") else ""
-                        if "SAFETY" in pf or "BLOCK" in pf:
-                            reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
-                        elif pf:
-                            reason = f"prompt_feedback: {pf[:80]}"
-                        else:
-                            reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
-                    except Exception:
-                        reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
-            except Exception as fe:
-                reason = f"impossibile leggere finish_reason: {fe}"
-            raise RuntimeError(f"Gemini ha risposto senza testo — {reason}")
-        except Exception as e:
-            err_text = str(e)
-            logger.error(f"\u274c GeminiClient.generate(): {e}", exc_info=True)
-            # FIX 2.4.8: il fallback reattivo a MODEL_LITE, introdotto in 2.4.7
-            # solo per il 503/overload, ora scatta anche sul 429/quota — la
-            # quota di gemini-3.5-flash è per (chiave, modello): quando è
-            # esaurita su tutte le chiavi (visto nel log del 30/07, tutte e 5
-            # le chiavi in 429 sullo stesso giro), MODEL_LITE ha una quota
-            # tutta sua, non ancora toccata, quindi vale la pena provarci
-            # prima di arrendersi. Si ritenta SUBITO con MODEL_LITE sulla
-            # STESSA chiave, prima ancora di ruotare. Se anche MODEL_LITE
-            # fallisce, si prosegue con la rotazione chiavi esistente ma
-            # restando su MODEL_LITE per tutti i tentativi successivi di
-            # questa chiamata.
-            _is_overload = (
-                "503" in err_text
-                or "unavailable" in err_text.lower()
-                or "overloaded" in err_text.lower()
-            )
-            _is_quota = (
-                "429" in err_text
-                or "quota" in err_text.lower()
-                or "exhausted" in err_text.lower()
-            )
-            _is_transient = (
-                _is_overload
-                or _is_quota
-                or "timeout" in err_text.lower()
-                or "timed out" in err_text.lower()
-                or "connection" in err_text.lower()
-            )
-            if not _is_transient:
-                raise
-            _current_model = model
-            if _is_transient and model != MODEL_LITE:
-                _reason = "503/overload" if _is_overload else ("429/quota" if _is_quota else "errore transitorio")
-                self.last_fallback_code = "503" if _is_overload else ("429" if _is_quota else "transient")
-                logger.info(f"\U0001f4c9 GeminiClient: {_reason} su {model} — ritento subito con {MODEL_LITE} (stessa chiave)")
-                try:
-                    if contents:
-                        text_part = genai_types.Part.from_text(text=prompt)
-                        payload = list(contents) + [text_part]
-                    else:
-                        payload = prompt
-                    response_lite = self._client.models.generate_content(
-                        model=MODEL_LITE,
-                        contents=payload,
-                        config=genai_types.GenerateContentConfig(
-                            safety_settings=safety,
-                            max_output_tokens=max_tokens,
-                        )
-                    )
-                    if response_lite.text:
-                        return response_lite.text.strip()
-                except Exception as e_lite:
-                    logger.warning(f"\u26a0\ufe0f {MODEL_LITE} anch'esso fallito sulla chiave corrente: {e_lite}")
-                _current_model = MODEL_LITE  # resta su lite anche nella rotazione chiavi sotto
-            # Tenta TUTTE le chiavi rimanenti prima di arrendersi
-            for _attempt in range(len(self._clients) - 1):
-                if not self._rotate_key():
-                    break
-                logger.info(f"\U0001f504 Ritento con chiave #{self._key_index + 1} (errore transitorio, modello {_current_model})...")
-                try:
-                    if contents:
-                        text_part = genai_types.Part.from_text(text=prompt)
-                        payload = list(contents) + [text_part]
-                    else:
-                        payload = prompt
-                    response2 = self._client.models.generate_content(
-                        model=_current_model,
-                        contents=payload,
-                        config=genai_types.GenerateContentConfig(
-                            safety_settings=safety,
-                            max_output_tokens=max_tokens,
-                        )
-                    )
-                    if response2.text:
-                        return response2.text.strip()
-                except Exception as e2:
-                    err2 = str(e2)
-                    _is_transient2 = (
-                        "429" in err2
-                        or "503" in err2
-                        or "quota" in err2.lower()
-                        or "exhausted" in err2.lower()
-                        or "unavailable" in err2.lower()
-                        or "overloaded" in err2.lower()
-                        or "timeout" in err2.lower()
-                        or "timed out" in err2.lower()
-                        or "connection" in err2.lower()
-                    )
-                    if _is_transient2:
-                        logger.warning(f"\u26a0\ufe0f Chiave #{self._key_index + 1} transitorio, provo la prossima...")
+
+        if contents:
+            text_part = genai_types.Part.from_text(text=prompt)
+            payload = list(contents) + [text_part]
+        else:
+            payload = prompt
+        safety = [
+            genai_types.SafetySetting(
+                category=genai_types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+            genai_types.SafetySetting(
+                category=genai_types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+            genai_types.SafetySetting(
+                category=genai_types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+            genai_types.SafetySetting(
+                category=genai_types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+        ]
+
+        chain = [model] + [m for m in MODEL_FALLBACKS if m != model]
+        n_keys = len(self._clients)
+        dead = set()            # coppie (indice chiave, modello) in quota esaurita, per QUESTA chiamata
+        last_exc = None
+        req_fail_code = None    # codice con cui è fallito il modello richiesto ("503"/"429"/"transient")
+        attempts = 0
+
+        for pass_no in range(GEMINI_RETRY_PASSES):
+            saw_overload = False
+            for key_step in range(n_keys):
+                idx = self._key_index
+                for m in chain:
+                    if (idx, m) in dead:
                         continue
-                    # Errore non transitorio (SAFETY, parametro errato, ecc.) — stop
-                    logger.error(f"\u274c GeminiClient.generate() chiave {self._key_index+1}: {e2}")
-                    raise e2
-            raise
+                    if attempts >= GEMINI_MAX_ATTEMPTS:
+                        break
+                    attempts += 1
+                    try:
+                        text = self._call_model(idx, m, payload, safety, max_tokens)
+                        if m != model:
+                            # Fallback realmente usato: solo ora si imposta il codice
+                            # mostrato all'utente (2.4.12), così non resta impostato
+                            # se il modello richiesto riesce al giro successivo.
+                            self.last_fallback_code = req_fail_code or "transient"
+                            logger.info(f"✅ GeminiClient: risposta da fallback {m} (chiave #{idx + 1}, {req_fail_code or 'transient'} su {model})")
+                        return text
+                    except Exception as e:
+                        err_text = str(e)
+                        kind = _classify_gemini_error(err_text)
+                        if kind is None:
+                            # Errore non transitorio (SAFETY, parametro errato, ecc.) — stop
+                            logger.error(f"❌ GeminiClient.generate() [{m}, chiave #{idx + 1}]: {e}", exc_info=True)
+                            raise
+                        last_exc = e
+                        code = "503" if kind == "overload" else ("429" if kind == "quota" else "transient")
+                        if m == model:
+                            req_fail_code = code
+                        if kind == "quota":
+                            dead.add((idx, m))
+                        else:
+                            saw_overload = True
+                        logger.warning(f"⚠️ GeminiClient: {code} su {m} (chiave #{idx + 1}, giro {pass_no + 1}/{GEMINI_RETRY_PASSES}): {err_text[:160]}")
+                if attempts >= GEMINI_MAX_ATTEMPTS:
+                    break
+                # Fine catena sulla chiave corrente. Si ruota chiave SOLO se almeno
+                # una coppia di questa chiave è in quota esaurita (429): su un
+                # 503 un'altra chiave non cambia nulla, l'overload è del modello.
+                if (any((idx, m) in dead for m in chain)
+                        and key_step < n_keys - 1
+                        and self._rotate_key()):
+                    continue
+                break
+            if attempts >= GEMINI_MAX_ATTEMPTS or not saw_overload:
+                # Solo quota esaurita ovunque (o budget tentativi finito): ripetere il giro non serve
+                break
+            if pass_no < GEMINI_RETRY_PASSES - 1:
+                delay = GEMINI_BACKOFF_BASE * (2 ** pass_no) + random.uniform(0, 1.5)
+                logger.info(f"⏳ GeminiClient: catena {chain} in overload, attendo {delay:.1f}s e ritento")
+                time.sleep(delay)
+
+        logger.error(f"❌ GeminiClient.generate(): catena {chain} esaurita dopo {attempts} tentativi")
+        if last_exc is None:
+            raise RuntimeError("GeminiClient.generate(): nessun tentativo eseguito")
+        raise last_exc
 
 
 # ============================================================
