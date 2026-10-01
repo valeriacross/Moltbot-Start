@@ -1,9 +1,39 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.15
+Versione: 2.4.16
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.16 (01/10/2026):
+  - Walter ha inoltrato un suggerimento di Gemini: un retry loop generico con
+    backoff esponenziale (2,4,8,16,32s) su un singolo `genai.Client()` senza
+    chiave esplicita. Valutato e NON adottato come sostituto di generate():
+    usa una sola chiave (incompatibile con la rotazione a 5 chiavi/progetti
+    di GeminiClient), riprova solo sullo stesso modello (nessun fallback su
+    MODEL_FALLBACKS), e perde messaggio Telegram amichevole/logging/
+    distinzione 429 vs 503 già presenti. L'unica idea utile — attendere di
+    più prima di arrendersi — è stata applicata direttamente ai parametri
+    già introdotti in 2.4.15, invece di sostituire la logica.
+  - Verificato prima di allungare l'attesa (rischio: bloccare un worker a
+    lungo) che tutti i bot che chiamano generate() girano su
+    infinity_polling (mai webhook, nessun rischio di timeout Telegram) con
+    pool di thread dedicato: Atelier e Surprise un ThreadPoolExecutor
+    esplicito (max_workers=4), Vogue il pool interno di telebot
+    (threaded=True, num_threads=2 di default, mai sovrascritto). Architect e
+    Filtro non più in uso da Walter (Vogue solo ~1 volta/mese, uso
+    prevalentemente solo-utente) — contesa sul pool di thread non è un
+    rischio pratico.
+  - GEMINI_RETRY_PASSES: default 2 → 4, reso configurabile via env (prima
+    hardcoded). GEMINI_BACKOFF_BASE: default 3.0 → 4.0, reso configurabile
+    via env. Con i default: fino a 3 attese tra i 4 giri (~4-5.5s, ~8-9.5s,
+    ~16-17.5s con jitter) prima di arrendersi, oltre al tempo delle chiamate
+    stesse — che durante un vero sovraccarico varia molto: nel log del 28/09
+    alcune risposte 503 sono arrivate in ~1s, una in ~12.5s. Nessuna
+    garanzia contro un episodio sostenuto di minuti come quello del 28/09 —
+    solo più occasioni di incrociare una schiarita, non una soluzione al
+    sovraccarico lato Google.
+  - Nessuna modifica alla logica di generate() stessa (identica a 2.4.15).
 
 CHANGELOG 2.4.15 (28/09/2026):
   - Walter ha mandato il log di un fallimento reale (Atelier, ore di
@@ -513,14 +543,14 @@ MODEL_FALLBACKS = [MODEL_LITE] + [
     for _m in os.environ.get("GEMINI_FALLBACK_MODELS", "").split(",")
     if _m.strip() and _m.strip() != MODEL_LITE
 ]
-GEMINI_RETRY_PASSES = 2      # giri completi sulla catena modelli quando c'è overload (503)
-GEMINI_BACKOFF_BASE = 3.0    # secondi; attesa tra un giro e l'altro = base * 2**giro + jitter 0-1.5s
+GEMINI_RETRY_PASSES = int(os.environ.get("GEMINI_RETRY_PASSES", "4"))   # giri sulla catena modelli in overload (503)
+GEMINI_BACKOFF_BASE = float(os.environ.get("GEMINI_BACKOFF_BASE", "4.0"))  # secondi; attesa = base * 2**giro + jitter 0-1.5s
 GEMINI_MAX_ATTEMPTS = 16     # tetto assoluto di chiamate API per singolo generate()
 
 # Versione
-VERSION = "2.4.15"
-SHARED_VERSION = "2.4.15"   # aggiornare ad ogni modifica
-SHARED_DATE    = "28/09/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.16"
+SHARED_VERSION = "2.4.16"   # aggiornare ad ogni modifica
+SHARED_DATE    = "01/10/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
 

@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 29/09/2026
+**Ultimo aggiornamento:** 01/10/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -16,7 +16,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 | FiltroBot | `Filtro_210.py` | 2.1.0 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_210.py` | 2.1.0 | surprise1/sorpresa | 1 |
 
-**Shared:** `C_shared100.py` v2.4.15 · **10 API key totali**
+**Shared:** `C_shared100.py` v2.4.16 · **10 API key totali**
 
 ---
 
@@ -83,7 +83,9 @@ openpyxl>=3.1.5
 
 ---
 
-## Fix robustezza (20/06/2026 → 29/09/2026)
+## Fix robustezza (20/06/2026 → 01/10/2026)
+
+**L'1/10 — tuning del backoff dopo un suggerimento esterno.** Walter ha inoltrato un retry loop proposto da Gemini (backoff esponenziale su un client a chiave singola). Valutato e scartato come sostituto — incompatibile con la rotazione a 5 chiavi, nessun fallback multi-modello — ma applicata l'unica idea utile: più tempo prima di arrendersi. `GEMINI_RETRY_PASSES` (2→4) e `GEMINI_BACKOFF_BASE` (3.0→4.0) ora configurabili via env (shared 2.4.16). Verificato prima che nessun bot gira su webhook (tutti `infinity_polling` con pool di thread dedicato), quindi attese più lunghe non bloccano nulla. Nessuna garanzia contro un sovraccarico sostenuto di minuti come quello del 28/09 — solo più occasioni di successo, non una soluzione.
 
 **Il 28-29/09 — 503 "high demand" simultaneo su due modelli, tutte le chiavi di Atelier.** Log reale allegato da Walter ha mostrato 503 UNAVAILABLE su `gemini-3.8-flash` E sul fallback `gemini-3.1-flash-lite`, identico sulle 5 chiavi (5 progetti Google Cloud separati, tutti free tier, nessuna fatturazione attiva) — overload per modello lato Google, non per chiave. Il vecchio `generate()` reagiva ruotando 4 chiavi extra sullo stesso modello dopo il fallback, senza backoff: inutile su un 503, solo più attesa (~20s). Riscritta la strategia di retry (shared 2.4.15): su 503 si scorre la catena di modelli (`MODEL_FALLBACKS`, estendibile via env `GEMINI_FALLBACK_MODELS`) sulla stessa chiave con backoff e un secondo giro, senza ruotare chiavi; su 429/quota si ruota per coppia (chiave, modello), non più l'intera chiave alla prima quota esaurita su un modello qualsiasi. Testato con 10 scenari via client Gemini finti — non ancora contro l'overload reale.
 
@@ -144,6 +146,8 @@ Dettagli storici in `HANDOFF-MASTER`, sezioni 2bis, 2ter, 2quater, 2quinquies, 2
 **TODO aperto:** shared 2.4.2/2.4.3 e Atelier 2.5.2 (densità sfondo) non ancora testati in produzione — in particolare mai testati su scene organiche/naturali. Atelier 2.5.3/2.5.4 (rimozione framing options) non richiedono validazione visiva specifica. shared 2.4.1/Atelier 2.5.1 (foto autorevole su occhiali/barba) — segnale positivo rafforzato: identità stabile anche nelle due generazioni successive (mosaico 27/07, poolside 28/07), ma resta non una conferma esaustiva su un modello non deterministico. shared 2.4.5 (bust volume/silhouette sempre visibile su scene a pelle scoperta) non ancora testato in produzione. shared 2.4.8 (fallback reattivo su gemini-3.1-flash-lite per 503/429/timeout/connessione) — **confermato in produzione il 05/08 per il caso 503**, tramite log reale (recupero in ~2.4s, nessun errore visibile). shared 2.4.11 (checklist mosaico condizionale) e shared 2.4.12/Atelier 2.7.0 (codice errore nell'header del fallback) non ancora testati in produzione. Nota permanente: tutti questi fix riducono ma non eliminano la variabilità — Flow resta non deterministico, nessun seed disponibile.
 
 **TODO aperto (29/09):** shared 2.4.13 (21/09, fix PROHIBITED_CONTENT) e 2.4.14 (26/09, modello gemini-3.8-flash) non risultano testati in produzione — nessuna conferma vista dopo il rispettivo commit. shared 2.4.15 (29/09, riscrittura retry per 503 simultaneo su due modelli) testato solo con client finti, non contro l'overload reale — Walter deve verificare se gli errori "Servizio Gemini non disponibile" si riducono, e valutare se configurare `GEMINI_FALLBACK_MODELS` con un terzo modello. **Nota:** le sezioni storiche Vogue/Architect/Atelier dell'HANDOFF avevano gap di versioni pregressi (2.2.0→4.0 Vogue, 2.6.0→2.7.0 Atelier, 3.1.0 Architect) scoperti solo confrontando i file con GitHub — non ricostruiti su indicazione esplicita di Walter.
+
+**TODO aperto (01/10):** shared 2.4.16 (backoff allungato, fino a ~4 giri/~30s di attese) non ancora verificato contro un vero episodio di overload — Walter deve osservare se riduce gli errori rispetto a 2.4.15, senza aspettarsi che risolva un episodio sostenuto di minuti.
 
 ## Nota tecnica importante
 
