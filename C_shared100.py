@@ -1,266 +1,38 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.16
+Versione: 2.4.3
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
 
-CHANGELOG 2.4.16 (01/10/2026):
-  - Walter ha inoltrato un suggerimento di Gemini: un retry loop generico con
-    backoff esponenziale (2,4,8,16,32s) su un singolo `genai.Client()` senza
-    chiave esplicita. Valutato e NON adottato come sostituto di generate():
-    usa una sola chiave (incompatibile con la rotazione a 5 chiavi/progetti
-    di GeminiClient), riprova solo sullo stesso modello (nessun fallback su
-    MODEL_FALLBACKS), e perde messaggio Telegram amichevole/logging/
-    distinzione 429 vs 503 già presenti. L'unica idea utile — attendere di
-    più prima di arrendersi — è stata applicata direttamente ai parametri
-    già introdotti in 2.4.15, invece di sostituire la logica.
-  - Verificato prima di allungare l'attesa (rischio: bloccare un worker a
-    lungo) che tutti i bot che chiamano generate() girano su
-    infinity_polling (mai webhook, nessun rischio di timeout Telegram) con
-    pool di thread dedicato: Atelier e Surprise un ThreadPoolExecutor
-    esplicito (max_workers=4), Vogue il pool interno di telebot
-    (threaded=True, num_threads=2 di default, mai sovrascritto). Architect e
-    Filtro non più in uso da Walter (Vogue solo ~1 volta/mese, uso
-    prevalentemente solo-utente) — contesa sul pool di thread non è un
-    rischio pratico.
-  - GEMINI_RETRY_PASSES: default 2 → 4, reso configurabile via env (prima
-    hardcoded). GEMINI_BACKOFF_BASE: default 3.0 → 4.0, reso configurabile
-    via env. Con i default: fino a 3 attese tra i 4 giri (~4-5.5s, ~8-9.5s,
-    ~16-17.5s con jitter) prima di arrendersi, oltre al tempo delle chiamate
-    stesse — che durante un vero sovraccarico varia molto: nel log del 28/09
-    alcune risposte 503 sono arrivate in ~1s, una in ~12.5s. Nessuna
-    garanzia contro un episodio sostenuto di minuti come quello del 28/09 —
-    solo più occasioni di incrociare una schiarita, non una soluzione al
-    sovraccarico lato Google.
-  - Nessuna modifica alla logica di generate() stessa (identica a 2.4.15).
-
-CHANGELOG 2.4.15 (28/09/2026):
-  - Walter ha mandato il log di un fallimento reale (Atelier, ore di
-    "Servizio Gemini non disponibile"): 503 UNAVAILABLE "high demand" sia su
-    gemini-3.8-flash sia su gemini-3.1-flash-lite, identico su tutte e 5 le
-    chiavi (5 progetti Google separati, tutti free tier). Diagnosi: overload
-    lato Google, per MODELLO — non dipende dalla chiave né dal progetto. Il
-    vecchio generate() però reagiva male: dopo il fallback su lite ruotava
-    tutte le altre 4 chiavi sullo stesso modello (4 chiamate su 6 identiche e
-    inutili), senza alcun backoff, con fino a ~20s di attesa per l'utente e
-    catena di due soli modelli entrambi colpiti. Riscritta solo la strategia
-    di retry in generate() (firma e valore di ritorno invariati):
-      * 503/overload → si scorre la catena modelli [richiesto, *MODEL_FALLBACKS]
-        sulla STESSA chiave, SENZA ruotare chiavi. Se tutta la catena fallisce:
-        backoff con jitter (GEMINI_BACKOFF_BASE, ~3-4.5s) e un secondo giro
-        (GEMINI_RETRY_PASSES = 2). Massimo 4 chiamate invece di 6.
-      * 429/quota → la coppia (chiave, modello) è segnata esaurita per quella
-        chiamata; si prova il modello successivo sulla stessa chiave e, se una
-        coppia della chiave è esaurita, si ruota alla chiave successiva (le
-        quote sono per progetto+modello, quindi qui la rotazione ha senso).
-        Se l'errore è solo quota ovunque non si ripete il giro né si dorme.
-      * errori non transitori (SAFETY, parametri, ecc.) → sollevati subito.
-      * tetto di sicurezza GEMINI_MAX_ATTEMPTS = 16 tentativi per chiamata.
-  - NUOVO: variabile d'ambiente opzionale GEMINI_FALLBACK_MODELS (elenco
-    separato da virgole) per aggiungere modelli in coda alla catena
-    (MODEL_FALLBACKS = [MODEL_LITE] + elenco) senza toccare il codice.
-    NESSUN terzo modello è hardcoded: non ho potuto verificare quale
-    risponda ora sul free tier, e le segnalazioni utente indicano 503 su
-    tutta la famiglia flash 3.x. Va provato prima di configurarlo.
-  - Cambi di comportamento collaterali, tutti voluti:
-      * last_fallback_code (2.4.12) viene ora impostato solo quando un
-        modello di fallback ha DAVVERO risposto, non appena il modello
-        richiesto fallisce: prima poteva restare impostato anche se il
-        modello richiesto riusciva al tentativo successivo.
-      * una risposta vuota da MODEL_LITE ora solleva (con il motivo
-        SAFETY/finish_reason) invece di essere ignorata in silenzio.
-      * gli errori transitori non stampano più il traceback completo a ogni
-        tentativo (logger.warning, riga corta); il traceback resta solo per
-        gli errori non transitori.
-      * le chiamate usano self._clients[idx] invece di self._client, per non
-        cambiare chiave a metà chiamata se un altro thread ruota.
-      * la rotazione chiave non scatta più su 503, quindi le callback
-        on_key_rotation si attivano solo su 429/quota e sul round-robin.
-  - Classificazione errori estratta in _classify_gemini_error() (stessi
-    criteri di prima: 503/unavailable/overloaded, 429/quota/exhausted,
-    timeout/connection). Non aggiunti 500/504.
-  - Non ancora testato in produzione. Testato in locale con client finti
-    (10 scenari: 503 ovunque, fallback riuscito, 429 con rotazione, quota
-    ovunque, successo al secondo giro, errore non transitorio, risposta
-    vuota, catena estesa da env).
-
-CHANGELOG 2.4.14 (26/09/2026):
-  - Walter ha chiesto di aggiornare i bot al nuovo modello gemini-3.8-flash,
-    dopo aver segnalato 503 persistenti su gemini-3.5-flash (ormai tre
-    generazioni indietro: 3.6/3.7/3.8 già rilasciati). Verificato prima di
-    cambiare nulla: (1) l'ID modello esatto è "gemini-3.8-flash", confermato
-    su più fonti ufficiali Google; (2) il requisito SDK per l'intera
-    famiglia Gemini 3.x (incluso 3.8) è google-genai >=2.0.0 — il pin
-    attuale (>=2.11.0) lo soddisfa ampiamente, nessun aggiornamento
-    requirements.txt necessario; (3) Gemini 3.x rimuove/deprecca
-    temperature/top_p/top_k/candidate_count e sostituisce thinking_budget
-    con thinking_level — verificato che generate() (qui sotto) passa solo
-    safety_settings e max_output_tokens a GenerateContentConfig, nessuno
-    dei parametri deprecati è in uso, quindi nessuna modifica di codice
-    necessaria per compatibilità. Cambiato solo MODEL. MODEL_LITE
-    ("gemini-3.1-flash-lite") NON toccato — fuori dallo scope di questa
-    richiesta, ma segnalato a Walter che esiste anche un
-    "gemini-3.5-flash-lite" più recente, da valutare separatamente se
-    interessa. Non ancora testato in produzione — resta da vedere se il
-    modello più recente riduce davvero i 503 come sperato, oppure se (come
-    successo con gemini-3-flash-preview a suo tempo) un modello nuovo porta
-    con sé i suoi problemi di capacità nelle prime settimane.
-
-CHANGELOG 2.4.13 (21/09/2026):
-  - Walter ha ricevuto un errore Telegram grezzo invece del messaggio amichevole
-    atteso: "Bad Request: can't parse entities: Unsupported start tag
-    'blockedreason.prohibited_content:'". Causa isolata in analyze_scene():
-    quando Gemini blocca l'analisi per PROHIBITED_CONTENT (prompt_feedback,
-    non finish_reason SAFETY), il testo grezzo dell'errore Python contiene
-    parentesi angolari (repr di un enum, es. "<BlockedReason.
-    PROHIBITED_CONTENT: 'PROHIBITED_CONTENT'>") — la classificazione errori
-    non riconosceva PROHIBITED_CONTENT come equivalente a SAFETY, quindi
-    cadeva nel ramo else finale, che mandava il testo grezzo a Telegram in
-    parse_mode HTML SENZA html.escape() — Telegram lo interpretava come un
-    tag HTML non valido e rifiutava l'intero messaggio (l'utente non vedeva
-    nessun errore leggibile, solo il 400 grezzo dell'API Telegram). Fix
-    doppio: (1) PROHIBITED_CONTENT aggiunto alla classificazione SAFETY, ora
-    restituisce il messaggio amichevole già esistente "Immagine bloccata dai
-    filtri Gemini" invece di cadere nel ramo generico; (2) html.escape()
-    aggiunto anche al ramo else finale, come difesa in profondità per
-    qualunque futuro testo di errore non classificato che contenga
-    caratteri HTML speciali. Stesso identico bug e stessa correzione
-    applicata anche a analyze_video() (Vogue, locale). Non ancora testato
-    in produzione.
-
-CHANGELOG 2.4.12 (03/08/2026):
-  - Walter ha chiesto che, quando scatta il fallback su MODEL_LITE (503 o
-    429), l'utente veda anche il codice errore nell'etichetta del prompt —
-    per capire se conviene riprovare a breve (503, transitorio, il modello
-    può tornare disponibile) o se resterà su lite fino al reset delle 08:00
-    (429, quota esaurita per la giornata, riprovare prima non cambia
-    nulla). Aggiunto GeminiClient.last_fallback_code ("503"/"429"/
-    "transient"/None) impostato dentro generate() nello stesso punto in cui
-    scatta già il fallback (2.4.8) — non si azzera da solo dentro
-    generate(), perché una richiesta utente può fare più chiamate generate()
-    (analisi + review_and_fix) e vogliamo che l'informazione sopravviva a
-    entrambe. Nuovo metodo reset_fallback(), stesso pattern di
-    reset_counters() — il chiamante lo invoca esplicitamente a inizio
-    richiesta. Non ancora testato in produzione.
-
-CHANGELOG 2.4.11 (03/08/2026):
-  - Walter ha notato che la riga "Subject identity" del checklist mosaico
-    (corretta in 2.4.10 per menzionare ogni figura) era scritta come testo
-    STATICO, sempre identica in ogni prompt — anche quando FIGURES dice
-    "One figure.", cioè quando la frase "if multiple figures are present"
-    non ha alcun senso, testo morto. A differenza di multi_subject_clause(),
-    che è correttamente condizionale. Estratta la logica di rilevamento in
-    una nuova funzione has_multiple_figures() (usata internamente anche da
-    multi_subject_clause(), stessa regex non più duplicata) — usata da
-    Atelier per costruire quella riga del checklist condizionalmente: con
-    una sola figura torna al testo originale senza la parentesi. Non
-    ancora testato in produzione.
-
-CHANGELOG 2.4.10 (01/08/2026):
-  - Walter ha testato in produzione il multi-soggetto di 2.4.9: Vogue e
-    Atelier modalità singola hanno funzionato bene (identità Valeria su
-    entrambe le figure), il MOSAICO Atelier no — la figura secondaria ha
-    mantenuto il volto reale della foto originale invece del volto di
-    Valeria. Riscritto VALERIA_MULTI_SUBJECT_LOCK per essere esplicito
-    quanto gli altri LOCK (FACE IDENTITY LOCK, HAIR LOCK, ecc.) invece di
-    un rimando indiretto — dice direttamente che la sostituzione vale per
-    OGNI figura, non solo la principale, e che nessun volto originale
-    sopravvive per nessuna figura. Fix di parte 2 in Atelier (2.6.1, vedi
-    changelog lì) sulla riga "Subject identity" del mosaico. Non ancora
-    testato in produzione.
-
-CHANGELOG 2.4.9 (01/08/2026):
-  - Walter ha chiesto di gestire foto di riferimento con 2+ soggetti distinti
-    (m+f, m+m, f+f...): il prompt generato deve presentare una figura
-    multipla, tutte con la stessa identità Valeria (stesso volto/DNA),
-    posizionate/interagenti come nell'originale, ciascuna con il proprio
-    outfit separato (non un outfit unico condiviso). Rilevamento automatico,
-    non un comando esplicito. Aggiunto campo FIGURES a _ANALYZE_PROMPT
-    (conta le persone, posa/posizione/interazione fisica di ciascuna, cieco
-    sull'identità come OUTFIT/PROPS & ACTIONS) e reso OUTFIT/ACCESSORIES/BODY
-    ART strutturabili per figura quando FIGURES rileva 2+ persone (stessa
-    label breve usata in FIGURES). Nuova costante VALERIA_MULTI_SUBJECT_LOCK
-    + funzione multi_subject_clause() — stesso identico pattern di
-    body_art_clause(): nessun impatto sul caso comune (una sola figura).
-    Applicata a Vogue e Atelier (unici bot in scope su richiesta di Walter).
-    Non ancora testato in produzione.
-
-CHANGELOG 2.4.8 (30/07/2026):
-  - Walter ha mandato il log di un fallimento reale: non era un 503/overload
-    come nei casi precedenti, ma un 429 RESOURCE_EXHAUSTED — quota free tier
-    (20 richieste/giorno per chiave per modello su gemini-3.5-flash) esaurita
-    su tutte e 5 le chiavi nello stesso giro. Il fallback reattivo su
-    MODEL_LITE, introdotto in 2.4.7 solo per il 503, ora scatta per
-    QUALSIASI errore transitorio (503/overload, 429/quota, timeout,
-    connessione) — non solo il 503. Stessa logica: ritenta SUBITO con
-    MODEL_LITE sulla chiave corrente prima di ruotare, perché MODEL_LITE ha
-    una quota separata da gemini-3.5-flash, non ancora toccata. Non ancora
-    testato in produzione.
-
-CHANGELOG 2.4.7 (30/07/2026):
-  - Walter ha chiesto di cambiare approccio rispetto alla 2.4.6: niente più
-    soglia di consumo (75 call) per passare a MODEL_LITE — rimossa
-    LITE_FALLBACK_AT. Ora il fallback è reattivo: su un 503/overload si
-    ritenta SUBITO con gemini-3.1-flash-lite sulla stessa chiave, prima
-    ancora di ruotare chiave (la rotazione chiave non serve contro un
-    overload lato server, condiviso da tutte le chiavi). Se anche
-    MODEL_LITE fallisce sulla chiave corrente, si prosegue con la
-    rotazione chiavi esistente ma restando su MODEL_LITE per il resto dei
-    tentativi di quella chiamata. Non ancora testato in produzione.
-
-CHANGELOG 2.4.6 (30/07/2026):
-  - Walter segnala errori "Servizio Gemini non disponibile — Sovraccarico
-    temporaneo" ricorrenti da due settimane, tipicamente dalle 12/13 di
-    Lisbona fino a sera tardi. Il retry esistente in generate() ruota le
-    chiavi ma non aiuta contro un vero overload lato server (503) — il
-    modello è saturo per tutte le chiavi contemporaneamente, non è un
-    problema di quota della singola chiave. Attivato il piano di fallback
-    già scritto (ma mai implementato) nel changelog 2.3.16: oltre
-    LITE_FALLBACK_AT (75) call totali giornaliere, le chiamate sul modello
-    di default passano automaticamente a MODEL_LITE
-    ("gemini-3.1-flash-lite"). Non tocca le chiamate con model esplicito
-    diverso (es. MODEL_TEXT_ID per le caption). Non ancora testato in
-    produzione — da verificare se la soglia 75 è quella giusta una volta
-    osservato il comportamento reale.
-
-CHANGELOG 2.4.5 (28/07/2026):
-  - Walter ha segnalato un pattern ricorrente su scene a pelle scoperta
-    (torso nudo/scoperto: piscina, spiaggia, doccia, ecc.): il corpo generato
-    torna maschile (peloso, senza seno) nonostante FULL D-CUP BUST e
-    COEXISTENCE già presenti — non un caso isolato, confermato ricorrente.
-    Segnalata anche una correlazione con la variante Gemini usata in Flow:
-    capita molto più spesso con "nano pro" che con "nano 2" o "nano light" —
-    annotato per riferimento, ma è una scelta manuale di Walter dentro Flow
-    al momento di incollare il prompt, non un parametro del codice dei bot:
-    nessuna leva qui lato codice per quella parte. Aggiunto un rinforzo
-    INCONDIZIONATO (vale in ogni immagine, non solo a pelle scoperta, su
-    richiesta esplicita di Walter — niente di legato a una scena specifica)
-    dopo la clausola COEXISTENCE sia in VALERIA_BODY_STRONG ("BUST VOLUME —
-    ALWAYS VISIBLE") sia in VALERIA_BODY_SAFE ("SILHOUETTE — ALWAYS
-    VISIBLE"), ereditato automaticamente ovunque questi due blocchi sono già
-    usati (Vogue via VALERIA_DNA, Atelier via build_valeria_identity()).
-    Non garantito al 100%: nota permanente già in HANDOFF, questi rinforzi
-    riducono ma non eliminano la variabilità di Flow. Non ancora ritestato
-    in produzione dopo questo fix.
-
-CHANGELOG 2.4.4 (27/07/2026):
-  - Walter ha segnalato scostamento tra un mosaico generato da Atelier e la
-    foto originale: il pattern del bodysuit (mosaico a frammenti fini, tipo
-    specchio infranto) era diventato nel generato un pattern "arlecchino" a
-    grandi rombi piatti — la scala/densità del pattern non teneva. Prima
-    ipotesi (negative prompt sul pattern arlecchino) scartata su richiesta
-    esplicita di Walter: Gemini non considera i negative prompt in
-    generazione (confermato anche dall'audit 2.4.0/2septendecies). Aggiunta
-    una nuova costante generica VALERIA_TEXTURE_LOCK — non legata a questa
-    scena/foto specifica, vale per qualsiasi pattern/texture/sfondo/
-    abbigliamento — interamente in positivo (nessun "not/never"), che
-    richiede granularità fine (decine/centinaia di unità piccole) per
-    qualunque pattern descritto nella scena. Inserita sia in VALERIA_DNA
-    (usato da Vogue) sia dentro build_valeria_identity() (usato da Atelier)
-    — verificato che Atelier NON passa mai da VALERIA_DNA nonostante lo
-    importi, quindi mettere il fix solo lì non sarebbe arrivato ad Atelier.
-    Non ancora testato in produzione.
+CHANGELOG 2.4.4 (03/10/2026):
+  - Su richiesta esplicita di Walter: MODEL passato da "gemini-3.5-flash" a
+    "gemini-3.8-flash" (verificato: GA, modello Flash più recente di Google
+    al momento, gratuito su free tier AI Studio al pari degli altri). Aggiunta
+    MODEL_FALLBACK_CHAIN = ["gemini-3.8-flash", "gemini-3.7-flash",
+    "gemini-3.5-flash-lite"] (tutti verificati gratuiti su free tier).
+    GeminiClient.generate() riscritta: quando il modello corrente esaurisce
+    tutte le chiavi disponibili con un errore transitorio (stessa logica
+    già esistente: 429/503/quota/overload/timeout), passa al modello
+    successivo della catena invece di arrendersi — stesso prompt, stesso
+    contenuto, chiavi ri-testate da capo sul nuovo modello. Un errore NON
+    transitorio (SAFETY, parametro errato) interrompe subito su qualunque
+    modello, nessun fallback inutile. Nota di design: free tier di
+    gemini-3.8-flash ha un limite giornaliero gratuito riportato come molto
+    più basso (~20 richieste/giorno in alcune fonti) di gemini-3.5-flash-lite
+    (centinaia/giorno) — il fallback non è solo per congestione occasionale,
+    potrebbe scattare spesso per limite strutturale del modello primario.
+    Dead-code check fatto: nessun chiamante interno passa un model= esplicito
+    a generate(), tutti usano il default — nessun'altra modifica necessaria
+    in questa funzione.
+  - Trovato, stessa causa: 4 bot (Vogue, Atelier, Architect, Surprise) hanno
+    una stringa locale hardcoded "gemini-3.5-flash" mostrata nei rispettivi
+    /info — nessuno importa MODEL da shared per il display. Corrette nello
+    stesso giro per evitare che /info mostri un modello diverso da quello
+    realmente in uso (stessa categoria di bug di VERSION/SHARED_VERSION,
+    sezione 2duodevicies). Filtro non ha questa stringa (rimossa in 2.0.1).
+    Non ancora testato in produzione — né il fallback né l'aggiornamento
+    del modello primario.
 
 CHANGELOG 2.4.3 (25/07/2026):
   - Il fix 2.4.2 sul campo BACKGROUND aveva un solo esempio illustrativo
@@ -506,7 +278,7 @@ CHANGELOG 1.0.x (09/05/2026):
     generate_caption(), CaptionGenerator, VALERIA_DNA, EDITORIAL_WRAPPER.
 """
 
-import os, html, logging, threading, flask, re, time, random
+import os, html, logging, threading, flask, re
 from google import genai
 from google.genai import types as genai_types
 
@@ -514,45 +286,28 @@ from google.genai import types as genai_types
 __all__ = [
     'GeminiClient', 'CaptionGenerator', 'HealthServer', 'is_allowed',
     'VALERIA_FACE', 'VALERIA_BODY_STRONG', 'VALERIA_BODY_SAFE',
-    'VALERIA_WATERMARK', 'VALERIA_TEXTURE_LOCK', 'VALERIA_MULTI_SUBJECT_LOCK',
+    'VALERIA_WATERMARK',
     'VALERIA_DNA', 'EDITORIAL_WRAPPER',
     'build_valeria_identity', 'generate_caption', 'generate_mini_caption', 'generate_mini_prompt',
-    'review_and_fix', 'sanitize_user_input', 'multi_subject_clause', 'has_multiple_figures',
-    'analyze_scene', 'genai_types', 'MODEL', 'detect_mime_type', 'is_allowed',
+    'review_and_fix', 'sanitize_user_input',
+    'analyze_scene', 'genai_types', 'MODEL', 'MODEL_FALLBACK_CHAIN', 'detect_mime_type', 'is_allowed',
     'SHARED_VERSION', 'SHARED_DATE',
 ]
 
 logger = logging.getLogger(__name__)
 
 MODEL = "gemini-3.8-flash"
-# Fallback automatico — introdotto in 2.4.6 (soglia 75 call/giorno), reso
-# REATTIVO in 2.4.7 su richiesta di Walter: niente più soglia di consumo —
-# su un 503/overload si ritenta SUBITO con MODEL_LITE, in ogni caso, prima
-# ancora di ruotare chiave (vedi generate()). Piano di fallback originale
-# concordato nel changelog 2.3.16. Non tocca le chiamate che passano
-# esplicitamente un modello diverso (es. MODEL_TEXT_ID per le caption,
-# definito nei singoli bot) — solo quelle sul default MODEL.
-MODEL_LITE = "gemini-3.1-flash-lite"
-
-# FIX 2.4.15 — catena di fallback modelli e parametri di retry (vedi changelog).
-# MODEL_FALLBACKS: modelli provati in ordine dopo quello richiesto. Si estende
-# senza toccare il codice con la variabile d'ambiente GEMINI_FALLBACK_MODELS
-# (elenco separato da virgole, es. "modello-a,modello-b").
-MODEL_FALLBACKS = [MODEL_LITE] + [
-    _m.strip()
-    for _m in os.environ.get("GEMINI_FALLBACK_MODELS", "").split(",")
-    if _m.strip() and _m.strip() != MODEL_LITE
-]
-GEMINI_RETRY_PASSES = int(os.environ.get("GEMINI_RETRY_PASSES", "4"))   # giri sulla catena modelli in overload (503)
-GEMINI_BACKOFF_BASE = float(os.environ.get("GEMINI_BACKOFF_BASE", "4.0"))  # secondi; attesa = base * 2**giro + jitter 0-1.5s
-GEMINI_MAX_ATTEMPTS = 16     # tetto assoluto di chiamate API per singolo generate()
+# FIX 2.4.4: catena di fallback sui MODELLI (non solo sulle chiavi) — usata da
+# GeminiClient.generate() quando MODEL esaurisce tutte le chiavi con un errore
+# transitorio. Tutti e tre liberi su free tier di Google AI Studio (verificato).
+MODEL_FALLBACK_CHAIN = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite"]
 
 # Versione
-VERSION = "2.4.16"
-SHARED_VERSION = "2.4.16"   # aggiornare ad ogni modifica
-SHARED_DATE    = "01/10/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.4"
+SHARED_VERSION = "2.4.4"   # aggiornare ad ogni modifica
+SHARED_DATE    = "03/10/2026"  # aggiornare ad ogni modifica
 
-logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
+logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL}")
 
 # ============================================================
 # WHITELIST — SICUREZZA
@@ -607,10 +362,7 @@ VALERIA_BODY_STRONG = (
     "from face → neck → shoulders → chest → arms.\n"
     "**⚠️ COEXISTENCE — CRITICAL:** The silver-grey beard on the face and the feminine body coexist "
     "together in the same image, exactly as described — the beard stays exactly as specified above, "
-    "the body stays exactly as specified here, both simultaneously, unchanged.\n"
-    "**⚠️ BUST VOLUME — ALWAYS VISIBLE:** The full D-cup bust stays fully three-dimensional, rounded and "
-    "clearly visible in every image, under any clothing, framing or pose — never flattened, minimized or "
-    "omitted, identically whether the skin is bare or covered.\n\n"
+    "the body stays exactly as specified here, both simultaneously, unchanged.\n\n"
 )
 
 VALERIA_BODY_SAFE = (
@@ -622,10 +374,7 @@ VALERIA_BODY_SAFE = (
     "from face → neck → shoulders → chest → arms.\n"
     "**⚠️ COEXISTENCE — CRITICAL:** The silver-grey beard on the face and the feminine body coexist "
     "together in the same image, exactly as described — the beard stays exactly as specified above, "
-    "the body stays exactly as specified here, both simultaneously, unchanged.\n"
-    "**⚠️ SILHOUETTE — ALWAYS VISIBLE:** The soft feminine chest and waist silhouette stays fully "
-    "visible in every image, under any clothing, framing or pose — never flattened, minimized or "
-    "omitted, identically whether the skin is bare or covered.\n\n"
+    "the body stays exactly as specified here, both simultaneously, unchanged.\n\n"
 )
 
 VALERIA_WATERMARK = "feat. Valeria Cross 👠"
@@ -666,83 +415,6 @@ def body_art_clause(scene_description: str) -> str:
         return ""
     return BODY_ART_EXCEPTION_TEXT
 
-# MULTI-SUBJECT LOCK — introdotta in 2.4.9, rafforzata in 2.4.10 dopo test
-# reali di Walter: Vogue e Atelier in modalità singola hanno funzionato bene
-# (identità Valeria su entrambe le figure), il MOSAICO Atelier no — la
-# figura secondaria ha mantenuto il volto reale della foto originale.
-# Ipotesi: il wording precedente era un rimando indiretto ("sharing the
-# identical face... described above"), una singola frase debole a
-# confronto con FACE IDENTITY LOCK/IDENTITY LOCK/HAIR LOCK/BEARD MANDATORY
-# che nel resto del prompt ribadiscono l'identità della figura principale
-# più volte — sproporzionato contro il prior visivo forte della foto
-# allegata per la figura secondaria. Riscritta per essere esplicita quanto
-# gli altri LOCK: dice direttamente che la sostituzione è totale e vale per
-# OGNI figura, non solo la principale — non un rimando implicito.
-# Generica, non legata a una scena specifica: se la foto di riferimento
-# mostra 2+ persone distinte (rilevato dal campo FIGURES di
-# _ANALYZE_PROMPT), il prompt finale deve generare lo stesso numero di
-# figure, tutte con l'identica identità Valeria — non persone diverse. Ogni
-# figura mantiene il proprio outfit/accessori/body art come descritti
-# separatamente per quella figura in OUTFIT/ACCESSORIES/BODY ART (vedi
-# _ANALYZE_PROMPT — quelle sezioni ora si strutturano per figura quando
-# FIGURES ne rileva 2+). Stesso pattern di body_art_clause(): nessun
-# impatto sul caso comune (una sola figura), nessuna riga aggiunta al
-# prompt in quel caso.
-VALERIA_MULTI_SUBJECT_LOCK = (
-    "**\u26a0\ufe0f MULTI-SUBJECT LOCK — ABSOLUTE PRIORITY:** If the FIGURES section above describes two or "
-    "more distinct people, EVERY one of those figures — not just the primary one — is replaced by the "
-    "exact same identity: the mature face with full beard, eyeglasses, and hairstyle described above, and "
-    "the same body identity described above. This replacement is total and applies identically to each "
-    "figure — none of the original people's faces, hair, or body types survive in the output, for any "
-    "figure, including secondary or background figures. All figures are the same person, repeated — zero "
-    "variation in identity between them. Each figure wears the outfit, accessories and body art "
-    "individually described for them in the OUTFIT/ACCESSORIES/BODY ART sections above — do not mix "
-    "garments between figures. Position, pose and physical interaction between the figures follow FIGURES "
-    "exactly as described. If FIGURES describes only one person, this does not apply — render a single "
-    "figure as normal.\n\n"
-)
-
-def has_multiple_figures(scene_description: str) -> bool:
-    """Restituisce True se scene_description contiene un campo FIGURES che descrive 2+
-    persone (non 'One figure.' o assente/vuoto) — False altrimenti. Introdotta in 2.4.11,
-    estratta da multi_subject_clause() perché serve anche altrove (checklist mosaico
-    Atelier "What stays identical") per evitare di duplicare la stessa regex in più punti —
-    vedi lezione #21 HANDOFF."""
-    if not scene_description:
-        return False
-    m = re.search(r'FIGURES:\s*(.+?)(?:\n\n|\Z)', scene_description, re.IGNORECASE | re.DOTALL)
-    if not m:
-        return False
-    val = m.group(1).strip()
-    return bool(val) and not val.lower().startswith("one figure")
-
-def multi_subject_clause(scene_description: str) -> str:
-    """Restituisce VALERIA_MULTI_SUBJECT_LOCK SOLO se has_multiple_figures() è True —
-    altrimenti stringa vuota, per non appesantire il prompt nel caso comune (una sola
-    persona nella foto). Usare dopo l'identità (VALERIA_DNA o build_valeria_identity())
-    nei bot che passano da analyze_scene() (Vogue, Atelier). NON usare in Architect — non
-    inietta DNA."""
-    if not has_multiple_figures(scene_description):
-        return ""
-    return VALERIA_MULTI_SUBJECT_LOCK
-
-# TEXTURE & PATTERN FIDELITY LOCK — introdotta in 2.4.4. Generica, non legata
-# a una scena/foto specifica: si applica a qualunque pattern, texture o
-# superficie descritta (mosaico, tessuto, marmo, stampa, ecc.), su qualunque
-# bot. Interamente in positivo — nessun "not/never" — coerente con l'audit
-# negative-prompt di 2.4.0 (Flow/Gemini non considera i negative prompt in
-# generazione). Va SEMPRE inserita sia in VALERIA_DNA (Vogue) sia dentro
-# build_valeria_identity() (Atelier) — Atelier importa VALERIA_DNA ma non lo
-# usa mai nel codice, quindi va aggiunta esplicitamente in entrambi i punti.
-VALERIA_TEXTURE_LOCK = (
-    "**⚠️ TEXTURE & PATTERN FIDELITY LOCK — ABSOLUTE PRIORITY:** Any pattern, texture, print, weave, "
-    "marbling or faceted surface described in the scene reference must be reproduced at fine, "
-    "small-scale granularity — dozens to hundreds of individual small units (tiles, facets, threads, "
-    "scales) visible across any single limb, panel or surface, matching the density and fragmentation "
-    "shown in the reference photograph. Each unit follows the contours of the body or object "
-    "continuously, exactly as a real photographed material would.\n\n"
-)
-
 # DNA completo assemblato — usato da Vogue. NOTA 2.4.0: Architect non lo
 # usa più dalla riscrittura v3.0.0 (10/07) — nessun DNA, analisi pura del
 # soggetto reale. Il commento precedente ("usato da Vogue e Architect") era
@@ -758,7 +430,6 @@ VALERIA_TEXTURE_LOCK = (
 VALERIA_DNA = (
     f"{VALERIA_FACE}"
     f"{VALERIA_BODY_STRONG}"
-    f"{VALERIA_TEXTURE_LOCK}"
     f"WATERMARK: '{VALERIA_WATERMARK}' — elegant champagne cursive, very small, bottom center, 90% opacity.\n"
     f"The output is a single photorealistic image. Hands are anatomically correct, five fingers each. "
     f"No text appears anywhere in the image beyond the watermark specified above.\n"
@@ -774,9 +445,9 @@ EDITORIAL_WRAPPER = (
 
 
 def build_valeria_identity(safe: bool = False) -> str:
-    """Assembla FACE + BODY (strong o safe) + TEXTURE LOCK — usato da Atelier nei prompt."""
+    """Assembla FACE + BODY (strong o safe) — usato da Atelier nei prompt."""
     body = VALERIA_BODY_SAFE if safe else VALERIA_BODY_STRONG
-    return VALERIA_FACE + body + VALERIA_TEXTURE_LOCK
+    return VALERIA_FACE + body
 
 # ============================================================
 # GENERATE_CAPTION — CAPTION SOCIAL UNIFICATA
@@ -1041,15 +712,6 @@ def sanitize_user_input(text: str, client: 'GeminiClient') -> str:
 _ANALYZE_PROMPT = (
     "Analyze this image. "
     "Return a structured description with these exact sections:\n\n"
-    "FIGURES: [How many distinct people are in the frame — exactly one, or two or more. "
-    "If two or more: describe each one's individual pose, position in the frame (e.g. "
-    "'left figure', 'kneeling figure in front', 'figure standing behind'), and how they "
-    "physically interact with each other — literal and specific, the same way PROPS & "
-    "ACTIONS is described below. Do not describe any physical identity trait of the "
-    "people themselves (no face, gender, hair, body-type details) — only count, position "
-    "and physical interaction. Give each figure a short consistent label (e.g. 'left "
-    "figure', 'right figure', 'kneeling figure') to be reused in OUTFIT/ACCESSORIES/BODY "
-    "ART below. If only one person is present, write 'One figure.']\n\n"
     "OUTFIT: [Every garment as a standalone object — exact name, color with HEX code, fabric, "
     "cut, fit, coverage, embellishments, details. "
     "Describe the garment as if it exists independently — no wearer mentioned.]\n\n"
@@ -1086,12 +748,7 @@ _ANALYZE_PROMPT = (
     "— Be precise and detailed on fabrics, colors and environment\n"
     "— For PROPS & ACTIONS: describe physical contact and actions literally, not metaphorically\n"
     "— For BODY ART: describe only markings actually visible on the skin — do not confuse with printed "
-    "patterns on garments (those belong in OUTFIT)\n"
-    "— If FIGURES describes two or more people: within OUTFIT, ACCESSORIES and BODY ART, describe each "
-    "figure's garments/accessories/markings SEPARATELY, labeled with the same short label used in FIGURES "
-    "(e.g. 'Left figure: ... Right figure: ...') — never merge different figures' garments into one "
-    "generic description. If FIGURES says 'One figure', describe these sections exactly as before, with "
-    "no figure labeling."
+    "patterns on garments (those belong in OUTFIT)"
 )
 
 
@@ -1130,7 +787,7 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
                     "Le 20 richieste giornaliere di questa chiave sono finite.\n"
                     "Reset alle 08:00 ora Lisbona."
                 )
-        elif "SAFETY" in err_text or "SAFETY BLOCK" in err_text or "PROHIBITED_CONTENT" in err_text or "sconosciuto" in err_text:
+        elif "SAFETY" in err_text or "SAFETY BLOCK" in err_text or "sconosciuto" in err_text:
             friendly = (
                 "⚠️ <b>Immagine bloccata dai filtri Gemini.</b>\n"
                 "Gemini rifiuta questa foto (contenuto sensibile).\n"
@@ -1147,22 +804,8 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
                 "La risposta ha impiegato troppo tempo. Riprova tra qualche secondo."
             )
         else:
-            friendly = f"❌ <b>Errore API Gemini:</b>\n<code>{html.escape(err_text)}</code>"
+            friendly = f"❌ <b>Errore API Gemini:</b>\n<code>{err_text}</code>"
         return None, friendly
-
-
-def _classify_gemini_error(err_text: str):
-    """Classifica un errore Gemini dal suo testo (FIX 2.4.15, stessi criteri di prima).
-    Ritorna "overload" (503/unavailable/overloaded), "quota" (429/quota/exhausted),
-    "transient" (timeout/connessione) oppure None se non transitorio."""
-    low = err_text.lower()
-    if "503" in err_text or "unavailable" in low or "overloaded" in low:
-        return "overload"
-    if "429" in err_text or "quota" in low or "exhausted" in low:
-        return "quota"
-    if "timeout" in low or "timed out" in low or "connection" in low:
-        return "transient"
-    return None
 
 
 # ============================================================
@@ -1174,7 +817,6 @@ class GeminiClient:
     Wrapper Singleton attorno a genai.Client con rotation automatica multi-chiave.
     Legge GOOGLE_API_KEY, GOOGLE_API_KEY_2, GOOGLE_API_KEY_3, GOOGLE_API_KEY_4, GOOGLE_API_KEY_5 dall'environment.
     Su 429/quota esaurita ruota automaticamente alla chiave successiva.
-    Su 503/overload ruota i MODELLI (MODEL_FALLBACKS), non le chiavi (2.4.15).
     """
     _instance = None
     _lock = threading.Lock()
@@ -1207,14 +849,6 @@ class GeminiClient:
         self._key_use_callbacks = []        # callback ad ogni chiamata (chiave, count)
         self._call_counts = [0] * len(keys)  # contatore per chiave — si azzera al riavvio
         self._total_calls = 0               # contatore globale — tutte le chiavi sommate
-        # last_fallback_code — introdotto in 2.4.12 su richiesta di Walter: quale errore
-        # ha fatto scattare l'ultimo fallback su MODEL_LITE ("503", "429", "transient") o
-        # None se nessun fallback è avvenuto. NON si azzera da solo dentro generate() —
-        # accumula attraverso più chiamate generate() della stessa richiesta (es. analisi +
-        # review_and_fix), altrimenti una seconda chiamata pulita cancellerebbe l'informazione
-        # della prima. Il chiamante deve azzerarlo esplicitamente con reset_fallback() prima
-        # di iniziare una nuova richiesta utente, stesso pattern di reset_counters().
-        self.last_fallback_code: str | None = None
 
         if not self._clients:
             logger.warning("⚠️ GeminiClient: nessuna GOOGLE_API_KEY configurata.")
@@ -1267,12 +901,6 @@ class GeminiClient:
         self._total_calls = 0
         logger.info("🔄 GeminiClient: contatori call azzerati")
 
-    def reset_fallback(self):
-        """Azzera last_fallback_code — chiamare all'inizio di ogni nuova richiesta utente
-        (es. inizio _process() su una foto), prima delle chiamate generate() di quella
-        richiesta, così last_fallback_code riflette solo i fallback di QUESTA richiesta."""
-        self.last_fallback_code = None
-
     def _schedule_daily_reset(self):
         """Pianifica reset automatico ogni giorno alle 07:00 UTC (= 08:00 Lisbona estate).
         FIX 2.3.12: datetime.utcnow() (deprecato, naive) sostituito con
@@ -1312,64 +940,11 @@ class GeminiClient:
     def available(self) -> bool:
         return bool(self._clients)
 
-    @staticmethod
-    def _empty_reason(response) -> str:
-        """Motivo leggibile di una risposta senza testo (finish_reason / prompt_feedback).
-        Estratto da generate() in 2.4.15 — logica invariata."""
-        reason = "sconosciuto"
-        try:
-            candidate = response.candidates[0] if response.candidates else None
-            if candidate:
-                fr = str(candidate.finish_reason)
-                if "SAFETY" in fr:
-                    reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
-                elif "RECITATION" in fr:
-                    reason = "RECITATION — Gemini ha bloccato per potenziale riproduzione di contenuto protetto"
-                elif "MAX_TOKENS" in fr:
-                    reason = "MAX_TOKENS — risposta troncata, output troppo lungo"
-                elif "STOP" in fr:
-                    reason = "STOP — risposta terminata normalmente ma testo vuoto"
-                else:
-                    reason = f"finish_reason: {fr}"
-            else:
-                # Nessun candidato — Gemini ha bloccato l'intera richiesta
-                # Controlla prompt_feedback per il motivo
-                try:
-                    pf = str(response.prompt_feedback) if hasattr(response, "prompt_feedback") else ""
-                    if "SAFETY" in pf or "BLOCK" in pf:
-                        reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
-                    elif pf:
-                        reason = f"prompt_feedback: {pf[:80]}"
-                    else:
-                        reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
-                except Exception:
-                    reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
-        except Exception as fe:
-            reason = f"impossibile leggere finish_reason: {fe}"
-        return reason
-
-    def _call_model(self, idx: int, model: str, payload, safety, max_tokens: int) -> str:
-        """Singola chiamata a (chiave idx, modello). Ritorna il testo oppure solleva.
-        Usa self._clients[idx] direttamente (non self._client) così una rotazione
-        fatta da un altro thread a metà chiamata non cambia la chiave sotto i piedi."""
-        response = self._clients[idx].models.generate_content(
-            model=model,
-            contents=payload,
-            config=genai_types.GenerateContentConfig(
-                safety_settings=safety,
-                max_output_tokens=max_tokens,
-            )
-        )
-        if response.text:
-            return response.text.strip()
-        # Risposta vuota — estrai il motivo reale da finish_reason
-        raise RuntimeError(f"Gemini ha risposto senza testo — {self._empty_reason(response)}")
-
     def generate(self, prompt: str, contents: list = None, model: str = MODEL, max_tokens: int = 3000) -> str | None:
         """
         Genera testo con Gemini.
         contents: lista di Part aggiuntivi (immagini, ecc.) — vengono messi PRIMA del testo.
-        Ritorna il testo generato; su errore solleva l'ultima eccezione.
+        Ritorna il testo generato o None in caso di errore.
 
         FIX 1.2.0: quando contents non è vuoto (es. immagini), il prompt testuale
         viene wrappato come genai_types.Part per garantire compatibilità con l'API.
@@ -1377,123 +952,172 @@ class GeminiClient:
         silenziosa dell'analisi immagine (Gemini ignora la parte visiva).
         FIX 1.6.0: safety_settings disabilitati — necessario per analisi outfit
         su immagini fashion che altrimenti vengono bloccate dai filtri Gemini.
-
-        FIX 2.4.15 — strategia di retry riscritta (vedi changelog):
-          - 503/overload (capacità del MODELLO, uguale per tutte le chiavi): si
-            scorre la catena [model, *MODEL_FALLBACKS] sulla STESSA chiave, senza
-            ruotare chiavi; se l'intera catena fallisce, backoff con jitter e
-            un secondo giro (GEMINI_RETRY_PASSES).
-          - 429/quota (per progetto+modello): la coppia (chiave, modello) è
-            segnata esaurita per questa chiamata; si prova il modello successivo
-            sulla stessa chiave e, se una qualunque coppia della chiave è in
-            quota esaurita, si ruota alla chiave successiva.
-          - Errori non transitori (SAFETY, parametri, ...): sollevati subito.
+        FIX 2.4.4: fallback sui MODELLI, non solo sulle chiavi — se model esaurisce
+        tutte le chiavi disponibili con un errore transitorio (429/503/quota/
+        overload/timeout), si passa al modello successivo in MODEL_FALLBACK_CHAIN,
+        stesso prompt e contenuto, prima di arrendersi definitivamente. Un errore
+        NON transitorio (SAFETY, parametro errato, ecc.) interrompe subito, su
+        qualunque modello — cambiare modello non risolverebbe un blocco di sicurezza.
+        NOTA: ogni modello tentato conta come una call separata (rotazione chiave,
+        _total_calls, callback on_key_use inclusi) — riflette l'uso reale di quota,
+        non \u00e8 un bug.
         """
         if not self._client:
             logger.error("❌ GeminiClient non disponibile.")
             return None
-        # Round-robin: ruota la chiave PRIMA di ogni chiamata
-        if len(self._clients) > 1:
-            self._rotate_key()
-        # Incrementa contatori e notifica on_key_use callbacks
-        self._total_calls += 1
-        if self._call_counts:
-            self._call_counts[self._key_index] += 1
-        _cur_key = self._key_index + 1
-        for _cb in self._key_use_callbacks:
+
+        _model_chain = [model] + [m for m in MODEL_FALLBACK_CHAIN if m != model]
+        _last_exc = None
+
+        for _chain_idx, _cur_model in enumerate(_model_chain):
+            # Round-robin: ruota la chiave PRIMA di ogni chiamata
+            if len(self._clients) > 1:
+                self._rotate_key()
+            # Incrementa contatori e notifica on_key_use callbacks
+            self._total_calls += 1
+            if self._call_counts:
+                self._call_counts[self._key_index] += 1
+            _cur_key = self._key_index + 1
+            for _cb in self._key_use_callbacks:
+                try:
+                    _cb(_cur_key, self._total_calls)
+                except Exception as _cb_err:
+                    logger.warning(f"\u26a0\ufe0f on_key_use callback error: {_cb_err}")
             try:
-                _cb(_cur_key, self._total_calls)
-            except Exception as _cb_err:
-                logger.warning(f"\u26a0\ufe0f on_key_use callback error: {_cb_err}")
-
-        if contents:
-            text_part = genai_types.Part.from_text(text=prompt)
-            payload = list(contents) + [text_part]
-        else:
-            payload = prompt
-        safety = [
-            genai_types.SafetySetting(
-                category=genai_types.HarmCategory.HARM_CATEGORY_HARASSMENT,
-                threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
-            ),
-            genai_types.SafetySetting(
-                category=genai_types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
-            ),
-            genai_types.SafetySetting(
-                category=genai_types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
-            ),
-            genai_types.SafetySetting(
-                category=genai_types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
-            ),
-        ]
-
-        chain = [model] + [m for m in MODEL_FALLBACKS if m != model]
-        n_keys = len(self._clients)
-        dead = set()            # coppie (indice chiave, modello) in quota esaurita, per QUESTA chiamata
-        last_exc = None
-        req_fail_code = None    # codice con cui è fallito il modello richiesto ("503"/"429"/"transient")
-        attempts = 0
-
-        for pass_no in range(GEMINI_RETRY_PASSES):
-            saw_overload = False
-            for key_step in range(n_keys):
-                idx = self._key_index
-                for m in chain:
-                    if (idx, m) in dead:
-                        continue
-                    if attempts >= GEMINI_MAX_ATTEMPTS:
-                        break
-                    attempts += 1
-                    try:
-                        text = self._call_model(idx, m, payload, safety, max_tokens)
-                        if m != model:
-                            # Fallback realmente usato: solo ora si imposta il codice
-                            # mostrato all'utente (2.4.12), così non resta impostato
-                            # se il modello richiesto riesce al giro successivo.
-                            self.last_fallback_code = req_fail_code or "transient"
-                            logger.info(f"✅ GeminiClient: risposta da fallback {m} (chiave #{idx + 1}, {req_fail_code or 'transient'} su {model})")
-                        return text
-                    except Exception as e:
-                        err_text = str(e)
-                        kind = _classify_gemini_error(err_text)
-                        if kind is None:
-                            # Errore non transitorio (SAFETY, parametro errato, ecc.) — stop
-                            logger.error(f"❌ GeminiClient.generate() [{m}, chiave #{idx + 1}]: {e}", exc_info=True)
-                            raise
-                        last_exc = e
-                        code = "503" if kind == "overload" else ("429" if kind == "quota" else "transient")
-                        if m == model:
-                            req_fail_code = code
-                        if kind == "quota":
-                            dead.add((idx, m))
+                if contents:
+                    text_part = genai_types.Part.from_text(text=prompt)
+                    payload = list(contents) + [text_part]
+                else:
+                    payload = prompt
+                safety = [
+                    genai_types.SafetySetting(
+                        category=genai_types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                        threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
+                    ),
+                    genai_types.SafetySetting(
+                        category=genai_types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                        threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
+                    ),
+                    genai_types.SafetySetting(
+                        category=genai_types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                        threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
+                    ),
+                    genai_types.SafetySetting(
+                        category=genai_types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                        threshold=genai_types.HarmBlockThreshold.BLOCK_NONE,
+                    ),
+                ]
+                response = self._client.models.generate_content(
+                    model=_cur_model,
+                    contents=payload,
+                    config=genai_types.GenerateContentConfig(
+                        safety_settings=safety,
+                        max_output_tokens=max_tokens,
+                    )
+                )
+                if response.text:
+                    return response.text.strip()
+                # Risposta vuota — estrai il motivo reale da finish_reason
+                reason = "sconosciuto"
+                try:
+                    candidate = response.candidates[0] if response.candidates else None
+                    if candidate:
+                        fr = str(candidate.finish_reason)
+                        if "SAFETY" in fr:
+                            reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
+                        elif "RECITATION" in fr:
+                            reason = "RECITATION — Gemini ha bloccato per potenziale riproduzione di contenuto protetto"
+                        elif "MAX_TOKENS" in fr:
+                            reason = "MAX_TOKENS — risposta troncata, output troppo lungo"
+                        elif "STOP" in fr:
+                            reason = "STOP — risposta terminata normalmente ma testo vuoto"
                         else:
-                            saw_overload = True
-                        logger.warning(f"⚠️ GeminiClient: {code} su {m} (chiave #{idx + 1}, giro {pass_no + 1}/{GEMINI_RETRY_PASSES}): {err_text[:160]}")
-                if attempts >= GEMINI_MAX_ATTEMPTS:
-                    break
-                # Fine catena sulla chiave corrente. Si ruota chiave SOLO se almeno
-                # una coppia di questa chiave è in quota esaurita (429): su un
-                # 503 un'altra chiave non cambia nulla, l'overload è del modello.
-                if (any((idx, m) in dead for m in chain)
-                        and key_step < n_keys - 1
-                        and self._rotate_key()):
+                            reason = f"finish_reason: {fr}"
+                    else:
+                        # Nessun candidato — Gemini ha bloccato l'intera richiesta
+                        # Controlla prompt_feedback per il motivo
+                        try:
+                            pf = str(response.prompt_feedback) if hasattr(response, "prompt_feedback") else ""
+                            if "SAFETY" in pf or "BLOCK" in pf:
+                                reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
+                            elif pf:
+                                reason = f"prompt_feedback: {pf[:80]}"
+                            else:
+                                reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
+                        except Exception:
+                            reason = "SAFETY BLOCK — immagine bloccata dai filtri di sicurezza Gemini"
+                except Exception as fe:
+                    reason = f"impossibile leggere finish_reason: {fe}"
+                raise RuntimeError(f"Gemini ha risposto senza testo — {reason}")
+            except Exception as e:
+                err_text = str(e)
+                logger.error(f"\u274c GeminiClient.generate() [{_cur_model}]: {e}", exc_info=True)
+                _last_exc = e
+                # Errori transitori: 429/quota, 503/overload, timeout, rete
+                # -> tenta TUTTE le chiavi rimanenti prima di cambiare modello
+                _is_transient = (
+                    "429" in err_text
+                    or "503" in err_text
+                    or "quota" in err_text.lower()
+                    or "exhausted" in err_text.lower()
+                    or "unavailable" in err_text.lower()
+                    or "overloaded" in err_text.lower()
+                    or "timeout" in err_text.lower()
+                    or "timed out" in err_text.lower()
+                    or "connection" in err_text.lower()
+                )
+                if not _is_transient:
+                    # Errore non transitorio (SAFETY, parametro errato, ecc.) — stop
+                    # subito, su qualunque modello: cambiare modello non aiuta.
+                    raise
+                for _attempt in range(len(self._clients) - 1):
+                    if not self._rotate_key():
+                        break
+                    logger.info(f"\U0001f504 [{_cur_model}] Ritento con chiave #{self._key_index + 1} (errore transitorio)...")
+                    try:
+                        if contents:
+                            text_part = genai_types.Part.from_text(text=prompt)
+                            payload = list(contents) + [text_part]
+                        else:
+                            payload = prompt
+                        response2 = self._client.models.generate_content(
+                            model=_cur_model,
+                            contents=payload,
+                            config=genai_types.GenerateContentConfig(
+                                safety_settings=safety,
+                                max_output_tokens=max_tokens,
+                            )
+                        )
+                        if response2.text:
+                            return response2.text.strip()
+                    except Exception as e2:
+                        err2 = str(e2)
+                        _last_exc = e2
+                        _is_transient2 = (
+                            "429" in err2
+                            or "503" in err2
+                            or "quota" in err2.lower()
+                            or "exhausted" in err2.lower()
+                            or "unavailable" in err2.lower()
+                            or "overloaded" in err2.lower()
+                            or "timeout" in err2.lower()
+                            or "timed out" in err2.lower()
+                            or "connection" in err2.lower()
+                        )
+                        if _is_transient2:
+                            logger.warning(f"\u26a0\ufe0f [{_cur_model}] Chiave #{self._key_index + 1} transitorio, provo la prossima...")
+                            continue
+                        # Errore non transitorio (SAFETY, parametro errato, ecc.) — stop
+                        logger.error(f"\u274c GeminiClient.generate() [{_cur_model}] chiave {self._key_index+1}: {e2}")
+                        raise e2
+                # Tutte le chiavi esaurite per questo modello con errore transitorio
+                if _chain_idx < len(_model_chain) - 1:
+                    logger.warning(
+                        f"\u26a0\ufe0f {_cur_model} esaurito su tutte le chiavi (errore transitorio) \u2014 "
+                        f"passo a {_model_chain[_chain_idx + 1]}..."
+                    )
                     continue
-                break
-            if attempts >= GEMINI_MAX_ATTEMPTS or not saw_overload:
-                # Solo quota esaurita ovunque (o budget tentativi finito): ripetere il giro non serve
-                break
-            if pass_no < GEMINI_RETRY_PASSES - 1:
-                delay = GEMINI_BACKOFF_BASE * (2 ** pass_no) + random.uniform(0, 1.5)
-                logger.info(f"⏳ GeminiClient: catena {chain} in overload, attendo {delay:.1f}s e ritento")
-                time.sleep(delay)
-
-        logger.error(f"❌ GeminiClient.generate(): catena {chain} esaurita dopo {attempts} tentativi")
-        if last_exc is None:
-            raise RuntimeError("GeminiClient.generate(): nessun tentativo eseguito")
-        raise last_exc
+                raise _last_exc
 
 
 # ============================================================
