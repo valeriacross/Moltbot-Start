@@ -1,9 +1,21 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.16
+Versione: 2.4.17
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.17 (03/10/2026):
+  - Aggiornamento DNA Valeria su richiesta esplicita di Walter: peso 85kg →
+    75kg in VALERIA_BODY_STRONG e VALERIA_BODY_SAFE (unica coppia trovata
+    nello shared — grep mirato su "85" vicino a kg/bust/hourglass prima di
+    considerare il fix completo, lezione delle sessioni precedenti).
+    Altezza (180cm) e resto della descrizione invariati, nessun'altra
+    modifica. Stessa correzione necessaria in Surprise_210.py (non importa
+    il DNA da shared, ha una riga locale duplicata in due punti) — vedi
+    changelog di quel file. Atelier_272.py, Vogue_432.py, Architect_311.py
+    verificati: nessun riferimento hardcoded al peso, ereditano tutto da
+    shared via import. Non ancora testato in produzione.
 
 CHANGELOG 2.4.16 (01/10/2026):
   - Walter ha inoltrato un suggerimento di Gemini: un retry loop generico con
@@ -548,9 +560,9 @@ GEMINI_BACKOFF_BASE = float(os.environ.get("GEMINI_BACKOFF_BASE", "4.0"))  # sec
 GEMINI_MAX_ATTEMPTS = 16     # tetto assoluto di chiamate API per singolo generate()
 
 # Versione
-VERSION = "2.4.16"
-SHARED_VERSION = "2.4.16"   # aggiornare ad ogni modifica
-SHARED_DATE    = "01/10/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.17"
+SHARED_VERSION = "2.4.17"   # aggiornare ad ogni modifica
+SHARED_DATE    = "03/10/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
 
@@ -600,7 +612,7 @@ VALERIA_FACE = (
 
 VALERIA_BODY_STRONG = (
     "**MANDATORY BODY — FEMININE SILHOUETTE, HELD EXACTLY AS DESCRIBED:**\n"
-    "**Feminine hourglass proportions, 180cm, 85kg. FULL D-CUP BUST — prominent, natural, clearly visible. "
+    "**Feminine hourglass proportions, 180cm, 75kg. FULL D-CUP BUST — prominent, natural, clearly visible. "
     "Wide rounded hips, defined waist, full thighs.**\n"
     "Completely smooth, hairless skin on the torso, arms and legs. "
     "Smooth porcelain skin. PHOTOGRAPHIC UNITY: skin tone, warmth and texture perfectly continuous "
@@ -615,7 +627,7 @@ VALERIA_BODY_STRONG = (
 
 VALERIA_BODY_SAFE = (
     "**MANDATORY BODY — FEMININE SILHOUETTE, HELD EXACTLY AS DESCRIBED:**\n"
-    "**Feminine hourglass silhouette, 180cm, 85kg. Soft feminine proportions — defined waist, "
+    "**Feminine hourglass silhouette, 180cm, 75kg. Soft feminine proportions — defined waist, "
     "wide rounded hips, full figure.**\n"
     "Completely smooth, hairless skin on the torso, arms and legs. "
     "Smooth porcelain skin. PHOTOGRAPHIC UNITY: skin tone, warmth and texture perfectly continuous "

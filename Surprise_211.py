@@ -7,9 +7,11 @@ from C_shared100 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_WATERMARK
 from C_shared100 import VALERIA_DNA, EDITORIAL_WRAPPER, build_valeria_identity
 
 # --- VERSIONE ---
-# CHANGELOG 2.1.1 (03/10/2026): /info mostrava "gemini-3.5-flash" — allineata
-# a "gemini-3.8-flash" dopo l'upgrade del motore reale in shared 2.4.4
-# (fallback a 3.7-flash/3.5-flash-lite se congestionato).
+# CHANGELOG 2.1.1 (03/10/2026): peso Valeria 85kg → 75kg nelle due righe
+# locali "Feminine hourglass, 180cm 85kg, D-cup bust" (riepilogo mini
+# prompt/caption, non DNA iniettato) — allineato allo stesso fix fatto in
+# shared 2.4.17 su richiesta esplicita di Walter. Surprise non importa il
+# DNA da shared, quindi la stringa era duplicata qui, non ereditata.
 # CHANGELOG 2.1.0 (17/07/2026): cambio di motore, non un patch — versione
 # alzata di conseguenza su richiesta esplicita di Walter (da 2.0.3 a 2.1.0).
 # Rimossi tutti i negative prompt — 3 occorrenze di "NEGATIVE:
@@ -1109,7 +1111,7 @@ def format_scenario(s, uid=None):
         f"🎨 <b>Style:</b> {s['style']}\n"
         f"💃 <b>Pose:</b> {s['pose']}\n"
         f"✨ <b>Mood:</b> {s['mood']}\n"
-        f"🏛 <b>Body:</b> Feminine hourglass, 180cm 85kg, D-cup bust, smooth skin"
+        f"🏛 <b>Body:</b> Feminine hourglass, 180cm 75kg, D-cup bust, smooth skin"
     )
 
 def _mini_prompt_from_scenario(scenario, tipo):
@@ -1138,7 +1140,7 @@ def _mini_prompt_from_scenario(scenario, tipo):
         f"🎨 <b>Style:</b> {html.escape(_short(scenario.get('style', ''), 200))}\n"
         f"💃 <b>Pose:</b> {html.escape(_short(scenario.get('pose', ''), 200))}\n"
         f"✨ <b>Mood:</b> {html.escape(_short(scenario.get('mood', ''), 200))}\n"
-        f"🏛 <b>Body:</b> Feminine hourglass, 180cm 85kg, D-cup bust, smooth skin"
+        f"🏛 <b>Body:</b> Feminine hourglass, 180cm 75kg, D-cup bust, smooth skin"
     )
 
 # --- /start ---
@@ -1185,7 +1187,7 @@ def handle_info(message):
         f"Genera scenari editoriali Valeria Cross.\n"
         f"Pool: {len(LOCATION_POOL)} location · {len(OUTFIT_POOL)} outfit · {len(STYLE_POOL)} stili · "
         f"{len(POSE_POOL)} pose · {len(SKY_POOL)} sky · {len(MOOD_POOL)} mood\n"
-        f"Modello caption: <code>gemini-3.8-flash</code>\n\n"
+        f"Modello caption: <code>gemini-3.5-flash</code>\n\n"
         f"<i>Output: label + caption + prompt Flow-ready.</i>"
     )
 
