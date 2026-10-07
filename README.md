@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 01/10/2026
+**Ultimo aggiornamento:** 07/10/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -13,10 +13,10 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 | VogueBot | `Vogue_432.py` | 4.3.2 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_311.py` | 3.1.1 | homely-annabelle/thearchitect | 1 |
 | AtelierBot | `Atelier_271.py` | 2.7.1 | flexible-denna/atelier | 5 |
-| FiltroBot | `Filtro_210.py` | 2.1.0 | screeching-jobina/filtro | 1 |
-| SurpriseBot | `Surprise_210.py` | 2.1.0 | surprise1/sorpresa | 1 |
+| FiltroBot | `Filtro_221.py` | 2.2.1 | screeching-jobina/filtro | 1 |
+| SurpriseBot | `Surprise_211.py` | 2.1.1 | surprise1/sorpresa | 1 |
 
-**Shared:** `C_shared100.py` v2.4.16 · **10 API key totali**
+**Shared:** `C_shared100.py` v2.4.17 · **10 API key totali**
 
 ---
 
@@ -27,8 +27,8 @@ C_shared100.py       # Libreria condivisa
 Vogue_432.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
 Architect_311.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
 Atelier_271.py       # Outfit analysis → prompt con filtri (filtro persistente)
-Filtro_210.py        # 7 categorie + LEGO + Mosaic + Scarabocchio
-Surprise_210.py      # Location + outfit random + /pride + /flag
+Filtro_221.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
+Surprise_211.py      # Location + outfit random + /pride + /flag
 requirements.txt
 README.md
 ```
@@ -83,7 +83,7 @@ openpyxl>=3.1.5
 
 ---
 
-## Fix robustezza (20/06/2026 → 01/10/2026)
+## Fix robustezza (20/06/2026 → 07/10/2026)
 
 **L'1/10 — tuning del backoff dopo un suggerimento esterno.** Walter ha inoltrato un retry loop proposto da Gemini (backoff esponenziale su un client a chiave singola). Valutato e scartato come sostituto — incompatibile con la rotazione a 5 chiavi, nessun fallback multi-modello — ma applicata l'unica idea utile: più tempo prima di arrendersi. `GEMINI_RETRY_PASSES` (2→4) e `GEMINI_BACKOFF_BASE` (3.0→4.0) ora configurabili via env (shared 2.4.16). Verificato prima che nessun bot gira su webhook (tutti `infinity_polling` con pool di thread dedicato), quindi attese più lunghe non bloccano nulla. Nessuna garanzia contro un sovraccarico sostenuto di minuti come quello del 28/09 — solo più occasioni di successo, non una soluzione.
 
@@ -148,6 +148,14 @@ Dettagli storici in `HANDOFF-MASTER`, sezioni 2bis, 2ter, 2quater, 2quinquies, 2
 **TODO aperto (29/09):** shared 2.4.13 (21/09, fix PROHIBITED_CONTENT) e 2.4.14 (26/09, modello gemini-3.8-flash) non risultano testati in produzione — nessuna conferma vista dopo il rispettivo commit. shared 2.4.15 (29/09, riscrittura retry per 503 simultaneo su due modelli) testato solo con client finti, non contro l'overload reale — Walter deve verificare se gli errori "Servizio Gemini non disponibile" si riducono, e valutare se configurare `GEMINI_FALLBACK_MODELS` con un terzo modello. **Nota:** le sezioni storiche Vogue/Architect/Atelier dell'HANDOFF avevano gap di versioni pregressi (2.2.0→4.0 Vogue, 2.6.0→2.7.0 Atelier, 3.1.0 Architect) scoperti solo confrontando i file con GitHub — non ricostruiti su indicazione esplicita di Walter.
 
 **TODO aperto (01/10):** shared 2.4.16 (backoff allungato, fino a ~4 giri/~30s di attese) non ancora verificato contro un vero episodio di overload — Walter deve osservare se riduce gli errori rispetto a 2.4.15, senza aspettarsi che risolva un episodio sostenuto di minuti.
+
+**TODO aperto (07/10):** Filtro 2.2.0/2.2.1 (Director's Cut + clausola di integrazione) non ancora ritestato dopo il fix del 06/10 — Walter deve verificare con la stessa foto di riferimento se il soggetto è ora correttamente reintegrato nella scena, su Villeneuve e idealmente su almeno un altro dei 12 registi. shared 2.4.17 (peso 75kg) non ancora verificato visivamente in produzione.
+
+**Il 06/10 — integrazione soggetto/sfondo nel Director's Cut (Filtro 2.2.0 → 2.2.1).** Walter ha testato il nuovo filtro con una foto di riferimento reale (Villeneuve): stile e sfondo corretti, ma il soggetto restava con luce e colore della foto originale invece di essere reintegrato nell'atmosfera generata — un taglia-e-incolla, non un'unica fotografia coerente. Causa: il template diceva solo "preserve the subject's appearance exactly as described above" — preservazione, non reintegrazione. Aggiunta `DIRECTOR_INTEGRATION_CLAUSE`, concatenata una sola volta a tutti e 12 i prompt in fase di costruzione del dizionario finale, non duplicata a mano nei 12 singoli (stesso errore già pagato con occhiali/barba il 25/07, evitato da subito stavolta). Verificato a runtime, non solo nel codice sorgente, che tutti e 12 i prompt finali la contengano. Non ancora ritestato dopo il fix.
+
+**Il 05/10 — nuova feature "Director's Cut" (Filtro 2.1.0 → 2.2.0).** Su richiesta di Walter: menu di primo livello con filtri nello stile di registi iconici, stesso principio già in produzione per lo Stile Artistico (20 pittori) ma senza sottocategorie — lista piatta di 12, come richiesto esplicitamente. Criterio di selezione concordato con Walter: firma visiva codificabile in palette/camera/composizione, non "regista famoso" in generale — esclusi Scorsese (stile narrativo più che visivo), Luhrmann (sovrapposto a filtri esistenti) e Lanthimos (doppione di Kubrick) durante la discussione. I 12: Hitchcock, Wes Anderson, Kubrick, David Lynch, Sergio Leone, Tim Burton, Guillermo del Toro, Pedro Almodóvar, Ridley Scott, Quentin Tarantino, Denis Villeneuve, Darren Aronofsky — quest'ultimo ancorato specificamente al registro di *Black Swan* (segnalato a Walter prima di scriverlo: la sua filmografia nel complesso non ha una firma visiva coerente tra un film e l'altro, un prompt generico sarebbe stato vago). Architettura: replica 1:1 il pattern `artistic_style` già in produzione (stesso sentinel in FILTERS, stesso meccanismo fkey/dizionario-utente/dizionario-pending) — nessun pattern nuovo, ogni touch point verificato con grep mirato prima di dichiararlo completo. Contenuto vincolato a tecnica/stile (camera, palette, composizione, mood), mai a scene o personaggi specifici di un film, stesso principio già rispettato dai pittori. Non ancora testato in produzione al momento del commit (vedi fix del 06/10 sopra per il primo risultato reale).
+
+**Il 03/10 — peso DNA Valeria, 85kg → 75kg.** Su richiesta esplicita di Walter. Trovato con grep mirato (non assunto) in 4 punti: `VALERIA_BODY_STRONG` e `VALERIA_BODY_SAFE` in shared (2.4.17, iniettato in tutti i bot che importano il DNA) più due righe locali duplicate in `Surprise_211.py` (2.1.1 — non importa il DNA da shared, ha un riepilogo testuale a sé). `Atelier_272.py`, `Vogue_432.py`, `Architect_311.py` verificati: nessun hardcode, ereditano da shared, nessuna modifica necessaria lì. Altezza (180cm) e resto della descrizione invariati.
 
 ## Nota tecnica importante
 
