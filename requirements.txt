@@ -36,8 +36,39 @@
 # vX"), nessun breaking change dichiarato. NON testato su questo stack (stesso
 # discorso già fatto per il salto precedente 4.31.0->4.34.0). Se un deploy si
 # rompe dopo questo bump, primo sospetto qui: tornare a ==4.34.0.
-pyTelegramBotAPI==4.36.0
+#
+# 09/10/2026 — nuovo controllo versioni su PyPI, pacchetto per pacchetto:
+# flask (3.1.3, 19/02/2026), Pillow (12.3.0, 01/07/2026) e openpyxl (3.1.5)
+# sono già le versioni più recenti: nessuna modifica. Pillow rilascia a
+# calendario trimestrale — prossima release prevista il 15/10/2026, non
+# ancora disponibile.
+# google-genai: floor >=2.17.0 -> >=2.29.0 (ultima release 07/10/2026, salto
+# di 12 versioni minori). Note di release GitHub consultate in parte come
+# snippet di ricerca, non sempre per intero (2.18.1, 2.22.0 e 2.23.0 non
+# lette nel dettaglio). Zero breaking change nelle note consultate: solo
+# aggiunte (nuovi campi/tool, supporto labels, continuation_token) e fix su
+# funzionalità non usate da questi bot. Unica nota rilevante per l'uso
+# reale (generate_content base, nessun tool): dalla 2.18.0 un warning
+# sull'uso diretto di AFC in Models.generate_content, ristretto dalla 2.29.0
+# ("only log direct AFC warning when functions are present") — solo rumore
+# nei log, nessun cambio di comportamento.
+# AGGIUNTO UPPER BOUND <3: il README ufficiale su PyPI avverte che la
+# prossima major (3.0.0) cambierà il comportamento di AFC e rimuoverà
+# argomenti legacy (tra cui prompt/text/image posizionali in
+# Models.generate_videos) e raccomanda di pinnare <3.0.0. Con il solo floor,
+# una 3.0.0 verrebbe installata al primo rebuild su Koyeb senza preavviso.
+# Se il bound dovesse bloccare qualcosa di voluto, toglierlo consapevolmente
+# dopo aver letto il changelog della 3.0.0.
+# pyTelegramBotAPI: 4.36.0 -> 4.37.0 (21/09/2026, Bot API 10.3) su richiesta
+# esplicita (update generale a tutte le ultime versioni). Differenza rispetto
+# ai bump precedenti: le note della 4.37.0 dichiarano anche "bugfixes and
+# internal redesign", non solo l'avanzamento della Bot API — è il primo bump
+# di questa serie con un refactor interno dichiarato. Esiste anche una 4.36.1
+# su PyPI (13/08/2026), senza release notes su GitHub: contenuto non
+# verificato. NON testato su questo stack. Se un deploy si rompe dopo questo
+# bump, primo sospetto qui: tornare a ==4.36.0.
+pyTelegramBotAPI==4.37.0
 flask==3.1.3
 Pillow>=12.3.0
-google-genai>=2.17.0
+google-genai>=2.29.0,<3
 openpyxl>=3.1.5
