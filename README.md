@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 09/10/2026
+**Ultimo aggiornamento:** 10/10/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -12,7 +12,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 |-----|------|---------|-------|--------|
 | VogueBot | `Vogue_432.py` | 4.3.2 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_311.py` | 3.1.1 | homely-annabelle/thearchitect | 1 |
-| AtelierBot | `Atelier_271.py` | 2.7.1 | flexible-denna/atelier | 5 |
+| AtelierBot | `Atelier_272.py` | 2.7.2 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_221.py` | 2.2.1 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_211.py` | 2.1.1 | surprise1/sorpresa | 1 |
 
@@ -26,7 +26,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 C_shared100.py       # Libreria condivisa
 Vogue_432.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
 Architect_311.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
-Atelier_271.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Atelier_272.py       # Outfit analysis → prompt con filtri (filtro persistente)
 Filtro_221.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
 Surprise_211.py      # Location + outfit random + /pride + /flag
 requirements.txt
@@ -83,7 +83,9 @@ openpyxl>=3.1.5
 
 ---
 
-## Fix robustezza (20/06/2026 → 09/10/2026)
+## Fix robustezza (20/06/2026 → 10/10/2026)
+
+**Il 10/10 — tabella riallineata ad Atelier 2.7.2 (rilasciata il 01/10).** Il README riportava ancora `Atelier_271.py` / 2.7.1, ma Walter ha confermato il 10/10 che la versione funzionante è la 2.7.2 (`Atelier_272.py`, il file era già stato caricato in chat il 03/10 senza che nessuna sessione aggiornasse la tabella). Contenuto della 2.7.2, dal changelog interno del file datato 01/10 (lavoro di un'altra sessione, non rifatto qui): la nota "⚠️ 503 overload → lite" esisteva già in `gemini.last_fallback_code` per ogni filtro, ma solo il ramo Shooting Editorial la mostrava nell'header — Yacht/Surf e gli altri filtri andavano in fallback altrettanto spesso (confermato da log reale del 01/10), in silenzio. Stessa nota ora aggiunta al ramo `is_dual` (Yacht, Surf, Selfie Spiaggia, Beach Club, Spiaggia Editoriale, Letto) e al ramo filtro semplice (Canvas Swimsuit, Riviera '60, Pool Party); patch, nessuna nuova costante. Confermata funzionante da Walter.
 
 **Il 09/10 — controllo versioni `requirements.txt` contro PyPI.** Walter ha notato che il blocco "Dipendenze" di questo README era rimasto indietro rispetto a `requirements.txt` (README fermo a `pyTelegramBotAPI==4.34.0` / `google-genai>=2.11.0`, requirements già a `4.36.0` / `>=2.17.0` dal 10/08) — riallineati entrambi alle versioni attuali. Verificato pacchetto per pacchetto: flask (3.1.3), Pillow (12.3.0, prossima release trimestrale prevista il 15/10) e openpyxl (3.1.5) già alle versioni più recenti, nessuna modifica. **google-genai** `>=2.17.0` → `>=2.29.0,<3` (ultima release 07/10/2026): note di release consultate in parte come snippet, zero breaking change trovati nel range. **Aggiunto upper bound `<3`** — non richiesto da Walter, scelta di Claude da confermare: il README ufficiale su PyPI avverte che la prossima major cambierà il comportamento di AFC e rimuoverà argomenti legacy, e raccomanda di pinnare `<3.0.0`; con il solo floor, una 3.0.0 verrebbe installata al primo rebuild su Koyeb senza preavviso. **pyTelegramBotAPI** `4.36.0` → `4.37.0` (21/09/2026, Bot API 10.3): a differenza dei bump precedenti, le note dichiarano anche "bugfixes and internal redesign" — primo bump della serie con un refactor interno dichiarato, **non testato su questo stack**; rollback `==4.36.0`. Resta aperto, di competenza di Walter, l'aggiornamento della cella REQUIREMENTS del foglio BOT nell'Excel (lezione sulle tre fonti: requirements.txt, README, Excel).
 
