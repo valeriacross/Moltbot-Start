@@ -1,9 +1,43 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.17
+Versione: 2.4.18
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.18 (23/10/2026):
+  - Nuova modalità volto "testo" per i bot che costruiscono l'identità via
+    build_valeria_identity() (oggi solo Atelier). Motivo (Walter): con la foto
+    reale del volto allegata in Flow le scene più spinte vengono bloccate; senza
+    foto il volto esce generico, perché dal 25/07 VALERIA_FACE rimanda alla
+    foto allegata invece di descrivere occhiali/barba/capelli. Nuove costanti
+    VALERIA_HAIR_TEXT, VALERIA_GLASSES_TEXT, VALERIA_FACE_TEXT — testo messo a
+    punto con Walter in 5 versioni provate a mano su Flow il 23/10 (v2-v6, 8
+    generazioni per variante, senza foto allegata): età 60, volto ovale di pienezza media,
+    barba piena bianco-argento, occhiali spessi verde petrolio di forma
+    geometrica tondeggiante (l'asimmetria reale non viene resa da Flow in
+    nessuna variante, quindi non richiesta), capelli pettinati all'indietro
+    come nella foto scelta da Walter. Esito del test: ~2 volti su 8 molto
+    simili senza foto, ~80% con foto + testo (stima di Walter) — il testo
+    avvicina il tipo di volto, non l'identità.
+  - DEVIAZIONI dal testo v6 testato, dichiarate: "male face" invece di "man"
+    (coerenza col DNA esistente "male face" e col corpo femminile, per non
+    spingere un torso maschile); tolto "warm wide smile" (l'espressione la
+    decide la scena, il mosaico Atelier varia già le espressioni); aggiunto
+    "ending well above the collar" ai capelli (limite superiore contro la
+    deriva a capelli lunghi già vista il 14/07). Questi tre punti NON sono
+    stati provati su Flow così come scritti.
+  - build_valeria_identity(safe=False, face_mode="photo"): nuovo parametro,
+    default invariato — Vogue e ogni chiamata esistente producono lo stesso
+    identico testo della 2.4.17 (verificato a runtime confrontando l'output).
+  - review_and_fix(prompt, client, face_mode="photo"): in modalità testo le
+    regole 1 (capelli), 2 (occhiali) e 4 (subject bleed) usano il testo
+    dettagliato invece di "short Italian cut, nape exposed" e "attached
+    reference photo" — senza questa modifica avrebbero riscritto capelli e
+    occhiali come ultimo step prima di Flow (stesso schema del 25/07,
+    lezione #17). Default invariato, verificato.
+  - Non toccati: VALERIA_FACE, VALERIA_DNA (Vogue), sanitize_user_input.
+    Non ancora testato in produzione. Rollback: ridistribuire la 2.4.17.
 
 CHANGELOG 2.4.17 (03/10/2026):
   - Aggiornamento DNA Valeria su richiesta esplicita di Walter: peso 85kg →
@@ -528,6 +562,7 @@ __all__ = [
     'VALERIA_FACE', 'VALERIA_BODY_STRONG', 'VALERIA_BODY_SAFE',
     'VALERIA_WATERMARK', 'VALERIA_TEXTURE_LOCK', 'VALERIA_MULTI_SUBJECT_LOCK',
     'VALERIA_DNA', 'EDITORIAL_WRAPPER',
+    'VALERIA_FACE_TEXT', 'VALERIA_HAIR_TEXT', 'VALERIA_GLASSES_TEXT',
     'build_valeria_identity', 'generate_caption', 'generate_mini_caption', 'generate_mini_prompt',
     'review_and_fix', 'sanitize_user_input', 'multi_subject_clause', 'has_multiple_figures',
     'analyze_scene', 'genai_types', 'MODEL', 'detect_mime_type', 'is_allowed',
@@ -560,9 +595,9 @@ GEMINI_BACKOFF_BASE = float(os.environ.get("GEMINI_BACKOFF_BASE", "4.0"))  # sec
 GEMINI_MAX_ATTEMPTS = 16     # tetto assoluto di chiamate API per singolo generate()
 
 # Versione
-VERSION = "2.4.17"
-SHARED_VERSION = "2.4.17"   # aggiornare ad ogni modifica
-SHARED_DATE    = "03/10/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.18"
+SHARED_VERSION = "2.4.18"   # aggiornare ad ogni modifica
+SHARED_DATE    = "23/10/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
 
@@ -606,6 +641,39 @@ VALERIA_FACE = (
     "**⚠️ BEARD — MANDATORY — NON-NEGOTIABLE:** Exactly as shown in the attached reference photo — same "
     "length, density, texture and shape, clearly visible in every shot. The beard is a permanent part of "
     "the identity lock, matching the reference image precisely.\n"
+    "**Rendering:** Subsurface Scattering, Global Illumination, Ambient Occlusion, Fresnel Effect. "
+    "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
+)
+
+# FACE TEXT MODE — introdotta in 2.4.18 (vedi changelog). Alternativa a
+# VALERIA_FACE per quando in Flow NON si allega la foto reale del volto:
+# descrive il volto per intero, senza rimandi a una foto allegata.
+# Interamente in positivo (coerente con l'audit 2.4.0). Il default dei bot
+# resta VALERIA_FACE (face_mode="photo"); questa si attiva solo su richiesta
+# esplicita dell'utente (Atelier: /volto testo). HAIR e GLASSES sono costanti
+# separate perché servono anche a review_and_fix() e ai blocchi HAIR LOCK /
+# IDENTITY LOCK locali di Atelier — un'unica fonte, mai copiate a mano.
+VALERIA_HAIR_TEXT = (
+    "silver-grey hair swept back from the recessed hairline in a natural quiff, about 8\u201310 cm on top, "
+    "sides combed back above the ears, reaching the nape and ending well above the collar, "
+    "fine slightly wavy texture"
+)
+VALERIA_GLASSES_TEXT = (
+    "glasses with a thick translucent deep-teal acetate frame in a rounded geometric shape, always worn"
+)
+VALERIA_FACE_TEXT = (
+    "**\u26a0\ufe0f FACE IDENTITY \u2014 ABSOLUTE PRIORITY:** The face is described completely below and is "
+    "reproduced exactly as written, identically in every image.\n"
+    "Mature male face of about 60, oval with average fullness, a tall wide forehead with moderate horizontal "
+    "lines, hairline receding at the temples. Warm dark-brown eyes with slightly hooded lids and light crow's "
+    "feet; bushy, untamed silver-white eyebrows. Medium nose with a rounded tip, in proportion to the face. "
+    "Ruddy, rosy complexion with light freckling, natural skin texture. "
+    "Full, wide, bushy silver-white beard with a rounded lower edge sitting just below the chin, voluminous "
+    "along the cheeks and jaw, loose curling strands, a darker steel-grey patch at the centre of the chin, "
+    "thick darker-grey moustache over the upper lip. "
+    + VALERIA_HAIR_TEXT[:1].upper() + VALERIA_HAIR_TEXT[1:] + ". "
+    + VALERIA_GLASSES_TEXT[:1].upper() + VALERIA_GLASSES_TEXT[1:] + ". "
+    "Soft expression lines around the eyes and mouth.\n"
     "**Rendering:** Subsurface Scattering, Global Illumination, Ambient Occlusion, Fresnel Effect. "
     "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
 )
@@ -785,10 +853,13 @@ EDITORIAL_WRAPPER = (
 )
 
 
-def build_valeria_identity(safe: bool = False) -> str:
-    """Assembla FACE + BODY (strong o safe) + TEXTURE LOCK — usato da Atelier nei prompt."""
+def build_valeria_identity(safe: bool = False, face_mode: str = "photo") -> str:
+    """Assembla FACE + BODY (strong o safe) + TEXTURE LOCK — usato da Atelier nei prompt.
+    face_mode="photo" (default): VALERIA_FACE, che rimanda alla foto reale allegata in Flow.
+    face_mode="text": VALERIA_FACE_TEXT, volto descritto per intero (2.4.18)."""
     body = VALERIA_BODY_SAFE if safe else VALERIA_BODY_STRONG
-    return VALERIA_FACE + body + VALERIA_TEXTURE_LOCK
+    face = VALERIA_FACE_TEXT if face_mode == "text" else VALERIA_FACE
+    return face + body + VALERIA_TEXTURE_LOCK
 
 # ============================================================
 # GENERATE_CAPTION — CAPTION SOCIAL UNIFICATA
@@ -955,36 +1026,74 @@ def generate_mini_prompt(text: str, client=None) -> tuple:
         return None, f"❌ <b>Errore mini prompt:</b> <code>{str(e)}</code>"
 
 
-def review_and_fix(prompt: str, client: 'GeminiClient') -> str:
-    """
-    Revisione e correzione contraddizioni nel prompt generato.
-    Corregge capelli, occhiali, body hair, watermark, subject bleed.
-    In caso di errore ritorna il prompt originale invariato.
-    """
-    try:
-        review_instr = (
-            "You are a prompt quality reviewer. Carefully read the following image generation prompt "
-            "and fix ALL contradictions, inconsistencies and conflicts. Return ONLY the corrected prompt, "
-            "no explanations, no preamble.\n\n"
-            "MANDATORY FIXES — apply all of these:\n\n"
+def _review_rules(face_mode: str = "photo"):
+    """Regole 1 (capelli), 2 (occhiali) e 4 (subject bleed) di review_and_fix().
+    face_mode="photo": testo identico alla 2.4.17. face_mode="text" (2.4.18): usano
+    VALERIA_HAIR_TEXT / VALERIA_GLASSES_TEXT, senza rimandi a una foto allegata."""
+    if face_mode == "text":
+        r1 = (
+            f"1. HAIR: Valeria Cross has {VALERIA_HAIR_TEXT}. "
+            "Remove or replace ANY mention of: long hair, brown hair, dark hair, black hair, curly hair, "
+            "flowing hair, loose waves, wet long hair, hair falling on shoulders, "
+            "hair spread around head, hair fanned out, dark flowing locks, wavy dark hair, hair against background. "
+            f"Replace with: {VALERIA_HAIR_TEXT}.\n\n"
+        )
+        r2 = (
+            f"2. GLASSES MANDATORY: Valeria Cross ALWAYS wears {VALERIA_GLASSES_TEXT}. "
+            "If the prompt does NOT mention glasses or eyeglasses, ADD this phrase in the "
+            f"Facial identity section: '{VALERIA_GLASSES_TEXT}'. "
+            "Also ensure 'no glasses' does NOT appear anywhere in the prompt.\n\n"
+        )
+        r4 = (
+            "4. SUBJECT BLEED: Remove any physical description belonging to the original reference subject. "
+            "Valeria Cross DNA: Male face 60yo, full silver-white beard, "
+            f"{VALERIA_GLASSES_TEXT}, {VALERIA_HAIR_TEXT}, hourglass body, smooth skin.\n\n"
+        )
+    else:
+        r1 = (
             "1. HAIR: Valeria Cross has SHORT silver/grey hair (sides 1-2cm, top max 15cm, nape exposed). "
             "Remove or replace ANY mention of: long hair, brown hair, dark hair, black hair, curly hair, "
             "flowing hair, loose waves, slicked back long hair, wet long hair, hair falling on shoulders, "
             "hair spread around head, hair fanned out, dark flowing locks, wavy dark hair, hair against background. "
             "Replace with: short silver Italian cut, slightly voluminous top, nape exposed.\n\n"
+        )
+        r2 = (
             "2. GLASSES MANDATORY: Valeria Cross ALWAYS wears eyeglasses, exactly as shown in the attached "
             "reference photo. If the prompt does NOT mention glasses or eyeglasses, ADD this phrase in the "
             "Facial identity section: 'eyeglasses exactly as shown in the attached reference photo "
             "(MANDATORY, always present)'. Also ensure 'no glasses' does NOT appear anywhere in the prompt.\n\n"
+        )
+        r4 = (
+            "4. SUBJECT BLEED: Remove any physical description belonging to the original reference subject. "
+            "Valeria Cross DNA: Male Italian face 60yo, beard and eyeglasses exactly as shown in the attached "
+            "reference photo, silver short hair, hourglass body, smooth skin.\n\n"
+        )
+    return r1, r2, r4
+
+
+def review_and_fix(prompt: str, client: 'GeminiClient', face_mode: str = "photo") -> str:
+    """
+    Revisione e correzione contraddizioni nel prompt generato.
+    Corregge capelli, occhiali, body hair, watermark, subject bleed.
+    In caso di errore ritorna il prompt originale invariato.
+    face_mode="photo" (default, comportamento storico) o "text" (2.4.18: le regole
+    1/2/4 usano il volto descritto a parole invece del rimando alla foto allegata).
+    """
+    try:
+        _r1, _r2, _r4 = _review_rules(face_mode)
+        review_instr = (
+            "You are a prompt quality reviewer. Carefully read the following image generation prompt "
+            "and fix ALL contradictions, inconsistencies and conflicts. Return ONLY the corrected prompt, "
+            "no explanations, no preamble.\n\n"
+            "MANDATORY FIXES — apply all of these:\n\n"
+            + _r1 + _r2 +
             "2b. GLASSES POSE REMOVAL: Remove ANY description of hands or fingers touching, adjusting, holding or "
             "raising to the glasses or temple area. The glasses are simply worn — no hand interaction with them.\n\n"
             "3. MIRROR SELFIE RULE: ONLY if the prompt explicitly contains 'mirror selfie' or both 'selfie' AND 'mirror' together — "
             "then smartphone held in hand IS a required prop. "
             "Do NOT add smartphone for decorative mirrors, antique mirrors, historical scenes, artistic reflections, "
             "or any mirror that is not a selfie context.\n\n"
-            "4. SUBJECT BLEED: Remove any physical description belonging to the original reference subject. "
-            "Valeria Cross DNA: Male Italian face 60yo, beard and eyeglasses exactly as shown in the attached "
-            "reference photo, silver short hair, hourglass body, smooth skin.\n\n"
+            + _r4 +
             "5. WATERMARK TEXT: Must read exactly: 'feat. Valeria Cross 👠' "
             "in elegant champagne cursive, very small, bottom center/left, 90% opacity. "
             "Replace any other watermark text with the exact text above.\n\n"
