@@ -1,9 +1,45 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.18
+Versione: 2.4.19
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+
+CHANGELOG 2.4.19 (07/11/2026):
+  - FIX 1 (difetto verificato nel codice): body_art_clause() e has_multiple_figures()
+    leggono i campi "BODY ART:" e "FIGURES:" dell'analisi con una regex che si
+    aspetta il testo subito dopo i due punti. Se analyze_scene() restituisce i
+    nomi dei campi in grassetto markdown ("**BODY ART:** None.", "**FIGURES:** One
+    figure."), la regex legge "** None." / "** One figure." come contenuto reale:
+    BODY ART EXCEPTION e MULTI-SUBJECT LOCK (e la frase "if multiple figures are
+    present" nel checklist del mosaico) venivano aggiunti anche con zero tatuaggi
+    e una sola figura — circa 1.800 caratteri inutili per prompt, solo quando
+    Gemini formatta in grassetto (varianza dell'analisi, non una scelta del
+    codice). Ora il markdown "**" e i punti elenco iniziali ("* ", "- ") vengono
+    ignorati prima del controllo; per input senza grassetto né elenchi il
+    comportamento è identico a prima.
+  - FIX 2 (difetto verificato): review_and_fix() accettava qualunque testo
+    restituito da Gemini senza controllare che fosse completo. Il 07/11 /lastprompt
+    ha mostrato un prompt finito a metà frase ("...and the same body identity
+    described") — mancavano IDENTITY LOCK, HAIR LOCK, BACKGROUND LOCK e la riga
+    Technical; il 23/10 un 503 sul modello lite aveva prodotto un prompt riscritto
+    e accorciato, senza COEXISTENCE/BUST VOLUME. Ora dopo la revisione si controlla
+    (_review_result_problem): lunghezza non inferiore al 60% dell'originale, fine
+    di frase se l'originale finisce in modo chiuso, presenza dei blocchi
+    obbligatori presenti nell'originale (COLOR/OUTFIT DETAIL/TEXTURE LOCK,
+    COEXISTENCE, BUST VOLUME, IDENTITY/HAIR/BACKGROUND LOCK locali, liste pose/
+    framing). Se un controllo fallisce si usa il prompt originale costruito dal
+    codice (sempre completo) e il motivo va nel log. Costo accettato: in quei
+    casi si perdono le correzioni di Gemini su capelli/occhiali/subject bleed,
+    già coperte dai blocchi del codice.
+  - DIAGNOSI (nessun cambio di comportamento): GeminiClient._call_model() ora
+    scrive nel log un warning se il finish_reason non è STOP (es. MAX_TOKENS,
+    SAFETY, ...), così al prossimo taglio si saprà perché Gemini si è fermato.
+    La causa del taglio del 07/11 NON è nota: un limite di token è solo
+    un'ipotesi, e Walter segnala che prompt completi in 4 blocchi sono arrivati
+    in passato, quindi il solo limite di lunghezza non basta a spiegarlo.
+  - Non toccati: Atelier (2.8.0 invariato), costanti DNA, max_tokens=8192.
+    Non ancora testato in produzione. Rollback: ridistribuire la 2.4.18.
 
 CHANGELOG 2.4.18 (23/10/2026):
   - Nuova modalità volto "testo" per i bot che costruiscono l'identità via
@@ -595,9 +631,9 @@ GEMINI_BACKOFF_BASE = float(os.environ.get("GEMINI_BACKOFF_BASE", "4.0"))  # sec
 GEMINI_MAX_ATTEMPTS = 16     # tetto assoluto di chiamate API per singolo generate()
 
 # Versione
-VERSION = "2.4.18"
-SHARED_VERSION = "2.4.18"   # aggiornare ad ogni modifica
-SHARED_DATE    = "23/10/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.19"
+SHARED_VERSION = "2.4.19"   # aggiornare ad ogni modifica
+SHARED_DATE    = "07/11/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
 
@@ -738,10 +774,11 @@ def body_art_clause(scene_description: str) -> str:
     (Vogue, Atelier). NON usare in Architect — vedi nota sopra."""
     if not scene_description:
         return ""
+    scene_description = scene_description.replace("**", "")  # 2.4.19: tollera i nomi campo in grassetto
     m = re.search(r'BODY ART:\s*(.+?)(?:\n\n|\Z)', scene_description, re.IGNORECASE | re.DOTALL)
     if not m:
         return ""
-    val = m.group(1).strip()
+    val = m.group(1).strip().lstrip("*-\u2022\u00b7 \t").strip()  # 2.4.19: tollera anche gli elenchi puntati
     if not val or val.lower().startswith("none"):
         return ""
     return BODY_ART_EXCEPTION_TEXT
@@ -790,10 +827,11 @@ def has_multiple_figures(scene_description: str) -> bool:
     vedi lezione #21 HANDOFF."""
     if not scene_description:
         return False
+    scene_description = scene_description.replace("**", "")  # 2.4.19: tollera i nomi campo in grassetto
     m = re.search(r'FIGURES:\s*(.+?)(?:\n\n|\Z)', scene_description, re.IGNORECASE | re.DOTALL)
     if not m:
         return False
-    val = m.group(1).strip()
+    val = m.group(1).strip().lstrip("*-\u2022\u00b7 \t").strip()  # 2.4.19: tollera anche gli elenchi puntati
     return bool(val) and not val.lower().startswith("one figure")
 
 def multi_subject_clause(scene_description: str) -> str:
@@ -1026,6 +1064,41 @@ def generate_mini_prompt(text: str, client=None) -> tuple:
         return None, f"❌ <b>Errore mini prompt:</b> <code>{str(e)}</code>"
 
 
+_REVIEW_MIN_RATIO = 0.6
+_REVIEW_END_CHARS = '.!?)"\'\u201d\u00bb*`'
+_REVIEW_REQUIRED = (
+    ("COLOR LOCK", r"COLOR LOCK"),
+    ("OUTFIT DETAIL LOCK", r"OUTFIT DETAIL LOCK"),
+    ("TEXTURE & PATTERN", r"TEXTURE & PATTERN"),
+    ("COEXISTENCE", r"COEXISTENCE"),
+    ("BUST VOLUME", r"BUST VOLUME"),
+    ("IDENTITY LOCK locale", r"(?<!FACE )IDENTITY LOCK"),
+    ("HAIR LOCK", r"HAIR LOCK"),
+    ("BACKGROUND LOCK", r"BACKGROUND LOCK"),
+    ("Pose options", r"Pose options"),
+    ("Framing options", r"Framing options"),
+)
+
+
+def _review_result_problem(original: str, reviewed: str):
+    """2.4.19 — controlla che la revisione di Gemini sia utilizzabile. Ritorna None se ok,
+    altrimenti una stringa col motivo. Vale solo per i blocchi presenti nell'originale:
+    un bot il cui prompt non li contiene non viene toccato. In caso di problema
+    review_and_fix() usa il prompt originale costruito dal codice."""
+    o, r = original.rstrip(), (reviewed or "").rstrip()
+    if not r:
+        return "risposta vuota"
+    if len(r) < _REVIEW_MIN_RATIO * len(o):
+        return f"accorciata troppo ({len(r)} contro {len(o)} caratteri)"
+    if o and o[-1] in _REVIEW_END_CHARS and r[-1] not in _REVIEW_END_CHARS:
+        return f"finisce a meta' frase (...{r[-40:]!r})"
+    missing = [name for name, pat in _REVIEW_REQUIRED
+               if re.search(pat, o) and not re.search(pat, r)]
+    if missing:
+        return "blocchi mancanti: " + ", ".join(missing)
+    return None
+
+
 def _review_rules(face_mode: str = "photo"):
     """Regole 1 (capelli), 2 (occhiali) e 4 (subject bleed) di review_and_fix().
     face_mode="photo": testo identico alla 2.4.17. face_mode="text" (2.4.18): usano
@@ -1108,6 +1181,10 @@ def review_and_fix(prompt: str, client: 'GeminiClient', face_mode: str = "photo"
         logger.info("🔍 review_and_fix: avviata")
         result = client.generate(review_instr, max_tokens=8192)
         if result:
+            _problem = _review_result_problem(prompt, result)
+            if _problem:
+                logger.warning(f"⚠️ review_and_fix: risposta non utilizzabile ({_problem}) — uso prompt originale")
+                return prompt
             logger.info(f"✅ review_and_fix: completata ({len(result)} chars)")
             return result
         logger.warning("⚠️ review_and_fix: risposta vuota — uso prompt originale")
@@ -1481,6 +1558,15 @@ class GeminiClient:
                 max_output_tokens=max_tokens,
             )
         )
+        try:  # 2.4.19 — solo diagnostica: segnala risposte non concluse normalmente
+            _cands = getattr(response, "candidates", None) or []
+            _fr = getattr(_cands[0], "finish_reason", None) if _cands else None
+            _fr_name = getattr(_fr, "name", str(_fr)) if _fr is not None else None
+            if _fr_name and _fr_name not in ("STOP", "FINISH_REASON_UNSPECIFIED"):
+                logger.warning(f"⚠️ GeminiClient: finish_reason={_fr_name} su {model} (chiave #{idx + 1}, "
+                               f"max_tokens={max_tokens}) — la risposta può essere parziale")
+        except Exception:
+            pass
         if response.text:
             return response.text.strip()
         # Risposta vuota — estrai il motivo reale da finish_reason

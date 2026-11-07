@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 23/10/2026
+**Ultimo aggiornamento:** 07/11/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -16,7 +16,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 | FiltroBot | `Filtro_221.py` | 2.2.1 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_211.py` | 2.1.1 | surprise1/sorpresa | 1 |
 
-**Shared:** `C_shared100.py` v2.4.18 · **10 API key totali**
+**Shared:** `C_shared100.py` v2.4.19 · **10 API key totali**
 
 ---
 
@@ -83,7 +83,9 @@ openpyxl>=3.1.5
 
 ---
 
-## Fix robustezza (20/06/2026 → 23/10/2026)
+## Fix robustezza (20/06/2026 → 07/11/2026)
+
+**Il 07/11 — primo test di `/volto testo` e prompt tagliati dopo `review_and_fix()` (shared 2.4.18 → 2.4.19).** Atelier 2.8.0 è in produzione (il bot risponde a `/volto`). Primo test con l'outfit rosa in lingerie: senza foto di riferimento Flow riproduce la lingerie e il volto è "nella famiglia giusta" (capelli all'indietro, barba bianca, occhiali verde petrolio) ma non quello di Walter — montatura spessa e squadrata, barba più lunga, volto più levigato, torso maschile; con la foto allegata l'outfit viene coperto, come già osservato. Il test non è pulito: il primo prompt era quello riscritto e accorciato dopo un 503 sul modello lite (mancavano COEXISTENCE, BUST VOLUME, i lock locali, le liste di varietà), il secondo — `/lastprompt` lo conferma — finisce davvero a metà frase ("…and the same body identity described") al pezzo 3/3, quindi non è Telegram a tagliare ma il prompt memorizzato è incompleto: mancano IDENTITY LOCK, HAIR LOCK, BACKGROUND LOCK e la riga Technical. Walter esclude un limite di lunghezza (prompt completi in 4 blocchi sono arrivati in passato): la causa vera è **sconosciuta**, un tetto di token resta solo un'ipotesi. Trovati e corretti due difetti verificati nel codice. **(1)** `body_art_clause()` e `has_multiple_figures()` leggono "BODY ART:" e "FIGURES:" con una regex che fallisce se Gemini scrive i nomi campo in grassetto ("**BODY ART:** None."): BODY ART EXCEPTION e MULTI-SUBJECT LOCK finivano nel prompt anche con zero tatuaggi e una sola figura (~1.800 caratteri in più, solo quando l'analisi esce in grassetto); ora grassetto e punti elenco vengono ignorati. **(2)** `review_and_fix()` accettava qualunque risposta di Gemini senza controllarne la completezza; ora verifica lunghezza (≥60% dell'originale), fine di frase e presenza dei blocchi obbligatori, e in caso contrario usa il prompt originale del codice (sempre completo), scrivendo il motivo nel log. Inoltre `_call_model()` registra nel log il `finish_reason` quando non è STOP, così al prossimo taglio si saprà perché. Verificato: 74 prompt (foto e testo) identici a prima su input senza grassetto; 30 controlli automatici, inclusa la riproduzione del taglio del 07/11 e della riscrittura del 23/10. Atelier non cambia. Non ancora testato in produzione.
 
 **Il 23/10 — nuova modalità volto "testo" in Atelier (shared 2.4.17 → 2.4.18, Atelier 2.7.2 → 2.8.0).** Problema di Walter: con la foto reale del volto allegata in Flow le scene più spinte vengono bloccate; senza foto il prompt genera ma con un volto "qualsiasi", perché dal 25/07 `VALERIA_FACE` rimanda alla foto invece di descrivere occhiali/barba/capelli. Soluzione concordata: un comando `/volto` che alterna per utente tra `foto` (DEFAULT, comportamento di sempre) e `testo` (volto descritto per intero, da incollare in Flow senza foto). Il testo (`VALERIA_FACE_TEXT`) è stato messo a punto con Walter in 5 versioni provate a mano su Flow (v2-v6), 8 generazioni per variante: tre lezioni — Flow ignora le misure in cm (barba), gli aggettivi tipo round/full/deep/weathered spingono verso volto pesante e anziano mentre lean/oval verso giovane e levigato, e l'asimmetria reale degli occhiali non viene mai resa. Risultato, stima di Walter: ~2 volti su 8 molto simili senza foto, ~80% di somiglianza con foto + testo (nessun confronto diretto con la sola foto sulla stessa scena) — il testo avvicina il *tipo* di volto, non l'identità. Implementazione: costanti nuove in shared (`VALERIA_FACE_TEXT`, `VALERIA_HAIR_TEXT`, `VALERIA_GLASSES_TEXT`), `build_valeria_identity()` e `review_and_fix()` con parametro `face_mode` (default `"photo"`); i tre blocchi locali IDENTITY LOCK + HAIR LOCK di Atelier ora vengono da una sola funzione `_face_locks()` invece di tre copie. Trovato leggendo il codice, non previsto nel piano: `review_and_fix()` riscriveva capelli e occhiali come "short Italian cut / attached reference photo" come ultimo step prima di Flow — senza adattarla la modalità testo si sarebbe annullata da sola. **Verificato a runtime:** in modalità foto tutti i 69 prompt costruibili (ogni filtro, safe/non-safe, single/mosaico, outfit singolo e multi-figura) sono identici carattere per carattere a quelli di Atelier 2.7.2 / shared 2.4.17; in modalità testo nessun rimando alla foto allegata né i vecchi capelli corti compaiono più nei prompt. Tre deviazioni dal testo v6 provato su Flow, **mai testate così come scritte**: "male face" invece di "man", tolto "warm wide smile", aggiunto "ending well above the collar" ai capelli. Run command Koyeb da aggiornare a `python Atelier_280.py`. Non ancora testato in produzione.
 
@@ -167,11 +169,13 @@ Dettagli storici in `HANDOFF-MASTER`, sezioni 2bis, 2ter, 2quater, 2quinquies, 2
 
 **TODO aperto (09/10):** deploy con `pyTelegramBotAPI==4.37.0` non ancora osservato — Walter deve controllare al primo redeploy su Koyeb che polling, callback inline ed edit dei messaggi funzionino su tutti i bot (refactor interno dichiarato nelle note della 4.37.0); se qualcosa si rompe, primo sospetto è questo bump, rollback `==4.36.0`. Da confermare anche l'upper bound `google-genai<3`.
 
+**TODO aperto (07/11):** shared 2.4.19 non ancora in produzione. Dopo il deploy cercare nel log Koyeb di Atelier le righe "review_and_fix: risposta non utilizzabile (…)" e "finish_reason=…": dicono se il taglio era un tetto di token, un blocco di sicurezza o altro. Le immagini del primo test di `/volto testo` non valgono come confronto (prompt corti o tagliati): rigenerare con un prompt completo, che deve finire con "**Technical:** 8K, cinematic, photorealistic.". Il Run command Koyeb di Atelier risulta aggiornato (il bot risponde a `/volto`).
+
 **TODO aperto (23/10):** aggiornare il Run command Koyeb di Atelier a `python Atelier_280.py` e provare `/volto testo` in produzione: più generazioni su una scena che oggi Flow blocca con la foto allegata, verificando (a) somiglianza, (b) capelli che non scivolano verso la lunghezza eccessiva (le tre deviazioni dal v6 non sono mai state provate su Flow), (c) che l'header mostri "🧑 volto: testo". Aperto anche il confronto foto sola contro foto + testo sulla stessa scena: finché non c'è, il default resta `foto`. Lo stato di `/volto` è in memoria e torna a `foto` ad ogni riavvio del servizio.
 
 ## Nota tecnica importante
 
-`review_and_fix()` in C_shared ha un prompt di sistema interno che **forza** il DNA Valeria Cross (viso, corpo, watermark). Non usarla per task che richiedono di rimuovere o alterare quel DNA — usare `gemini.generate()` direttamente con un prompt dedicato, senza chiamare `review_and_fix()`. (Dal 23/10 `review_and_fix()` accetta `face_mode="text"`, che sostituisce solo le regole su capelli/occhiali/subject bleed con il volto descritto a parole; il DNA resta forzato. Fino al 10/07 l'esempio di riferimento era `/generico` in Architect — rimosso in quella data, vedi sezione dedicata in HANDOFF; Architect ora non usa più `review_and_fix()` né alcun DNA.)
+`review_and_fix()` in C_shared ha un prompt di sistema interno che **forza** il DNA Valeria Cross (viso, corpo, watermark). Non usarla per task che richiedono di rimuovere o alterare quel DNA — usare `gemini.generate()` direttamente con un prompt dedicato, senza chiamare `review_and_fix()`. (Dal 07/11 `review_and_fix()` scarta la risposta di Gemini se tagliata, accorciata troppo o priva dei blocchi obbligatori e usa il prompt originale. Dal 23/10 accetta `face_mode="text"`, che sostituisce solo le regole su capelli/occhiali/subject bleed con il volto descritto a parole; il DNA resta forzato. Fino al 10/07 l'esempio di riferimento era `/generico` in Architect — rimosso in quella data, vedi sezione dedicata in HANDOFF; Architect ora non usa più `review_and_fix()` né alcun DNA.)
 
 ---
 
