@@ -18,7 +18,7 @@ Progetto di bot Telegram che generano prompt di fotografia editoriale di moda pe
 
 ## Regole sul codice
 
-- Quando correggi i dati del volto o del DNA di Valeria, esegui `grep -rn` su tutto il progetto prima di considerare il lavoro finito. Le specifiche possono essere duplicate in `review_and_fix()`, in `sanitize_user_input()` e nei blocchi locali `IDENTITY LOCK`.
+- Quando correggi i dati del volto o del DNA di Valeria, esegui `grep -rn` su tutto il progetto prima di considerare il lavoro finito. Le specifiche possono essere duplicate in `review_and_fix()` e nei blocchi locali `IDENTITY LOCK`.
 - I conteggi dei pool (per esempio `LOCATION_POOL`) si verificano nel codice, non nelle etichette di un foglio Excel.
 - Nano Banana non ha un campo `negativePrompt` indipendente: i prompt di tutti i bot sono scritti solo in positivo. Non reintrodurre negative prompt senza una richiesta esplicita.
 
