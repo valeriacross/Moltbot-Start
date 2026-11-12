@@ -1,8 +1,8 @@
-import os, logging, re, telebot, html, time, threading
+import os, logging, re, telebot, html, threading
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from C_shared100 import GeminiClient, HealthServer, is_allowed, genai_types, analyze_scene
 from C_shared100 import VALERIA_BODY_STRONG, VALERIA_WATERMARK, VALERIA_TEXTURE_LOCK
-from C_shared100 import VALERIA_DNA, generate_caption, review_and_fix, SHARED_VERSION, SHARED_DATE, body_art_clause, multi_subject_clause
+from C_shared100 import generate_caption, review_and_fix, SHARED_VERSION, SHARED_DATE, body_art_clause, multi_subject_clause, MODEL
 
 # --- VERSIONE ---
 # CHANGELOG 2.1.0 (17/07/2026): cambio di motore, non un patch — versione
@@ -198,7 +198,25 @@ from C_shared100 import VALERIA_DNA, generate_caption, review_and_fix, SHARED_VE
 # a "gemini-3.8-flash" — il modello reale usato da generate() viene da
 # shared (MODEL, aggiornato in 2.4.14), questa è solo la stringa mostrata
 # all'utente, che era rimasta al vecchio nome. Nessuna modifica funzionale.
-VERSION = "4.3.2"
+# CHANGELOG 4.3.3 (12/11/2026): revisione del codice su richiesta di Walter.
+# - review_and_fix() ora riceve face_mode="described" (shared 2.4.20) per foto e
+#   video: prima usava le regole "photo", che chiedono "eyeglasses exactly as shown
+#   in the attached reference photo" e "short silver Italian cut" — potevano
+#   reinserire nel prompt video proprio il rimando alla foto che VALERIA_FACE_VIDEO
+#   (4.2.3) aveva tolto, e sostituirne la descrizione dei capelli.
+# - VALERIA_FACE_VIDEO: tolta la riga "**Build:** Stocky, heavyset." — contraddiceva
+#   VALERIA_BODY_STRONG subito dopo (clessidra femminile, 75 kg). Nient'altro del
+#   volto video è cambiato.
+# - /dna mostra VALERIA_DNA_VIDEO, il DNA usato davvero nei prompt (prima mostrava
+#   VALERIA_DNA di shared, versione foto, mai usata da Vogue).
+# - _has_described_movement(): ignora il grassetto markdown e riconosce "None",
+#   "No movement", "Static", "N/A" — prima "**MOVEMENT:** None." contava come
+#   movimento osservato.
+# - analyze_video(): max_tokens 3000 → 8192 (stessa ragione di analyze_scene() in
+#   shared 2.4.20). Messaggio quota allineato a shared.
+# - /info: modello letto da shared (MODEL). Tolti import e variabili non usati
+#   (VALERIA_DNA, time, doppia dichiarazione di _active_cid).
+VERSION = "4.3.3"
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -206,7 +224,6 @@ logger = logging.getLogger(__name__)
 
 # --- CONFIGURAZIONE ---
 TOKEN      = os.environ.get("TELEGRAM_TOKEN")
-MODEL_TEXT = "gemini-3.8-flash"
 
 # --- PROMPT ANALISI VIDEO — Vogue 3.0, isolato qui, NON in shared ---
 # Stesse identiche sezioni di _ANALYZE_PROMPT (shared) — così body_art_clause()/
@@ -306,7 +323,6 @@ pending_caption = {}   # uid → True se in attesa foto per /caption
 _caption_timers = {}   # uid → threading.Timer — scade dopo 60s
 
 _active_cid_lock = threading.Lock()
-_active_cid: int | None = None
 
 def _expire_caption(uid: int):
     """Callback del timer: rimuove il flag /caption scaduto."""
@@ -331,7 +347,7 @@ def analyze_video(video_bytes: bytes, mime: str):
     try:
         video_part = genai_types.Part.from_bytes(data=video_bytes, mime_type=mime)
         logger.info(f"🎥 analyze_video: mime={mime} ({len(video_bytes)} bytes)")
-        result = gemini.generate(_ANALYZE_PROMPT_VIDEO, contents=[video_part])
+        result = gemini.generate(_ANALYZE_PROMPT_VIDEO, contents=[video_part], max_tokens=8192)
         if result:
             logger.info(f"✅ analyze_video: completato ({len(result)} chars)")
             return result, None
@@ -348,7 +364,7 @@ def analyze_video(video_bytes: bytes, mime: str):
             else:
                 friendly = (
                     "❌ <b>Quota API esaurita.</b>\n"
-                    "Le 20 richieste giornaliere di questa chiave sono finite.\n"
+                    "Quota giornaliera finita su tutte le chiavi disponibili.\n"
                     "Reset alle 08:00 ora Lisbona."
                 )
         elif "SAFETY" in err_text or "SAFETY BLOCK" in err_text or "PROHIBITED_CONTENT" in err_text or "sconosciuto" in err_text:
@@ -378,11 +394,15 @@ def _has_described_movement(scene_description: str) -> bool:
     analyze_photo(), o testo utente). Stesso pattern di has_multiple_figures() (shared)."""
     if not scene_description:
         return False
+    scene_description = scene_description.replace("**", "")  # 4.3.3: tollera i nomi campo in grassetto
     m = re.search(r'MOVEMENT:\s*(.+?)(?:\n\n|\Z)', scene_description, re.IGNORECASE | re.DOTALL)
     if not m:
         return False
-    val = m.group(1).strip()
-    return bool(val) and val.lower() not in ("none.", "none", "n/a")
+    val = m.group(1).strip().lstrip("*-\u2022\u00b7 \t").strip()
+    return bool(val) and not _NO_MOVEMENT_RE.match(val)
+
+# 4.3.3 — varianti con cui Gemini dice "nessun movimento"
+_NO_MOVEMENT_RE = re.compile(r"^(none\b|n/?a\b|no\s+(visible\s+)?(movement|motion)\b|static\b)", re.IGNORECASE)
 
 # Wrapper editoriale per il video — Vogue 4.2.1. Variante locale di EDITORIAL_WRAPPER
 # (shared) che apre tutti i prompt di Atelier ma dice "image", non adatta al video —
@@ -422,7 +442,6 @@ VALERIA_FACE_VIDEO = (
     "continuous chunky frame. A deliberately mismatched, statement-piece design, not a "
     "standard uniform pair — this asymmetry is the single most identifying detail and must be "
     "preserved exactly.\n"
-    "**Build:** Stocky, heavyset.\n"
     "**Rendering:** Subsurface Scattering, Global Illumination, Ambient Occlusion, Fresnel Effect. "
     "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
 )
@@ -455,17 +474,17 @@ def build_prompt_video(scene_description):
     movement_observed = _has_described_movement(scene_description)
     if movement_observed:
         movement_instr = (
-            f"Reproduce the exact movement described in the MOVEMENT section above — do NOT invent a "
-            f"different motion. Follow its sequence, direction and speed precisely, including how hair, "
-            f"fabric, water or other elements respond to it, and any camera movement noted there.\n"
+            "Reproduce the exact movement described in the MOVEMENT section above — do NOT invent a "
+            "different motion. Follow its sequence, direction and speed precisely, including how hair, "
+            "fabric, water or other elements respond to it, and any camera movement noted there.\n"
         )
     else:
         movement_instr = (
-            f"Invent a natural, cinematic movement coherent with the scene — the subject may walk, turn, "
-            f"shift weight, reach toward something, or move in any way that fits the pose and setting "
-            f"described above; hair, fabric, water, smoke or other elements present in the scene may move "
-            f"or flow with the motion. The movement can be as dramatic or subtle as best fits the mood of "
-            f"the scene, even without an explicit action described in the reference above.\n"
+            "Invent a natural, cinematic movement coherent with the scene — the subject may walk, turn, "
+            "shift weight, reach toward something, or move in any way that fits the pose and setting "
+            "described above; hair, fabric, water, smoke or other elements present in the scene may move "
+            "or flow with the motion. The movement can be as dramatic or subtle as best fits the mood of "
+            "the scene, even without an explicit action described in the reference above.\n"
         )
     prompt = (
         f"{EDITORIAL_WRAPPER_VIDEO}\n"
@@ -531,7 +550,7 @@ def cmd_info(m):
     api_status = "✅ Configurata" if gemini.available else "❌ Mancante"
     bot.send_message(m.chat.id,
         f"<b>ℹ️ VOGUE v{VERSION}</b>\n\n"
-        f"Modello: <code>{MODEL_TEXT}</code>\n"
+        f"Modello: <code>{MODEL}</code>\n"
         f"API Key: {api_status}\n\n"
         f"<i>Genera prompt testuali per Flow — nessuna immagine generata dal bot.</i>"
     )
@@ -547,7 +566,7 @@ def cmd_shared(m):
 @bot.message_handler(commands=['dna'])
 def cmd_dna(m):
     bot.send_message(m.chat.id,
-        f"<b>🧬 DNA Valeria Cross:</b>\n\n<code>{html.escape(VALERIA_DNA)}</code>"
+        f"<b>🧬 DNA Valeria Cross (video):</b>\n\n<code>{html.escape(VALERIA_DNA_VIDEO)}</code>"
     )
 
 # --- /caption ---
@@ -665,7 +684,7 @@ def handle_photo(m):
         bot.send_message(m.chat.id, err or "❌ Analisi fallita. Riprova.", parse_mode="HTML")
         return
 
-    prompt = review_and_fix(build_prompt_video(scene_desc), gemini)
+    prompt = review_and_fix(build_prompt_video(scene_desc), gemini, face_mode="described")
     last_prompt[uid] = prompt
 
     bot.send_message(m.chat.id, "✅ <b>Prompt Video Flow-ready</b> (da foto)\n\nCopia e incolla su Flow:")
@@ -731,7 +750,7 @@ def handle_video(m):
         bot.send_message(m.chat.id, err or "❌ Analisi fallita. Riprova.", parse_mode="HTML")
         return
 
-    prompt = review_and_fix(build_prompt_video(scene_desc), gemini)
+    prompt = review_and_fix(build_prompt_video(scene_desc), gemini, face_mode="described")
     last_prompt[uid] = prompt
 
     bot.send_message(m.chat.id, "✅ <b>Prompt Video Flow-ready</b> (da video)\n\nCopia e incolla su Flow:")

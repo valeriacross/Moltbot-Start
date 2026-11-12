@@ -1,9 +1,35 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.19
+Versione: 2.4.20
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+CHANGELOG 2.4.20 (12/11/2026): revisione del codice su richiesta di Walter. Il DNA
+  di Valeria (volto, capelli, occhiali, barba, corpo) NON è stato toccato.
+  - review_and_fix(): la regola 6 (togli "Valeria Cross") contraddiceva la regola 5
+    (il watermark contiene "Valeria Cross") — ora il watermark è escluso
+    esplicitamente. Regola 5 allineata al DNA: "bottom center" (prima
+    "bottom center/left").
+  - review_and_fix(): nuovo face_mode="described" — regole su capelli, occhiali e
+    subject bleed che rimandano all'identità GIÀ descritta nel prompt, senza
+    rimandi a una foto allegata e senza imporre un testo di DNA. Serve a Vogue,
+    il cui volto video è descritto a parole (prima la revisione in modalità
+    "photo" poteva reinserire "attached reference photo" nel prompt video).
+  - body_art_clause()/has_multiple_figures(): riconoscono anche le varianti di
+    Gemini ("No visible tattoos", "Single figure", "Only one person", ...) —
+    prima aggiungevano per errore ~1.800 caratteri di clausole inutili.
+  - analyze_scene(): max_tokens 3000 → 8192. Con risposte troncate (finish_reason
+    MAX_TOKENS) le ultime sezioni dell'analisi potevano mancare senza avviso.
+  - Reset contatori: alle 08:00 ora di Lisbona tutto l'anno (Europe/Lisbon), non
+    più alle 07:00 UTC fisse (in inverno erano le 07:00 di Lisbona). Log corretto.
+  - Contatori chiamate: contano anche i tentativi ripetuti dentro generate()
+    (prima un generate() con 5 tentativi contava 1). La notifica 🔑 resta una
+    sola per richiesta. Rotazione chiave e contatori protetti da un lock.
+  - Messaggio quota in analyze_scene(): non dice più "le 20 richieste di questa
+    chiave" (generate() prova tutte le chiavi prima di arrendersi).
+  - Rimossa sanitize_user_input() — non usata da nessun bot dalla Vogue 4.2.
+    __all__: tolto il doppione di is_allowed, aggiunti body_art_clause,
+    BODY_ART_EXCEPTION_TEXT e MODEL_LITE.
 
 CHANGELOG 2.4.19 (07/11/2026):
   - FIX 1 (difetto verificato nel codice): body_art_clause() e has_multiple_figures()
@@ -600,8 +626,9 @@ __all__ = [
     'VALERIA_DNA', 'EDITORIAL_WRAPPER',
     'VALERIA_FACE_TEXT', 'VALERIA_HAIR_TEXT', 'VALERIA_GLASSES_TEXT',
     'build_valeria_identity', 'generate_caption', 'generate_mini_caption', 'generate_mini_prompt',
-    'review_and_fix', 'sanitize_user_input', 'multi_subject_clause', 'has_multiple_figures',
-    'analyze_scene', 'genai_types', 'MODEL', 'detect_mime_type', 'is_allowed',
+    'review_and_fix', 'multi_subject_clause', 'has_multiple_figures',
+    'body_art_clause', 'BODY_ART_EXCEPTION_TEXT',
+    'analyze_scene', 'genai_types', 'MODEL', 'MODEL_LITE', 'detect_mime_type',
     'SHARED_VERSION', 'SHARED_DATE',
 ]
 
@@ -631,9 +658,9 @@ GEMINI_BACKOFF_BASE = float(os.environ.get("GEMINI_BACKOFF_BASE", "4.0"))  # sec
 GEMINI_MAX_ATTEMPTS = 16     # tetto assoluto di chiamate API per singolo generate()
 
 # Versione
-VERSION = "2.4.19"
-SHARED_VERSION = "2.4.19"   # aggiornare ad ogni modifica
-SHARED_DATE    = "07/11/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.20"
+SHARED_VERSION = "2.4.20"   # aggiornare ad ogni modifica
+SHARED_DATE    = "12/11/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
 
@@ -779,9 +806,22 @@ def body_art_clause(scene_description: str) -> str:
     if not m:
         return ""
     val = m.group(1).strip().lstrip("*-\u2022\u00b7 \t").strip()  # 2.4.19: tollera anche gli elenchi puntati
-    if not val or val.lower().startswith("none"):
+    if not val or _BODY_ART_EMPTY_RE.match(val):
         return ""
     return BODY_ART_EXCEPTION_TEXT
+
+# 2.4.20 \u2014 varianti con cui Gemini dice "nessun segno sulla pelle" oltre a "None."
+# (es. "No visible tattoos.", "No body art.", "N/A", "Not visible", "Nothing").
+_BODY_ART_EMPTY_RE = re.compile(
+    r"^(none\b|no\b|n/?a\b|nothing\b|not\s+(visible|present|applicable)\b|absent\b)",
+    re.IGNORECASE,
+)
+# 2.4.20 \u2014 varianti con cui Gemini descrive UNA sola persona oltre a "One figure."
+# (es. "Single figure.", "Only one person.", "Exactly one figure.", "1 figure", "A single woman").
+_ONE_FIGURE_RE = re.compile(
+    r"^((there\s+is\s+)?(exactly|only|just)\s+)?(one|1|a\s+single|single|a\s+lone|lone|solo|no|none|zero)\b",
+    re.IGNORECASE,
+)
 
 # MULTI-SUBJECT LOCK — introdotta in 2.4.9, rafforzata in 2.4.10 dopo test
 # reali di Walter: Vogue e Atelier in modalità singola hanno funzionato bene
@@ -832,7 +872,7 @@ def has_multiple_figures(scene_description: str) -> bool:
     if not m:
         return False
     val = m.group(1).strip().lstrip("*-\u2022\u00b7 \t").strip()  # 2.4.19: tollera anche gli elenchi puntati
-    return bool(val) and not val.lower().startswith("one figure")
+    return bool(val) and not _ONE_FIGURE_RE.match(val)
 
 def multi_subject_clause(scene_description: str) -> str:
     """Restituisce VALERIA_MULTI_SUBJECT_LOCK SOLO se has_multiple_figures() è True —
@@ -1122,6 +1162,25 @@ def _review_rules(face_mode: str = "photo"):
             "Valeria Cross DNA: Male face 60yo, full silver-white beard, "
             f"{VALERIA_GLASSES_TEXT}, {VALERIA_HAIR_TEXT}, hourglass body, smooth skin.\n\n"
         )
+    elif face_mode == "described":
+        # 2.4.20 — per prompt il cui volto è GIÀ descritto per intero nel blocco di
+        # identità (es. Vogue video). Nessun rimando a foto allegate e nessun testo di
+        # DNA imposto qui: Gemini mantiene quello che il prompt stesso dice.
+        r1 = (
+            "1. HAIR: Keep the hairstyle exactly as described in the face identity section at the top "
+            "of the prompt. Remove or replace ANY other hair description that conflicts with it "
+            "(for example hair coming from the scene reference). Do not add a different hairstyle.\n\n"
+        )
+        r2 = (
+            "2. GLASSES MANDATORY: The subject ALWAYS wears the eyeglasses described in the face identity "
+            "section. Keep that description exactly as written. Ensure 'no glasses' does NOT appear "
+            "anywhere in the prompt. Do NOT add any reference to an attached or reference photo.\n\n"
+        )
+        r4 = (
+            "4. SUBJECT BLEED: Remove any physical description belonging to the original reference subject "
+            "(face, hair, beard, body type) that contradicts the identity and body described at the top of "
+            "the prompt. The identity sections at the top stay exactly as written.\n\n"
+        )
     else:
         r1 = (
             "1. HAIR: Valeria Cross has SHORT silver/grey hair (sides 1-2cm, top max 15cm, nape exposed). "
@@ -1150,7 +1209,9 @@ def review_and_fix(prompt: str, client: 'GeminiClient', face_mode: str = "photo"
     Corregge capelli, occhiali, body hair, watermark, subject bleed.
     In caso di errore ritorna il prompt originale invariato.
     face_mode="photo" (default, comportamento storico) o "text" (2.4.18: le regole
-    1/2/4 usano il volto descritto a parole invece del rimando alla foto allegata).
+    1/2/4 usano il volto descritto a parole invece del rimando alla foto allegata)
+    o "described" (2.4.20: le regole 1/2/4 rimandano all'identità già scritta nel
+    prompt, senza imporre un testo di DNA — usato da Vogue per il prompt video).
     """
     try:
         _r1, _r2, _r4 = _review_rules(face_mode)
@@ -1168,9 +1229,10 @@ def review_and_fix(prompt: str, client: 'GeminiClient', face_mode: str = "photo"
             "or any mirror that is not a selfie context.\n\n"
             + _r4 +
             "5. WATERMARK TEXT: Must read exactly: 'feat. Valeria Cross 👠' "
-            "in elegant champagne cursive, very small, bottom center/left, 90% opacity. "
+            "in elegant champagne cursive, very small, bottom center, 90% opacity. "
             "Replace any other watermark text with the exact text above.\n\n"
-            "6. NAME REMOVAL: Remove any occurrence of 'Valeria Cross' or 'DNA of Valeria Cross' from the prompt body.\n\n"
+            "6. NAME REMOVAL: Remove any occurrence of 'Valeria Cross' or 'DNA of Valeria Cross' from the prompt body, "
+            "EXCEPT inside the watermark text of rule 5, which stays exactly 'feat. Valeria Cross 👠'.\n\n"
             "7. KEEP INTACT: scene, outfit, lighting, environment, pose, mood, camera settings, "
             "photographic style, watermark spec, all creative elements not related to the subject's identity.\n\n"
             "8. BODY STATEMENT: Ensure the Subject body section explicitly states, in positive terms: "
@@ -1192,43 +1254,6 @@ def review_and_fix(prompt: str, client: 'GeminiClient', face_mode: str = "photo"
     except Exception as e:
         logger.warning(f"⚠️ review_and_fix: fallita, uso prompt originale: {e}")
         return prompt
-
-
-def sanitize_user_input(text: str, client: 'GeminiClient') -> str:
-    """
-    Pre-processa il testo dell'utente rimuovendo elementi incompatibili con il DNA di Valeria Cross.
-    Rimuove: makeup, capelli non coerenti, watermark errati, tratti facciali femminili espliciti.
-    Non bloccante — in caso di errore ritorna il testo originale.
-    """
-    if not text or not text.strip():
-        return text
-    try:
-        instr = (
-            "You are a pre-processing filter for an AI image generation system. "
-            "The subject of every image is a fixed character with these IMMUTABLE traits:\n"
-            "- Male Italian face, ~60 years old, silver/grey short hair (max 15cm, nape exposed)\n"
-            "- Beard and eyeglasses exactly as shown in the attached reference photo (ALWAYS present)\n"
-            "- NO makeup of any kind (no eyeshadow, no eyeliner, no lipstick, no contour, no mascara)\n"
-            "- NO long hair, NO dark hair, NO brown/black/blonde hair\n"
-            "- Hourglass feminine body, smooth skin\n\n"
-            "Your task: clean the user's idea text by REMOVING or REPLACING these elements:\n"
-            "1. Any makeup description → REMOVE entirely\n"
-            "2. Any hair description conflicting with short silver hair → REMOVE entirely\n"
-            "3. Any watermark not reading 'feat. Valeria Cross' → REMOVE entirely\n"
-            "4. Any explicit mention of a young female face or female facial traits → REMOVE\n"
-            "5. Keep EVERYTHING else intact: scene, outfit, pose, environment, lighting, camera specs, mood\n\n"
-            "Return ONLY the cleaned text. No explanations, no preamble.\n\n"
-            f"USER TEXT:\n{text}"
-        )
-        result = client.generate(instr)
-        if result:
-            if result != text:
-                logger.info("🧹 sanitize_user_input: rimossi elementi conflittuali")
-            return result
-        return text
-    except Exception as e:
-        logger.warning(f"⚠️ sanitize_user_input: fallita (non bloccante): {e}")
-        return text
 
 
 # ============================================================
@@ -1305,7 +1330,7 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
         mime = detect_mime_type(img_bytes)
         img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type=mime)
         logger.info(f"🔍 analyze_scene: mime={mime} ({len(img_bytes)} bytes)")
-        result = client.generate(_ANALYZE_PROMPT, contents=[img_part])
+        result = client.generate(_ANALYZE_PROMPT, contents=[img_part], max_tokens=8192)
         if result:
             logger.info(f"✅ analyze_scene: completato ({len(result)} chars)")
             return result, None
@@ -1325,7 +1350,7 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
             else:
                 friendly = (
                     "❌ <b>Quota API esaurita.</b>\n"
-                    "Le 20 richieste giornaliere di questa chiave sono finite.\n"
+                    "Quota giornaliera finita su tutte le chiavi disponibili.\n"
                     "Reset alle 08:00 ora Lisbona."
                 )
         elif "SAFETY" in err_text or "SAFETY BLOCK" in err_text or "PROHIBITED_CONTENT" in err_text or "sconosciuto" in err_text:
@@ -1376,6 +1401,7 @@ class GeminiClient:
     """
     _instance = None
     _lock = threading.Lock()
+    _state_lock = threading.RLock()   # 2.4.20 — rotazione chiave e contatori (più thread per bot)
 
     def __new__(cls, api_key: str = None):
         if cls._instance is None:
@@ -1426,9 +1452,10 @@ class GeminiClient:
         """Ruota alla chiave successiva — chiamato su 429/quota."""
         if len(self._clients) <= 1:
             return False
-        self._key_index = (self._key_index + 1) % len(self._clients)
-        self._client = self._clients[self._key_index]
-        new_num = self._key_index + 1
+        with self._state_lock:
+            self._key_index = (self._key_index + 1) % len(self._clients)
+            self._client = self._clients[self._key_index]
+            new_num = self._key_index + 1
         logger.warning(f"🔄 GeminiClient: rotazione chiave → indice {new_num}/{len(self._clients)}")
         # Notifica tutti i callback registrati
         for cb in self._rotation_callbacks:
@@ -1460,9 +1487,10 @@ class GeminiClient:
         self._key_use_callbacks.append(callback)
 
     def reset_counters(self):
-        """Azzera tutti i contatori call — chiamare su /start e automaticamente alle 08:00 UTC."""
-        self._call_counts = [0] * len(self._clients)
-        self._total_calls = 0
+        """Azzera tutti i contatori call — chiamare su /start e automaticamente alle 08:00 ora di Lisbona."""
+        with self._state_lock:
+            self._call_counts = [0] * len(self._clients)
+            self._total_calls = 0
         logger.info("🔄 GeminiClient: contatori call azzerati")
 
     def reset_fallback(self):
@@ -1472,7 +1500,10 @@ class GeminiClient:
         self.last_fallback_code = None
 
     def _schedule_daily_reset(self):
-        """Pianifica reset automatico ogni giorno alle 07:00 UTC (= 08:00 Lisbona estate).
+        """Pianifica reset automatico ogni giorno alle 08:00 ora di Lisbona (Europe/Lisbon),
+        cioè quando si azzera la quota Gemini (mezzanotte del Pacifico). FIX 2.4.20: prima
+        era alle 07:00 UTC fisse, che in inverno sono le 07:00 di Lisbona — un'ora prima.
+        Se il fuso Europe/Lisbon non è disponibile nel container si usa 07:00 UTC.
         FIX 2.3.12: datetime.utcnow() (deprecato, naive) sostituito con
         datetime.now(timezone.utc) (aware) — evita TypeError silenziosi futuri su
         confronti naive/aware. Il loop è inoltre avvolto in try/except: prima, una
@@ -1483,15 +1514,23 @@ class GeminiClient:
         import threading as _t
         import datetime as _dt
 
+        try:
+            from zoneinfo import ZoneInfo
+            _tz, _hour, _label = ZoneInfo("Europe/Lisbon"), 8, "08:00 Lisbona"
+        except Exception:
+            _tz, _hour, _label = _dt.timezone.utc, 7, "07:00 UTC (fuso Lisbona non disponibile)"
+
         def _reset_loop():
             while True:
                 try:
-                    now = _dt.datetime.now(_dt.timezone.utc)
-                    next_reset = now.replace(hour=7, minute=0, second=0, microsecond=0)
+                    now = _dt.datetime.now(_tz)
+                    next_reset = now.replace(hour=_hour, minute=0, second=0, microsecond=0)
                     if now >= next_reset:
-                        next_reset += _dt.timedelta(days=1)
-                    wait_secs = (next_reset - now).total_seconds()
-                    logger.info(f"⏰ Prossimo reset contatori in {int(wait_secs//3600)}h {int((wait_secs%3600)//60)}m (08:00 UTC)")
+                        next_reset = (next_reset + _dt.timedelta(days=1)).replace(hour=_hour)
+                    # differenza calcolata in UTC: corretta anche nei giorni di cambio ora
+                    wait_secs = (next_reset.astimezone(_dt.timezone.utc)
+                                 - now.astimezone(_dt.timezone.utc)).total_seconds()
+                    logger.info(f"⏰ Prossimo reset contatori in {int(wait_secs//3600)}h {int((wait_secs%3600)//60)}m ({_label})")
                     _t.Event().wait(timeout=wait_secs)
                     self.reset_counters()
                 except Exception as e:
@@ -1600,16 +1639,15 @@ class GeminiClient:
             logger.error("❌ GeminiClient non disponibile.")
             return None
         # Round-robin: ruota la chiave PRIMA di ogni chiamata
-        if len(self._clients) > 1:
-            self._rotate_key()
-        # Incrementa contatori e notifica on_key_use callbacks
-        self._total_calls += 1
-        if self._call_counts:
-            self._call_counts[self._key_index] += 1
-        _cur_key = self._key_index + 1
+        with self._state_lock:
+            if len(self._clients) > 1:
+                self._rotate_key()
+            _cur_key = self._key_index + 1
+            _cur_total = self._total_calls + 1   # la prima chiamata viene contata nel ciclo sotto
+        # Notifica on_key_use callbacks — una sola volta per richiesta
         for _cb in self._key_use_callbacks:
             try:
-                _cb(_cur_key, self._total_calls)
+                _cb(_cur_key, _cur_total)
             except Exception as _cb_err:
                 logger.warning(f"\u26a0\ufe0f on_key_use callback error: {_cb_err}")
 
@@ -1647,13 +1685,18 @@ class GeminiClient:
         for pass_no in range(GEMINI_RETRY_PASSES):
             saw_overload = False
             for key_step in range(n_keys):
-                idx = self._key_index
+                with self._state_lock:
+                    idx = self._key_index
                 for m in chain:
                     if (idx, m) in dead:
                         continue
                     if attempts >= GEMINI_MAX_ATTEMPTS:
                         break
                     attempts += 1
+                    with self._state_lock:   # 2.4.20 — conta OGNI chiamata API reale, anche i retry
+                        self._total_calls += 1
+                        if idx < len(self._call_counts):
+                            self._call_counts[idx] += 1
                     try:
                         text = self._call_model(idx, m, payload, safety, max_tokens)
                         if m != model:

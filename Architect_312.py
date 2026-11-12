@@ -1,7 +1,7 @@
 import os, html, logging, threading
 import telebot
 from concurrent.futures import ThreadPoolExecutor
-from C_shared100 import GeminiClient, HealthServer, is_allowed, genai_types, detect_mime_type, SHARED_VERSION, SHARED_DATE
+from C_shared100 import GeminiClient, HealthServer, is_allowed, genai_types, detect_mime_type, SHARED_VERSION, SHARED_DATE, MODEL
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -64,7 +64,13 @@ logger = logging.getLogger(__name__)
 # CHANGELOG 3.1.1 (26/09/2026): aggiornata la stringa modello in /info a
 # "gemini-3.8-flash" (solo display) — il modello reale viene da shared
 # (MODEL, aggiornato in 2.4.14). Nessuna modifica funzionale.
-VERSION = "3.1.1"
+# CHANGELOG 3.1.2 (12/11/2026): revisione del codice su richiesta di Walter.
+# analyze_image_full(): max_tokens 4096 → 8192 (analisi "esaustiva" a 10 sezioni,
+# rischio di risposta troncata senza avviso). Messaggio di /start: tolto "della
+# scena" ripetuto. /help: "/lastprompt" reinvia il prompt in chat (non più un
+# file dalla 3.0.2). /info: il modello mostrato è letto da shared (MODEL), non
+# più scritto a mano. Nessuna modifica al prompt di analisi.
+VERSION = "3.1.2"
 TOKEN   = os.environ.get("TELEGRAM_TOKEN_ARCHITECT")
 
 gemini   = GeminiClient()
@@ -157,7 +163,7 @@ def analyze_image_full(img_bytes: bytes) -> tuple[str | None, str | None]:
     try:
         mime = detect_mime_type(img_bytes)
         img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type=mime)
-        raw = gemini.generate(ANALYSIS_PROMPT, contents=[img_part], max_tokens=4096)
+        raw = gemini.generate(ANALYSIS_PROMPT, contents=[img_part], max_tokens=8192)
         if not raw:
             return None, "Risposta vuota da Gemini."
         return raw.strip(), None
@@ -178,7 +184,7 @@ def start(m):
     logger.info(f"🔄 /start da {username} (id={uid})")
     bot.send_message(m.chat.id,
         f"<b>📐 ARCHITECT v{VERSION}</b>\n\n"
-        f"Inviami una foto: ti restituisco il prompt completo della scena in chat "
+        f"Inviami una foto: ti restituisco in chat il prompt completo "
         f"della scena — soggetto, outfit, accessori, sfondo, luce, tutto quello che è "
         f"visibile — senza alcun DNA Valeria Cross. Descrizione fedele, pronta all'uso."
     )
@@ -188,7 +194,7 @@ def cmd_help(m):
     bot.send_message(m.chat.id,
         f"<b>📐 ARCHITECT v{VERSION} — Comandi</b>\n\n"
         f"/start · /reset — Messaggio iniziale\n"
-        f"/lastprompt — Reinvia l'ultimo file prompt generato\n"
+        f"/lastprompt — Reinvia l'ultimo prompt generato\n"
         f"/info — Versione e informazioni\n"
         f"/shared — Versione shared\n"
         f"/help — Questo messaggio\n\n"
@@ -199,7 +205,7 @@ def cmd_help(m):
 def cmd_info(m):
     bot.send_message(m.chat.id,
         f"<b>📐 ARCHITECT v{VERSION}</b>\n\n"
-        f"Motore: <code>gemini-3.8-flash</code>\n"
+        f"Motore: <code>{MODEL}</code>\n"
         f"Funzione: prompt testuale completo dell'immagine — nessun DNA identitario, "
         f"nessuna sostituzione del soggetto.\n"
         f"Output: testo in chat, pronto all'uso — nessun file da scaricare.\n"

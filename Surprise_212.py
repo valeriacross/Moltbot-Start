@@ -1,10 +1,8 @@
-import os, io, random, logging, telebot, html, time
-from telebot import types
+import os, random, logging, telebot, html, time
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from concurrent.futures import ThreadPoolExecutor
-from C_shared100 import GeminiClient, CaptionGenerator, HealthServer, is_allowed, analyze_scene, generate_mini_caption, generate_mini_prompt, SHARED_VERSION, SHARED_DATE
+from C_shared100 import GeminiClient, CaptionGenerator, HealthServer, is_allowed, generate_mini_caption, generate_mini_prompt, SHARED_VERSION, SHARED_DATE, MODEL
 from C_shared100 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_WATERMARK
-from C_shared100 import VALERIA_DNA, EDITORIAL_WRAPPER, build_valeria_identity
 
 # --- VERSIONE ---
 # CHANGELOG 2.1.1 (03/10/2026): peso Valeria 85kg → 75kg nelle due righe
@@ -60,7 +58,26 @@ from C_shared100 import VALERIA_DNA, EDITORIAL_WRAPPER, build_valeria_identity
 # tastiera, causando selezione silenziosamente errata dal secondo giro in
 # sessione. Introdotto shown_pool per tracciare il pool esatto mostrato per
 # uid+step; fix applicato sia alla selezione che al cambio pagina (pg_).
-VERSION = "2.1.1"
+# CHANGELOG 2.1.2 (12/11/2026): revisione del codice su richiesta di Walter. Il DNA
+# di Valeria (e quello di Walter/Carlotta/Fufos/Fritz in /pride) non è stato toccato.
+#  - Bottoni di /pride ("🔄 Nuovo prompt", "🔁 Stessa location", "📝 Mini caption",
+#    "📋 Mini prompt") e di /flag ("🔄 Nuovo flag") non facevano niente: il gestore
+#    generico dei bottoni (func=lambda call: True), registrato prima, li riceveva
+#    tutti e li ignorava. Ora il gestore generico esclude pride_* e flag_generate.
+#  - /lastprompt era sempre vuoto: last_prompt veniva scritto solo dai bottoni
+#    "conferma"/"riprova", che nessuna tastiera mostrava più. Ora salva i due prompt
+#    (scatto singolo e mosaico) a ogni scena e /lastprompt li reinvia entrambi.
+#  - La caption Gemini veniva generata PRIMA di inviare il prompt (che è locale): un
+#    errore 503/quota bloccava tutto — in Manuale senza alcun messaggio. Ora un
+#    errore della caption non impedisce l'invio di mini prompt e prompt Flow.
+#  - Foto location: un errore di analisi ora finisce nel log (prima era ignorato).
+#  - /info: modello letto da shared (MODEL) invece di "gemini-3.5-flash" scritto a mano.
+#  - Rimosso codice mai usato: SCENARIO_SYSTEM, FANTASY_WORDS/sanitize_scenario(),
+#    _build_base_prompt(), build_flow_prompt(), build_prompt(), format_scenario(),
+#    get_shooting_keyboard(), get_confirm_keyboard(), get_confirm_flow_keyboard(),
+#    i rami "conferma"/"riprova", last_flow_prompt, _uid_for_gen, import inutilizzati.
+#    Il testo dei prompt Flow (singolo e mosaico) è identico a prima.
+VERSION = "2.1.2"
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -738,23 +755,6 @@ MOOD_POOL = [
     ("Visionaria · futurista",               "visionary and futuristic"),
 ]
 
-SCENARIO_SYSTEM = """You are a creative director for a high-fashion AI image generation system.
-You will receive a location. Your job is to choose ONE sky, ONE pose and ONE mood that are COHERENT with that location.
-
-COHERENCE RULES — strictly enforced:
-- Outdoor natural locations (beach, mountain, countryside, garden): use natural light skies (golden hour, sunrise, midday sun, blue hour, stormy, foggy). NEVER use ballroom, opera house, studio, neon city, candlelight or penthouse skies.
-- Indoor luxury venues (ballroom, opera house, atelier, gallery): use interior lighting skies (chandeliers, spotlights, candlelight, studio). NEVER use beach, desert, tropical or snowy outdoor skies.
-- Urban outdoor (city streets, rooftops, canals, promenades): use city-compatible skies (blue hour, neon night, rainy evening, golden hour, overcast). NEVER use underwater, ballroom or snowy mountain skies.
-- Beach / water locations: use beach or water-compatible skies (tropical noon, beach morning, golden hour, backlit). NEVER use ballroom, snowy or studio skies.
-- Pose must be physically possible in the chosen location — no crouching on a yacht deck in a gown unless it makes sense.
-
-Return ONLY valid JSON with these exact keys, no other text:
-{
-  "sky": "chosen sky from the options that fits the location",
-  "pose": "chosen pose that fits the location and outfit",
-  "mood": "chosen mood"
-}"""
-
 def generate_scenario(uid=None):
     """Genera scenario completamente locale — zero API."""
     used_loc = used_locations.get(uid, set())
@@ -780,46 +780,9 @@ def generate_scenario(uid=None):
     return scenario
 
 # --- COSTRUISCE PROMPT IMMAGINE ---
-FANTASY_WORDS = [
-    "wing", "wings", "fairy", "floating", "weightless", "levitating", "levitation",
-    "flying", "fly", "hovering", "hover", "angel", "angelic", "supernatural",
-    "mythical", "mermaid", "dragon", "magical", "enchanted", "ethereal wings",
-    "organza wings", "butterfly wings", "feather wings"
-]
-
-def sanitize_scenario(scenario):
-    """Rimuove elementi fantasy da outfit e pose."""
-    import re
-    for field in ["outfit", "pose", "mood"]:
-        val = scenario.get(field, "")
-        for word in FANTASY_WORDS:
-            val = re.sub(rf"\b{re.escape(word)}\b", "", val, flags=re.IGNORECASE)
-        val = re.sub(r",\s*,", ",", val)
-        val = re.sub(r"\s+", " ", val).strip(" ,")
-        scenario[field] = val
-    return scenario
-
-def _build_base_prompt(scenario):
-    """Costruisce il blocco base comune a single e mosaic."""
-    loc    = scenario.get('location', '')
-    outfit = scenario.get('outfit', '')
-    sky    = scenario.get('sky', '')
-    pose   = scenario.get('pose', '')
-    mood   = scenario.get('mood', '')
-    style  = scenario.get('style', '')
-    return (
-        f"{VALERIA_FACE}"
-        f"{VALERIA_BODY_STRONG}"
-        f"LOCATION: {loc}\n\n"
-        f"OUTFIT: {outfit}\n\n"
-        f"LIGHTING / SKY: {sky}\n\n"
-        f"POSE: {pose}\n\n"
-        f"MOOD / ATMOSPHERE: {mood}\n\n"
-        f"PHOTOGRAPHIC STYLE: {style}\n\n"
-        f"TECHNICAL: 8K cinematic, 85mm lens, f/2.8, ISO 200, natural bokeh, "
-        f"Subsurface Scattering, Global Illumination.\n"
-        f"WATERMARK: '{VALERIA_WATERMARK}' — elegant champagne cursive, very small, bottom center, 90% opacity.\n"
-    ), loc, outfit, sky, pose, mood, style
+def _scenario_fields(scenario):
+    """Campi dello scenario nell'ordine usato dai prompt Flow."""
+    return tuple(scenario.get(k, '') for k in ('location', 'outfit', 'sky', 'pose', 'mood', 'style'))
 
 
 def build_flow_prompt_single(scenario):
@@ -836,7 +799,7 @@ def build_flow_prompt_single(scenario):
         "**⚠️ CRITICAL — BACKGROUND LOCK:** The exact location described below appears precisely, "
         "as the setting of the whole scene.\n\n"
     )
-    (_, loc, outfit, sky, pose, mood, style) = _build_base_prompt(scenario)
+    loc, outfit, sky, pose, mood, style = _scenario_fields(scenario)
     return (
         f"{VALERIA_FACE}{VALERIA_BODY_STRONG}"
         f"{shooting_block}"
@@ -867,7 +830,7 @@ def build_flow_prompt_mosaic(scenario):
         "**⚠️ CRITICAL — BACKGROUND LOCK:** The exact location described below appears precisely, "
         "identically in ALL 4 shots, as the setting of the whole scene.\n\n"
     )
-    (_, loc, outfit, sky, pose, mood, style) = _build_base_prompt(scenario)
+    loc, outfit, sky, pose, mood, style = _scenario_fields(scenario)
     return (
         f"{VALERIA_FACE}{VALERIA_BODY_STRONG}"
         f"{shooting_block}"
@@ -879,28 +842,24 @@ def build_flow_prompt_mosaic(scenario):
     )
 
 
-def build_flow_prompt(scenario, uid=None):
-    """Compatibilità — ritorna il prompt single (usato dove serve un solo prompt)."""
-    return build_flow_prompt_single(scenario)
-
-def build_prompt(scenario, uid=None):
-    return build_flow_prompt(scenario, uid=uid), "2:3", None
-
 def generate_caption_from_scenario(scenario):
-    """→ shared.CaptionGenerator.from_scenario()"""
-    return caption.from_scenario(scenario)
+    """→ shared.CaptionGenerator.from_scenario(). 2.1.2: un errore Gemini non blocca più
+    l'invio del prompt (che è locale) — ritorna (None, messaggio) invece di sollevare."""
+    try:
+        return caption.from_scenario(scenario)
+    except Exception as e:
+        logger.warning(f"⚠️ caption scenario non disponibile: {e}")
+        return None, str(e)
 
 # --- BOT ---
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
 # --- STATO ---
 last_scenario  = {}
-last_prompt    = {}
+last_prompt    = {}   # uid → [(titolo, prompt Flow), ...] — ultimi prompt inviati (2.1.2)
 manual_state   = {}
 used_locations = {}   # uid → set di label location usate nella sessione
-_uid_for_gen   = None  # uid corrente durante generate_scenario
 used_outfits   = {}   # uid → set di label outfit usati nella sessione
-last_flow_prompt = {}  # uid → prompt Flow-ready
 user_photo_location   = {}  # uid → location string estratta dalla foto
 waiting_location_photo = {} # uid → True se in attesa foto location
 
@@ -955,14 +914,6 @@ def get_photo_choice_keyboard():
     )
     return markup
 
-def get_shooting_keyboard():
-    markup = InlineKeyboardMarkup()
-    markup.row(
-        InlineKeyboardButton("📷 Scatto singolo", callback_data="shooting_single"),
-        InlineKeyboardButton("🗂️ Mosaico 4 foto", callback_data="shooting_mosaic")
-    )
-    return markup
-
 def get_main_keyboard():
     markup = InlineKeyboardMarkup()
     markup.row(
@@ -1008,30 +959,13 @@ def _send_dual_output(cid, uid, scenario, caption_text):
             f"{header}<code>{html.escape(chunk)}</code>",
             parse_mode="HTML", reply_markup=kb)
 
-    # Salva prompt single per compat /conferma esistente
-    last_flow_prompt[uid] = p_single
+    # 2.1.2: salvati per /lastprompt
+    last_prompt[uid] = [("📷 Scatto singolo", p_single), ("🗂️ Mosaico 4 foto", p_mosaic)]
 
-
-def get_confirm_keyboard():
-    markup = InlineKeyboardMarkup()
-    markup.row(
-        InlineKeyboardButton("✅ Sì", callback_data="conferma"),
-        InlineKeyboardButton("🏠 No", callback_data="no_home")
-    )
-    return markup
 
 def get_retry_keyboard():
     markup = InlineKeyboardMarkup()
     markup.row(InlineKeyboardButton("🎲 Nuova scena", callback_data="tira"))
-    return markup
-
-def get_confirm_flow_keyboard():
-    """Keyboard di conferma: un solo pulsante Flow + Home."""
-    markup = InlineKeyboardMarkup()
-    markup.row(
-        InlineKeyboardButton("📋 Prompt Flow", callback_data="conferma"),
-        InlineKeyboardButton("🏠 Home", callback_data="no_home")
-    )
     return markup
 
 LABEL_WIDTH = 52  # larghezza uniforme label in caratteri
@@ -1098,22 +1032,6 @@ def send_manual_step(cid, uid, step_index):
         markup = get_pool_keyboard(pool, 0, prefix, title, manual_state.get(uid, {}), step_index)
         bot.send_message(cid, title, reply_markup=markup, parse_mode="HTML")
 
-def format_scenario(s, uid=None):
-    import re as _re
-    loc_display = s['location']
-    if '{' in loc_display and '"subject"' in loc_display:
-        values = _re.findall(r'"(?:subject|ground|sky|colors|lighting|depth|mood)"\s*:\s*"([^"]+)"', loc_display)
-        loc_display = ", ".join(v.strip() for v in values if v.strip()) if values else loc_display[:120]
-    return (
-        f"📍 <b>Location:</b> {html.escape(loc_display)}\n"
-        f"🌤 <b>Sky:</b> {s['sky']}\n"
-        f"👗 <b>Outfit:</b> {s['outfit']}\n"
-        f"🎨 <b>Style:</b> {s['style']}\n"
-        f"💃 <b>Pose:</b> {s['pose']}\n"
-        f"✨ <b>Mood:</b> {s['mood']}\n"
-        f"🏛 <b>Body:</b> Feminine hourglass, 180cm 75kg, D-cup bust, smooth skin"
-    )
-
 def _mini_prompt_from_scenario(scenario, tipo):
     """
     Costruisce il mini prompt direttamente dal dict scenario — zero regex, zero API.
@@ -1157,7 +1075,6 @@ def handle_start(message):
     used_locations.pop(uid, None)
     used_outfits.pop(uid, None)
     shown_pool.pop(uid, None)
-    last_flow_prompt.pop(uid, None)
     user_photo_location.pop(uid, None)
     waiting_location_photo.pop(uid, None)
     logger.info(f"📍 /start da {username} (id={uid})")
@@ -1187,7 +1104,7 @@ def handle_info(message):
         f"Genera scenari editoriali Valeria Cross.\n"
         f"Pool: {len(LOCATION_POOL)} location · {len(OUTFIT_POOL)} outfit · {len(STYLE_POOL)} stili · "
         f"{len(POSE_POOL)} pose · {len(SKY_POOL)} sky · {len(MOOD_POOL)} mood\n"
-        f"Modello caption: <code>gemini-3.5-flash</code>\n\n"
+        f"Modello caption: <code>{MODEL}</code>\n\n"
         f"<i>Output: label + caption + prompt Flow-ready.</i>"
     )
 
@@ -1195,14 +1112,15 @@ def handle_info(message):
 @bot.message_handler(commands=['lastprompt'])
 def cmd_lastprompt(m):
     uid = m.from_user.id
-    prompt = last_prompt.get(uid)
-    if not prompt:
-        bot.send_message(m.chat.id, "⚠️ Nessun prompt disponibile. Genera prima un'immagine.")
+    prompts = last_prompt.get(uid)
+    if not prompts:
+        bot.send_message(m.chat.id, "⚠️ Nessun prompt disponibile. Genera prima una scena.")
         return
-    chunks = [prompt[i:i+3800] for i in range(0, len(prompt), 3800)]
-    for idx, chunk in enumerate(chunks):
-        header = f"🔍 <b>Ultimo prompt</b> ({idx+1}/{len(chunks)}):\n\n" if idx == 0 else f"<i>(continua {idx+1}/{len(chunks)})</i>\n\n"
-        bot.send_message(m.chat.id, f"{header}<code>{html.escape(chunk)}</code>")
+    for title, prompt in prompts:
+        chunks = [prompt[i:i+3800] for i in range(0, len(prompt), 3800)]
+        for idx, chunk in enumerate(chunks):
+            header = f"🔍 <b>{title}</b> ({idx+1}/{len(chunks)}):\n\n" if idx == 0 else f"<i>(continua {idx+1}/{len(chunks)})</i>\n\n"
+            bot.send_message(m.chat.id, f"{header}<code>{html.escape(chunk)}</code>")
 
 # --- HANDLER FOTO LOCATION ---
 @bot.message_handler(content_types=['photo'])
@@ -1250,6 +1168,7 @@ def handle_location_photo(m):
         )
         location_text = gemini.generate(location_prompt, contents=[img_part], max_tokens=2048)
     except Exception as e:
+        logger.error(f"❌ Analisi foto location fallita per {username}: {e}", exc_info=True)
         location_text = None
 
     try: bot.delete_message(cid, wait.message_id)
@@ -1273,7 +1192,9 @@ def handle_location_photo(m):
 
 
 # --- CALLBACK ---
-@bot.callback_query_handler(func=lambda call: True)
+# 2.1.2: esclude i bottoni di /pride e /flag, che hanno gestori propri più sotto —
+# prima questo gestore (registrato per primo) li riceveva tutti e li ignorava.
+@bot.callback_query_handler(func=lambda call: not (call.data or "").startswith(("pride_", "flag_")))
 def handle_callback(call):
     uid = call.from_user.id
     if not is_allowed(uid):
@@ -1426,7 +1347,6 @@ def handle_callback(call):
         try: bot.edit_message_reply_markup(cid, call.message.message_id, reply_markup=None)
         except Exception: pass
         manual_state.pop(uid, None)
-        last_flow_prompt.pop(uid, None)
         user_photo_location.pop(uid, None)
         waiting_location_photo.pop(uid, None)
         bot.send_message(cid,
@@ -1439,57 +1359,11 @@ def handle_callback(call):
         last_scenario.pop(uid, None)
         last_prompt.pop(uid, None)
         manual_state.pop(uid, None)
-        last_flow_prompt.pop(uid, None)
         user_photo_location.pop(uid, None)
         waiting_location_photo.pop(uid, None)
         bot.send_message(cid,
             f"<b>📍 SURPRISE v{VERSION}</b>\n\nHai una foto da usare come location di sfondo?",
             reply_markup=get_photo_choice_keyboard())
-
-    elif data == "conferma":
-        try: bot.edit_message_reply_markup(cid, call.message.message_id, reply_markup=None)
-        except Exception: pass
-        scenario = last_scenario.get(uid)
-        if not scenario:
-            bot.send_message(cid, "⚠️ Sessione scaduta.", reply_markup=get_main_keyboard())
-            return
-        full_p, fmt, _ = build_prompt(scenario, uid=uid)
-        last_prompt[uid] = full_p
-        # flow_prompt già salvato al momento della scena — aggiorna per sicurezza
-        if not last_flow_prompt.get(uid):
-            last_flow_prompt[uid] = build_flow_prompt(scenario, uid=uid)
-        flow_p = last_flow_prompt.get(uid) or build_flow_prompt(scenario, uid=uid)
-        header = "📋 <b>Prompt Flow-ready</b>"
-        bot.send_message(cid, header, parse_mode="HTML")
-        chunks = [flow_p[i:i+3800] for i in range(0, len(flow_p), 3800)]
-        for idx, chunk in enumerate(chunks):
-            if idx == len(chunks) - 1:
-                bot.send_message(cid, f"<code>{html.escape(chunk)}</code>",
-                    parse_mode="HTML", reply_markup=get_retry_keyboard())
-            else:
-                bot.send_message(cid, f"<code>{html.escape(chunk)}</code>", parse_mode="HTML")
-        logger.info(f"📋 FLOW PROMPT inviato a {username} (id={uid})")
-
-    elif data == "riprova":
-        try: bot.edit_message_reply_markup(cid, call.message.message_id, reply_markup=None)
-        except Exception: pass
-        scenario = last_scenario.get(uid)
-        if not scenario:
-            bot.send_message(cid, "⚠️ Sessione scaduta.", reply_markup=get_main_keyboard())
-            return
-        full_p_retry, fmt_retry, _ = build_prompt(scenario, uid=uid)
-        last_prompt[uid] = full_p_retry
-        flow_p = last_flow_prompt.get(uid) or build_flow_prompt(scenario, uid=uid)
-        header = "📋 <b>Prompt Flow-ready</b> <i>(reinviato)</i>"
-        bot.send_message(cid, header, parse_mode="HTML")
-        chunks = [flow_p[i:i+3800] for i in range(0, len(flow_p), 3800)]
-        for idx, chunk in enumerate(chunks):
-            if idx == len(chunks) - 1:
-                bot.send_message(cid, f"<code>{html.escape(chunk)}</code>",
-                    parse_mode="HTML", reply_markup=get_retry_keyboard())
-            else:
-                bot.send_message(cid, f"<code>{html.escape(chunk)}</code>", parse_mode="HTML")
-
 
 # --- FLASK ---
 # --- MAIN ---
@@ -1975,7 +1849,6 @@ def handle_flag_callback(call):
 
 # ═══════════════════════════════════════════════════════════════════════════════
 if __name__ == '__main__':
-    import time
     logger.info(f"📍 SURPRISE v{VERSION} — avvio")
     server.start()
     if not gemini.available:

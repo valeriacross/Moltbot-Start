@@ -1,11 +1,9 @@
-import os, telebot, html, threading, io, logging, time
-from PIL import Image
+import os, telebot, html, threading, logging, time
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from C_shared100 import GeminiClient, CaptionGenerator, HealthServer, is_allowed, genai_types, analyze_scene, SHARED_VERSION, SHARED_DATE
-from C_shared100 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_BODY_SAFE, VALERIA_WATERMARK
-from C_shared100 import VALERIA_DNA, EDITORIAL_WRAPPER, build_valeria_identity, generate_caption, review_and_fix, body_art_clause, multi_subject_clause, has_multiple_figures
+from C_shared100 import GeminiClient, HealthServer, is_allowed, analyze_scene, SHARED_VERSION, SHARED_DATE, MODEL
+from C_shared100 import EDITORIAL_WRAPPER, build_valeria_identity, generate_caption, review_and_fix, body_art_clause, multi_subject_clause, has_multiple_figures
 from C_shared100 import VALERIA_HAIR_TEXT
 
 # --- LOGGING ---
@@ -250,13 +248,33 @@ logger = logging.getLogger(__name__)
 #  - build_valeria_identity() e review_and_fix() ricevono face_mode.
 #  - Scope: solo Atelier + shared. Vogue/Surprise/Filtro/Architect invariati.
 # Non ancora testato in produzione.
-VERSION = "2.8.0"
+# CHANGELOG 2.8.1 (12/11/2026): revisione del codice su richiesta di Walter. Il DNA
+# di Valeria non è stato toccato.
+#  - /shared non rispondeva mai: il gestore del testo (registrato prima) riceveva
+#    anche i comandi e li scartava. /shared ora è registrato prima del gestore testo.
+#  - /start con un filtro già attivo azzerava la modalità a "singola" pur dicendo
+#    "invia una foto": chi aveva scelto Mosaico riceveva un prompt singolo senza
+#    saperlo. Ora la modalità resta quella scelta ed è mostrata nel messaggio.
+#  - _face_locks(): nei filtri body_safe (Selfie Spiaggia, Spiaggia Editoriale,
+#    Yacht, Surf) diceva "full bust described above", in contraddizione con
+#    VALERIA_BODY_SAFE. Ora rimanda alla silhouette morbida descritta sopra.
+#  - Filtro Riviera '60: tolta la riga residua "Instagram filter appearance,
+#    contemporary aesthetic." — era la coda del vecchio NEGATIVE e ora si leggeva
+#    come richiesta, l'opposto di quello che il filtro vuole.
+#  - Filtri normali in modalità Mosaico: IDENTITY LOCK e HAIR LOCK usano la
+#    versione "in every shot / across all 4 shots" (prima sempre quella singola).
+#  - /info: modello letto da shared (MODEL).
+#  - Rimosso codice mai usato: _to_jpeg(), generate_caption_from_image(),
+#    generate_caption_from_prompt(), get_shooting_mode_keyboard(),
+#    get_loop_keyboard() e i callback loop_*, shooting_menu, shooting_new,
+#    cabina_newprompt, alias shooting_single/shooting_mosaic, CaptionGenerator e
+#    import inutilizzati (PIL, io, genai_types, VALERIA_FACE/BODY_*/WATERMARK/DNA).
+VERSION = "2.8.1"
 TOKEN   = os.environ.get("TELEGRAM_TOKEN_CLOSET")
 
 # GeminiClient da C_shared100 v2.2.0 — gestisce nativamente la rotation
 # multi-chiave (GOOGLE_API_KEY / _2 / _3) su errore 429/quota esaurita.
 gemini  = GeminiClient()
-caption = CaptionGenerator(gemini)
 server  = HealthServer("ATELIER", VERSION)
 
 # Notifica cambio API key — invia messaggio all'utente attivo
@@ -561,8 +579,7 @@ FILTERS = {
             "Color palette: Wes Anderson vintage meets aged Riviera postcard — dusty pinks, warm ivories, "
             "faded teals, sun-bleached blues. The image should feel like it was found in a 1968 photo album, "
             "not shot today with a retro filter.\n\n"
-            "**Framing:** Classic editorial composition, medium to full body. Timeless, iconic, cinematic.\n\n"
-            "Instagram filter appearance, contemporary aesthetic.\n"
+            "**Framing:** Classic editorial composition, medium to full body. Timeless, iconic, cinematic.\n"
         ),
     },
     "pool_party": {
@@ -634,20 +651,6 @@ def get_confirm_keyboard():
     return markup
 
 # --- ANALISI OUTFIT (pipeline neutra come Architect) ---
-def _to_jpeg(img_bytes: bytes) -> bytes:
-    """Converte img_bytes in JPEG puro via PIL. Necessario perché Telegram può inviare
-    immagini in formato WebP o PNG — l'API Gemini vision richiede JPEG o PNG esplicito.
-    Ritorna i bytes JPEG oppure i bytes originali se la conversione fallisce."""
-    try:
-        buf = io.BytesIO(img_bytes)
-        img = Image.open(buf).convert("RGB")
-        out = io.BytesIO()
-        img.save(out, format="JPEG", quality=92)
-        return out.getvalue()
-    except Exception as e:
-        logger.warning(f"⚠️ _to_jpeg: conversione fallita ({e}), uso bytes originali")
-        return img_bytes
-
 def describe_outfit_from_image(img_bytes):
     """
     Analisi immagine centralizzata — usa analyze_scene() da C_shared100.
@@ -665,22 +668,6 @@ def describe_outfit_from_image(img_bytes):
         logger.error(f"❌ describe_outfit_from_image ECCEZIONE: {e}", exc_info=True)
         return None, f"❌ Eccezione: {e}"
 
-# --- CAPTION --- (usa generate_caption centralizzata da C_shared100)
-def generate_caption_from_image(img_bytes):
-    """Caption da immagine → shared.generate_caption()."""
-    return generate_caption(img_bytes, gemini)
-
-def generate_caption_from_prompt(outfit_desc, img_bytes=None, filter_key=None, settings=None):
-    """Caption: usa sempre from_image se disponibile — outfit_desc da solo è troppo povero."""
-    if img_bytes:
-        return generate_caption(img_bytes, gemini)
-    return None, "⚠️ Caption non disponibile — nessuna immagine di riferimento."
-
-
-def get_shooting_mode_keyboard():
-    return get_mode_keyboard()
-
-
 # --- IDENTITÀ BUILDER ---
 # build_valeria_identity(), EDITORIAL_WRAPPER, generate_caption() → da C_shared100
 
@@ -693,15 +680,19 @@ _MOSAIC_BLOCK = (
     "Background, lighting and outfit MUST remain identical across all 4 shots.\n\n"
 )
 
-def _face_locks(face_mode: str = "photo", scope: str = "single") -> str:
+def _face_locks(face_mode: str = "photo", scope: str = "single", safe: bool = False) -> str:
     """IDENTITY LOCK + HAIR LOCK locali, un'unica fonte per i tre punti di assemblaggio
     (build_full_prompt, build_shooting_prompt single e mosaic) — introdotta in 2.8.0.
     scope="single": filtro e scatto singolo. scope="mosaic": mosaico a 4 scatti.
     face_mode="photo": testo storico identico alla 2.7.2 (rimando alla foto allegata).
     face_mode="text": volto descritto in shared (VALERIA_FACE_TEXT), capelli da VALERIA_HAIR_TEXT."""
     mosaic = scope == "mosaic"
+    # 2.8.1: nei filtri body_safe il corpo è VALERIA_BODY_SAFE (silhouette morbida, senza
+    # riferimento al seno) — "full bust" lo contraddiceva.
+    shape = ("the soft feminine hourglass silhouette described above" if safe
+             else "the feminine hourglass silhouette and full bust described above")
     body = (
-        "The body keeps the feminine hourglass silhouette and full bust described above, with completely "
+        "The body keeps " + shape + ", with completely "
         "smooth, hairless skin on the torso, arms and legs"
         + (", identically in all 4 shots" if mosaic else "")
         + ".\n\n"
@@ -764,7 +755,7 @@ def build_full_prompt(filter_key, outfit_description, scene_override=None, mode=
         f"richness of detail as the reference.\n\n"
         f"{body_art_clause(outfit_description)}"
         f"{multi_subject_clause(outfit_description)}"
-        f"{_face_locks(face_mode, 'single')}"
+        f"{_face_locks(face_mode, 'mosaic' if mode == 'mosaic' else 'single', safe=safe)}"
         f"**Technical:** 8K, cinematic, photorealistic.\n"
     )
 
@@ -868,20 +859,23 @@ def cmd_start(m):
         logger.warning(f"🚫 /start non autorizzato: uid={uid} username={m.from_user.username}")
         return
     username = m.from_user.username or m.from_user.first_name
-    user_settings[uid] = {'mode': 'single'}
     gemini.reset_counters()  # azzera contatori call ad ogni /start
     # NON resetta user_filter — mantiene ultimo filtro usato
     last_prompt.pop(uid, None)
     logger.info(f"▶️ /start da {username} id={uid}")
-    # Se ha già un filtro → vai diretto a "invia foto"
+    # Se ha già un filtro → vai diretto a "invia foto", con la modalità già scelta (2.8.1)
     if user_filter.get(uid):
+        mode = user_settings[uid].get('mode', 'single')
+        user_settings[uid] = {'mode': mode}
         flt_label = FILTERS[user_filter[uid]]["label"]
+        mode_label = "🗂️ Mosaico 4 foto" if mode == "mosaic" else "📷 Foto singola"
         bot.send_message(m.chat.id,
             f"<b>✦ ATELIER v{VERSION}</b>\n\n"
-            f"Filtro attivo: <b>{flt_label}</b>\n\n"
-            f"📸 Invia una foto, oppure premi 🏠 Home per cambiare filtro.",
+            f"Filtro attivo: <b>{flt_label}</b> · {mode_label}\n\n"
+            f"📸 Invia una foto, oppure premi 🏠 Home per cambiare filtro o modalità.",
             reply_markup=get_confirm_keyboard())
         return
+    user_settings[uid] = {'mode': 'single'}
     bot.send_message(m.chat.id,
         f"<b>✦ ATELIER v{VERSION}</b>\n\nFoto singola o mosaico di 4?",
         reply_markup=get_mode_keyboard())
@@ -908,7 +902,7 @@ def cmd_info(m):
         f"<b>✦ ATELIER v{VERSION}</b>\n\n"
         f"Filtro attivo: <b>{flt_label}</b>\n"
         f"Volto: <b>{'testo dettagliato' if user_face_mode.get(uid) == 'text' else 'foto allegata'}</b>\n"
-        f"Modello: <code>gemini-3.8-flash</code>\n\n"
+        f"Modello: <code>{MODEL}</code>\n\n"
         f"<i>Output: prompt Flow-ready + caption. Nessuna generazione immagini diretta.</i>"
     )
 
@@ -1041,9 +1035,8 @@ def handle_callbacks(call):
         bot.send_message(cid, "📸 Invia una nuova foto di riferimento.")
 
     # Modalità scelta (singola / mosaico) — step 1
-    elif data in ("mode_single", "mode_mosaic", "shooting_mosaic", "shooting_single"):
-        # Normalizza: shooting_* è alias per retrocompatibilità
-        if data in ("mode_mosaic", "shooting_mosaic"):
+    elif data in ("mode_single", "mode_mosaic"):
+        if data == "mode_mosaic":
             mode = "mosaic"
         else:
             mode = "single"
@@ -1059,55 +1052,6 @@ def handle_callbacks(call):
                 cid, call.message.message_id,
                 reply_markup=get_filter_keyboard())
         except Exception: pass
-
-    elif data == "shooting_menu":
-        # Torna al menu iniziale completo
-        try: bot.edit_message_reply_markup(cid, call.message.message_id, reply_markup=None)
-        except Exception: pass
-        user_settings[uid] = {'mode': 'single'}
-        user_filter.pop(uid, None)
-        last_prompt.pop(uid, None)
-        logger.info(f"🏠 {username} (id={uid}) → shooting_menu (reset)")
-        bot.send_message(cid,
-            f"<b>✦ ATELIER v{VERSION}</b>\n\nFoto singola o mosaico di 4?",
-            reply_markup=get_mode_keyboard())
-
-    elif data == "shooting_new":
-        # Nuovo shooting — stesso filtro, nuova foto, scelta modalità diretta
-        try: bot.edit_message_reply_markup(cid, call.message.message_id, reply_markup=None)
-        except Exception: pass
-        user_filter[uid] = "shooting_editorial"
-        logger.info(f"📸 {username} (id={uid}) → shooting_new")
-        bot.send_message(cid,
-            f"🎬 <b>Shooting Editorial</b>\n\n🎬 Come vuoi generare gli scatti?",
-            reply_markup=get_shooting_mode_keyboard())
-
-
-    elif data == "cabina_newprompt":
-        try: bot.edit_message_reply_markup(cid, call.message.message_id, reply_markup=None)
-        except Exception: pass
-        bot.send_message(cid, "📸 Invia una nuova foto di riferimento.")
-
-    # --- LOOP (deprecato — flusso reale usa cancel_gen/go_home) ---
-    elif data in ("loop_same", "loop_new_filter", "loop_new_photo", "loop_reset"):
-        try: bot.edit_message_reply_markup(cid, call.message.message_id, reply_markup=None)
-        except Exception: pass
-        # NON resetta user_filter — mantiene ultimo filtro
-        bot.send_message(cid, "📸 Invia una nuova foto.", reply_markup=None)
-
-
-# --- LOOP KEYBOARD ---
-def get_loop_keyboard():
-    markup = InlineKeyboardMarkup()
-    markup.row(
-        InlineKeyboardButton("🔄 Stessa foto, stesso filtro", callback_data="loop_same"),
-        InlineKeyboardButton("📸 Nuova foto, stesso filtro", callback_data="loop_new_photo"),
-    )
-    markup.row(
-        InlineKeyboardButton("🆕 Nuovo filtro, stessa foto", callback_data="loop_new_filter"),
-        InlineKeyboardButton("🔀 Nuova foto, nuovo filtro", callback_data="loop_reset"),
-    )
-    return markup
 
 # --- GENERAZIONE STANDARD (N foto) ---
 # --- HANDLER FOTO ---
@@ -1300,24 +1244,20 @@ def handle_photo(m):
 
     executor.submit(_process)
 
-@bot.message_handler(content_types=['text'])
-def handle_text(m):
-    if m.text and m.text.startswith('/'):
-        return
-    uid = m.from_user.id
-    bot.reply_to(m, "📸 Invia una foto del costume o outfit da replicare.\nUsa /start per scegliere il filtro.")
-
-# --- SERVER ---
-
-# --- /shared ---
+# --- /shared --- (2.8.1: registrato PRIMA del gestore testo, altrimenti non risponde mai)
 @bot.message_handler(commands=['shared'])
 def cmd_shared(m):
     bot.send_message(m.chat.id,
         f"📦 <b>C_shared100.py</b> v{SHARED_VERSION} — {SHARED_DATE}"
     )
 
+@bot.message_handler(content_types=['text'])
+def handle_text(m):
+    if m.text and m.text.startswith('/'):
+        return
+    bot.reply_to(m, "📸 Invia una foto del costume o outfit da replicare.\nUsa /start per scegliere il filtro.")
+
 if __name__ == "__main__":
-    import time
     logger.info(f"✦ Avvio ATELIER v{VERSION}")
     server.start()
     if not gemini.available:
