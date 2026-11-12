@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 07/11/2026
+**Ultimo aggiornamento:** 12/11/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -10,13 +10,13 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 | Bot | File | Versione | Koyeb | Chiavi |
 |-----|------|---------|-------|--------|
-| VogueBot | `Vogue_432.py` | 4.3.2 | colossal-giselle/vogue | 2 |
-| ArchitectBot | `Architect_311.py` | 3.1.1 | homely-annabelle/thearchitect | 1 |
-| AtelierBot | `Atelier_280.py` | 2.8.0 | flexible-denna/atelier | 5 |
-| FiltroBot | `Filtro_221.py` | 2.2.1 | screeching-jobina/filtro | 1 |
-| SurpriseBot | `Surprise_211.py` | 2.1.1 | surprise1/sorpresa | 1 |
+| VogueBot | `Vogue_433.py` | 4.3.3 | colossal-giselle/vogue | 2 |
+| ArchitectBot | `Architect_312.py` | 3.1.2 | homely-annabelle/thearchitect | 1 |
+| AtelierBot | `Atelier_281.py` | 2.8.1 | flexible-denna/atelier | 5 |
+| FiltroBot | `Filtro_222.py` | 2.2.2 | screeching-jobina/filtro | 1 |
+| SurpriseBot | `Surprise_212.py` | 2.1.2 | surprise1/sorpresa | 1 |
 
-**Shared:** `C_shared100.py` v2.4.19 · **10 API key totali**
+**Shared:** `C_shared100.py` v2.4.20 · **10 API key totali**
 
 ---
 
@@ -24,11 +24,11 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 ```
 C_shared100.py       # Libreria condivisa
-Vogue_432.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
-Architect_311.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
-Atelier_280.py       # Outfit analysis → prompt con filtri (filtro persistente) · /volto: volto a foto o a testo
-Filtro_221.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
-Surprise_211.py      # Location + outfit random + /pride + /flag
+Vogue_433.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
+Architect_312.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
+Atelier_281.py       # Outfit analysis → prompt con filtri (filtro persistente) · /volto: volto a foto o a testo
+Filtro_222.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
+Surprise_212.py      # Location + outfit random + /pride + /flag
 requirements.txt
 README.md
 ```
@@ -83,7 +83,9 @@ openpyxl>=3.1.5
 
 ---
 
-## Fix robustezza (20/06/2026 → 07/11/2026)
+## Fix robustezza (20/06/2026 → 12/11/2026)
+
+**Il 12/11 — revisione completa del codice (shared 2.4.19 → 2.4.20, Vogue 4.3.3, Architect 3.1.2, Atelier 2.8.1, Filtro 2.2.2, Surprise 2.1.2).** Controllo file per file chiesto da Walter. **Il DNA di Valeria non è stato toccato** (occhiali, capelli e barba restano descritti in modo diverso tra i file: da allineare quando Walter darà i dati veri). Bug verificati e corretti: **Surprise** — i bottoni di `/pride` e `/flag` non facevano niente (un gestore generico registrato prima li intercettava tutti), `/lastprompt` era sempre vuoto, un errore della caption bloccava l'invio del prompt; **Filtro** — la whitelist generale veniva scartata da telebot all'avvio (sostituita con un middleware a classe), oltre 9 foto il mosaico si bloccava in silenzio, Mirror analizzava la foto due volte, il prompt 3D Stereo rimandava a una descrizione inesistente, tastiere artisti in errore; **Atelier** — `/shared` non rispondeva mai, `/start` perdeva la scelta Mosaico, "full bust" nei filtri body_safe, riga residua "Instagram filter appearance" nel filtro Riviera '60; **Vogue** — la revisione finale usava le regole "foto allegata" sul prompt video (ora `face_mode="described"`), tolta la riga "Stocky, heavyset" che contraddiceva il corpo, `/dna` mostra il DNA video; **shared** — regola watermark in contraddizione con la regola "togli Valeria Cross", riconoscimento più robusto di "nessun tatuaggio / una sola figura", `analyze_scene()` a 8192 token, reset contatori alle 08:00 di Lisbona tutto l'anno, contatori che contano anche i tentativi ripetuti, rimossa `sanitize_user_input()` inutilizzata. Rimosso codice morto in tutti i bot. **Verificato offline** con pyTelegramBotAPI 4.37.0 (messaggi Telegram simulati, nessuna rete): bottoni Pride/Flag, `/shared`, whitelist, limite 9 foto, conteggio tentativi; il testo dei prompt Flow di Surprise è identico a prima. **Non ancora testato in produzione.** File rinominati: **aggiornare i 5 Run command su Koyeb** (vedi HANDOFF).
 
 **Il 07/11 — primo test di `/volto testo` e prompt tagliati dopo `review_and_fix()` (shared 2.4.18 → 2.4.19).** Atelier 2.8.0 è in produzione (il bot risponde a `/volto`). Primo test con l'outfit rosa in lingerie: senza foto di riferimento Flow riproduce la lingerie e il volto è "nella famiglia giusta" (capelli all'indietro, barba bianca, occhiali verde petrolio) ma non quello di Walter — montatura spessa e squadrata, barba più lunga, volto più levigato, torso maschile; con la foto allegata l'outfit viene coperto, come già osservato. Il test non è pulito: il primo prompt era quello riscritto e accorciato dopo un 503 sul modello lite (mancavano COEXISTENCE, BUST VOLUME, i lock locali, le liste di varietà), il secondo — `/lastprompt` lo conferma — finisce davvero a metà frase ("…and the same body identity described") al pezzo 3/3, quindi non è Telegram a tagliare ma il prompt memorizzato è incompleto: mancano IDENTITY LOCK, HAIR LOCK, BACKGROUND LOCK e la riga Technical. Walter esclude un limite di lunghezza (prompt completi in 4 blocchi sono arrivati in passato): la causa vera è **sconosciuta**, un tetto di token resta solo un'ipotesi. Trovati e corretti due difetti verificati nel codice. **(1)** `body_art_clause()` e `has_multiple_figures()` leggono "BODY ART:" e "FIGURES:" con una regex che fallisce se Gemini scrive i nomi campo in grassetto ("**BODY ART:** None."): BODY ART EXCEPTION e MULTI-SUBJECT LOCK finivano nel prompt anche con zero tatuaggi e una sola figura (~1.800 caratteri in più, solo quando l'analisi esce in grassetto); ora grassetto e punti elenco vengono ignorati. **(2)** `review_and_fix()` accettava qualunque risposta di Gemini senza controllarne la completezza; ora verifica lunghezza (≥60% dell'originale), fine di frase e presenza dei blocchi obbligatori, e in caso contrario usa il prompt originale del codice (sempre completo), scrivendo il motivo nel log. Inoltre `_call_model()` registra nel log il `finish_reason` quando non è STOP, così al prossimo taglio si saprà perché. Verificato: 74 prompt (foto e testo) identici a prima su input senza grassetto; 30 controlli automatici, inclusa la riproduzione del taglio del 07/11 e della riscrittura del 23/10. Atelier non cambia. Non ancora testato in produzione.
 
@@ -168,6 +170,8 @@ Dettagli storici in `HANDOFF-MASTER`, sezioni 2bis, 2ter, 2quater, 2quinquies, 2
 **TODO aperto (07/10):** Filtro 2.2.0/2.2.1 (Director's Cut + clausola di integrazione) non ancora ritestato dopo il fix del 06/10 — Walter deve verificare con la stessa foto di riferimento se il soggetto è ora correttamente reintegrato nella scena, su Villeneuve e idealmente su almeno un altro dei 12 registi. shared 2.4.17 (peso 75kg) non ancora verificato visivamente in produzione.
 
 **TODO aperto (09/10):** deploy con `pyTelegramBotAPI==4.37.0` non ancora osservato — Walter deve controllare al primo redeploy su Koyeb che polling, callback inline ed edit dei messaggi funzionino su tutti i bot (refactor interno dichiarato nelle note della 4.37.0); se qualcosa si rompe, primo sospetto è questo bump, rollback `==4.36.0`. Da confermare anche l'upper bound `google-genai<3`.
+
+**TODO aperto (12/11):** dopo il merge aggiornare i Run command Koyeb: `python Vogue_433.py` (colossal-giselle/vogue), `python Architect_312.py` (homely-annabelle/thearchitect), `python Atelier_281.py` (flexible-denna/atelier), `python Filtro_222.py` (screeching-jobina/filtro), `python Surprise_212.py` (surprise1/sorpresa). Poi provare: bottoni di `/pride` e `/flag`, `/lastprompt` in Surprise, `/shared` in Atelier, un mosaico Filtro da 10 foto, un prompt video Vogue (non deve contenere "attached reference photo").
 
 **TODO aperto (07/11):** shared 2.4.19 non ancora in produzione. Dopo il deploy cercare nel log Koyeb di Atelier le righe "review_and_fix: risposta non utilizzabile (…)" e "finish_reason=…": dicono se il taglio era un tetto di token, un blocco di sicurezza o altro. Le immagini del primo test di `/volto testo` non valgono come confronto (prompt corti o tagliati): rigenerare con un prompt completo, che deve finire con "**Technical:** 8K, cinematic, photorealistic.". Il Run command Koyeb di Atelier risulta aggiornato (il bot risponde a `/volto`).
 

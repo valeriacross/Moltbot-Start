@@ -3,7 +3,7 @@ from PIL import Image
 from telebot import types
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from google.genai import types as genai_types
+from telebot.handler_backends import BaseMiddleware, CancelUpdate
 from C_shared100 import GeminiClient, CaptionGenerator, HealthServer, is_allowed, SHARED_VERSION, SHARED_DATE
 from C_shared100 import analyze_scene
 
@@ -73,7 +73,36 @@ from C_shared100 import analyze_scene
 # usano MODEL definito in C_shared100.py, mai queste due costanti locali.
 # CHANGELOG 2.0.0 (20/06/2026): fix #9 — rimosso blocco cleanup mosaic
 # irraggiungibile in handle_photo (dead code, verificato non necessario).
-VERSION = "2.2.1"
+# CHANGELOG 2.2.2 (12/11/2026): revisione del codice su richiesta di Walter. Il DNA
+# di Valeria non è stato toccato.
+#  - Whitelist: il middleware funzione (@bot.middleware_handler) con
+#    use_class_middlewares=True veniva SCARTATO da telebot all'avvio ("cannot be
+#    used with use_class_middlewares=True. Skipped") — i gestori senza un proprio
+#    is_allowed() rispondevano a chiunque. Sostituito con un middleware a classe
+#    (WhitelistMiddleware), verificato con pyTelegramBotAPI 4.37.0.
+#  - Mosaic: oltre 9 foto il bot si bloccava in silenzio (KeyError su LAYOUTS in
+#    _finalize_mosaic, fuori dal try, sessione persa). Ora dalla 10ª foto in poi la
+#    foto viene rifiutata con un messaggio, e _finalize_mosaic è protetta da try.
+#  - Mirror: la foto veniva analizzata due volte (anteprima + "🚀 Genera", che
+#    rifaceva l'analisi e mandava un secondo prompt diverso). Ora un'analisi sola,
+#    prompt inviato subito. Rimossi mirror_confirm, mirror_pending_prompt, mirror_retry.
+#  - 3D Stereo: il prompt diceva "analyze the outfit description in the subject
+#    description above", ma sopra non c'era niente (la foto non veniva usata). Ora
+#    rimanda alla foto di riferimento da allegare in Flow, come ricordato dagli altri
+#    filtri. Tolto "Attendi ~30 secondi" (il prompt è immediato). Rimossi
+#    stereo_retry/stereo_last_img mai usati.
+#  - Stile Artistico: rimosso il secondo gestore "artcat_" (mai raggiunto) e le
+#    tastiere artist_cat_keyboard()/artist_list_keyboard(), che andavano in
+#    ValueError (le categorie hanno 3 campi, non 2) — handle_photo ora usa
+#    get_artist_cat_keyboard().
+#  - LEGO Galaxy: il bokeh pixel per pixel girava sulla foto intera; ora su una
+#    copia ridotta (8 px per stud), il risultato finale è comunque 52×37 stud.
+#  - Lista LEGO Excel: i colori sono presi da LEGO_PALETTE (5 HEX non coincidevano).
+#  - Testi: "fallita dopo 2 tentativi" (il tentativo è uno), /info elenca tutte le
+#    categorie, /start azzera anche regista scelto e stile in attesa.
+#  - Rimosso codice morto: altri_menu, import genai_types/get_column_letter,
+#    variabili non usate.
+VERSION = "2.2.2"
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -345,8 +374,6 @@ def get_artist_list_keyboard(cat_key):
 def get_artist_keyboard():
     """Alias per compatibilità — mostra menu categorie artisti."""
     return get_artist_cat_keyboard()
-
-    return markup
 
 def build_artistic_style_prompt(artist_key=None):
     """Costruisce il prompt per il filtro artistico.
@@ -1057,21 +1084,26 @@ def filters_by_cat(cat):
 # ============================================================
 # BOT
 # ============================================================
-telebot.apihelper.ENABLE_MIDDLEWARE = True
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML", use_class_middlewares=True)
 
 # --- WHITELIST MIDDLEWARE ---
-@bot.middleware_handler(update_types=['message', 'callback_query'])
-def check_whitelist(bot_instance, update):
-    if hasattr(update, 'from_user'):
-        uid = update.from_user.id
-    elif hasattr(update, 'message') and update.message:
-        uid = update.message.from_user.id
-    else:
-        return
-    if not is_allowed(uid):
-        logger.warning(f"🚫 Accesso non autorizzato bloccato: uid={uid}")
-        raise telebot.CancelUpdate()
+# 2.2.2: middleware a classe. Il vecchio @bot.middleware_handler veniva scartato da
+# telebot quando use_class_middlewares=True, quindi la whitelist non era mai attiva.
+class WhitelistMiddleware(BaseMiddleware):
+    def __init__(self):
+        super().__init__()
+        self.update_types = ['message', 'callback_query']
+
+    def pre_process(self, obj, data):
+        user = getattr(obj, 'from_user', None)
+        if user is None or not is_allowed(user.id):
+            logger.warning(f"🚫 Accesso non autorizzato bloccato: uid={getattr(user, 'id', None)}")
+            return CancelUpdate()
+
+    def post_process(self, obj, data, exception):
+        pass
+
+bot.setup_middleware(WhitelistMiddleware())
 
 # --- KEYBOARD CATEGORIE ---
 def cat_keyboard():
@@ -1085,24 +1117,6 @@ def cat_keyboard():
             markup.add(types.InlineKeyboardButton(cat_label, callback_data="cat_lego"))
         else:
             markup.add(types.InlineKeyboardButton(cat_label, callback_data=f"cat_{cat_key}"))
-    return markup
-
-def artist_cat_keyboard():
-    """Sottomenu categorie artisti — primo livello."""
-    markup = types.InlineKeyboardMarkup()
-    for cat_label, _ in ARTIST_CATEGORIES:
-        markup.add(types.InlineKeyboardButton(cat_label, callback_data=f"artcat_{cat_label}"))
-    markup.add(types.InlineKeyboardButton("◀️ Indietro", callback_data="back_cats"))
-    return markup
-
-def artist_list_keyboard(cat_label):
-    """Lista artisti di una categoria — secondo livello."""
-    markup = types.InlineKeyboardMarkup()
-    artists = next((a for l, a in ARTIST_CATEGORIES if l == cat_label), [])
-    for i in range(0, len(artists), 2):
-        row = [types.InlineKeyboardButton(a, callback_data=f"artist_{a}") for a in artists[i:i+2]]
-        markup.row(*row)
-    markup.add(types.InlineKeyboardButton("◀️ Categorie", callback_data="cat_artistic"))
     return markup
 
 # --- KEYBOARD FILTRI ---
@@ -1125,15 +1139,14 @@ def cmd_start(m):
     user_filter[uid] = None
     user_category[uid] = None
     user_artist.pop(uid, None)
+    user_director.pop(uid, None)
+    pending_director_style.pop(uid, None)
     pending.pop(uid, None)
     last_img.pop(uid, None)
     last_prompt.pop(uid, None)
     pending_artistic_style.pop(uid, None)
     stereo_waiting.pop(uid, None)
-    stereo_last_img.pop(uid, None)
     mirror_waiting.pop(uid, None)
-    mirror_last_img.pop(uid, None)
-    mirror_pending_prompt.pop(uid, None)
     if uid in mosaic_collecting:
         session = mosaic_collecting.pop(uid)
         if session.get('timer'):
@@ -1180,7 +1193,7 @@ def cmd_info(m):
     bot.send_message(m.chat.id,
         f"<b>🎨 Filtro v{VERSION}</b>\n\n"
         f"Filtro attivo: <b>{fname}</b>\n"
-        f"Categorie: Stilistici · Fantasy & Art · Scenografici · Collage · Mosaic · Altri\n"
+        f"Categorie: {' · '.join(CATEGORIES.values())}\n"
         f"Comandi: /help per la lista completa"
     )
 
@@ -1431,7 +1444,7 @@ def handle_filter(call):
 
 # --- 3D STEREO ---
 STEREO_PROMPT = (
-    "Analyze the outfit description in the subject description above carefully. "
+    "Use the attached reference photo: same subject, same outfit, same scene. "
     "Recreate it as a single composite image in 21:9 aspect ratio divided into exactly two equal panels side by side, "
     "designed for cross-eyed stereoscopic 3D viewing.\n\n"
     "LEFT PANEL — right-eye view: recreate the scene with the virtual camera shifted approximately 6cm to the RIGHT. "
@@ -1475,7 +1488,7 @@ def _run_stereo(chat_id, uid, username, img_bytes):
         result_markup = types.InlineKeyboardMarkup()
         result_markup.add(types.InlineKeyboardButton("📷 Nuova foto", callback_data="stereo_start"))
         result_markup.add(types.InlineKeyboardButton("🏠 Menu principale", callback_data="stereo_menu"))
-        bot.send_message(chat_id, "⚡ <b>Prompt Stereo pronto.</b> Usa Flow per generare.")
+        bot.send_message(chat_id, "⚡ <b>Prompt Stereo pronto.</b> Usa Flow per generare, allegando la stessa foto.")
         chunks = [full_prompt[i:i+3800] for i in range(0, len(full_prompt), 3800)]
         for idx, chunk in enumerate(chunks):
             header = "" if len(chunks) == 1 else f"<i>({idx+1}/{len(chunks)})</i>\n"
@@ -1488,8 +1501,6 @@ def _run_stereo(chat_id, uid, username, img_bytes):
         elapsed = round(time.time() - t_start, 1)
         logger.error(f"   ❌ Errore stereo: {e}", exc_info=True)
         bot.send_message(chat_id, f"❌ Errore interno ({elapsed}s):\n<code>{html.escape(str(e))}</code>")
-
-stereo_last_img = {}  # uid → img_bytes per retry
 
 # --- MIRROR OUTFITS ---
 
@@ -1525,62 +1536,16 @@ def _build_mirror_prompt(outfit_desc):
         "- No text, no watermarks"
     )
 
-@bot.callback_query_handler(func=lambda c: c.data in ["stereo_retry", "stereo_menu"])
+@bot.callback_query_handler(func=lambda c: c.data == "stereo_menu")
 def handle_stereo_post(call):
-    uid = call.from_user.id
-    username = call.from_user.username or call.from_user.first_name
     try:
         bot.answer_callback_query(call.id)
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
     except Exception:
         pass
-    if call.data == "stereo_menu":
-        bot.send_message(call.message.chat.id, "🎨 <b>Scegli una categoria:</b>", reply_markup=cat_keyboard())
-        return
-    # stereo_retry
-    img_bytes = stereo_last_img.get(uid)
-    if not img_bytes:
-        bot.send_message(call.message.chat.id, "⚠️ Sessione scaduta. Invia di nuovo la foto.")
-        stereo_waiting[uid] = True
-        return
-    bot.send_message(call.message.chat.id, "🔁 Riprovo la stessa foto...\n⏳ Attendi ~30 secondi.")
-    executor.submit(_run_stereo, call.message.chat.id, uid, username, img_bytes)
+    bot.send_message(call.message.chat.id, "🎨 <b>Scegli una categoria:</b>", reply_markup=cat_keyboard())
 
 mirror_waiting = {}   # uid → True
-mirror_last_img = {}  # uid → img_bytes per retry
-mirror_pending_prompt = {}  # uid → prompt string
-
-@bot.callback_query_handler(func=lambda c: c.data == "mirror_confirm")
-def handle_mirror_confirm(call):
-    uid = call.from_user.id
-    username = call.from_user.username or call.from_user.first_name
-    try:
-        bot.answer_callback_query(call.id)
-        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
-    except Exception:
-        pass
-    img_bytes = mirror_last_img.get(uid)
-    if not img_bytes:
-        bot.send_message(call.message.chat.id, "⚠️ Sessione scaduta. Invia di nuovo la foto.")
-        return
-    bot.send_message(call.message.chat.id, "🪞 <b>Mirror Outfits avviato!</b>\n⏳ Attendi ~30 secondi.")
-    executor.submit(_run_mirror, call.message.chat.id, uid, username, img_bytes)
-
-@bot.callback_query_handler(func=lambda c: c.data == "altri_menu")
-def handle_altri_menu(call):
-    uid = call.from_user.id
-    try:
-        bot.answer_callback_query(call.id)
-        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
-    except Exception:
-        pass
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("🎥 3D Stereo", callback_data="stereo_start"))
-    markup.add(types.InlineKeyboardButton("🪞 Mirror Outfits", callback_data="mirror_start"))
-    for fkey, fdata in filters_by_cat("altri").items():
-        markup.add(types.InlineKeyboardButton(fdata["label"], callback_data=f"f_{fkey}"))
-    markup.add(types.InlineKeyboardButton("◀️ Indietro", callback_data="back_cats"))
-    bot.send_message(call.message.chat.id, "✨ <b>Altri filtri:</b>", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda c: c.data == "mirror_start")
 def handle_mirror_start(call):
@@ -1600,7 +1565,7 @@ def _run_mirror(chat_id, uid, username, img_bytes):
     t_start = time.time()
     logger.info(f"   🪞 Mirror Outfits | {username} — analisi outfit in corso")
     try:
-        # Analisi outfit reale dall'immagine — fino a 2 tentativi
+        # Analisi outfit reale dall'immagine — un solo tentativo (analyze_scene)
         wait = bot.send_message(chat_id, "🔍 <b>Analizzo l'outfit...</b>")
         outfit_desc, err = analyze_scene(img_bytes, gemini)
         try: bot.delete_message(chat_id, wait.message_id)
@@ -1631,25 +1596,14 @@ def _run_mirror(chat_id, uid, username, img_bytes):
         logger.error(f"   ❌ Errore mirror: {e}", exc_info=True)
         bot.send_message(chat_id, f"❌ Errore interno ({elapsed}s):\n<code>{html.escape(str(e))}</code>")
 
-@bot.callback_query_handler(func=lambda c: c.data in ["mirror_retry", "mirror_menu"])
+@bot.callback_query_handler(func=lambda c: c.data == "mirror_menu")
 def handle_mirror_post(call):
-    uid = call.from_user.id
-    username = call.from_user.username or call.from_user.first_name
     try:
         bot.answer_callback_query(call.id)
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
     except Exception:
         pass
-    if call.data == "mirror_menu":
-        bot.send_message(call.message.chat.id, "🎨 <b>Scegli una categoria:</b>", reply_markup=cat_keyboard())
-        return
-    img_bytes = mirror_last_img.get(uid)
-    if not img_bytes:
-        bot.send_message(call.message.chat.id, "⚠️ Sessione scaduta. Invia di nuovo la foto.")
-        mirror_waiting[uid] = True
-        return
-    bot.send_message(call.message.chat.id, "🔁 Riprovo con nuovi outfit...\n⏳ Attendi ~30 secondi.")
-    executor.submit(_run_mirror, call.message.chat.id, uid, username, img_bytes)
+    bot.send_message(call.message.chat.id, "🎨 <b>Scegli una categoria:</b>", reply_markup=cat_keyboard())
 @bot.callback_query_handler(func=lambda c: c.data.startswith("mosaic_build_"))
 def handle_mosaic_build(call):
     uid = call.from_user.id
@@ -1747,22 +1701,6 @@ def cb_artcat(call):
     except Exception:
         bot.send_message(call.message.chat.id, f"🎨 <b>{cat_label}</b> — scegli l'artista:",
             reply_markup=get_artist_list_keyboard(cat_key), parse_mode="HTML")
-
-@bot.callback_query_handler(func=lambda c: c.data.startswith("artcat_"))
-def cb_artist_cat(call):
-    """Mostra lista artisti di una categoria."""
-    uid = call.from_user.id
-    if not is_allowed(uid): return
-    try: bot.answer_callback_query(call.id)
-    except Exception: pass
-    cat_label = call.data.replace("artcat_", "", 1)
-    try:
-        bot.edit_message_text(f"🎨 <b>{cat_label}</b> — scegli l'artista:",
-            call.message.chat.id, call.message.message_id,
-            reply_markup=artist_list_keyboard(cat_label), parse_mode="HTML")
-    except Exception:
-        bot.send_message(call.message.chat.id, f"🎨 <b>{cat_label}</b> — scegli l'artista:",
-            reply_markup=artist_list_keyboard(cat_label), parse_mode="HTML")
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("artist_"))
 def cb_artist_choice(call):
@@ -1865,17 +1803,23 @@ def _finalize_mosaic(uid, chat_id):
         return
     if data.get('timer'):
         data['timer'].cancel()
+    try:
+        _finalize_mosaic_inner(uid, chat_id, data)
+    except Exception as e:
+        # 2.2.2: prima un errore qui (es. layout mancante) chiudeva la sessione in silenzio
+        logger.error(f"   ❌ _finalize_mosaic: {e}", exc_info=True)
+        bot.send_message(chat_id, f"❌ Errore nel collage:\n<code>{html.escape(str(e))}</code>")
 
-    photos = data['photos']
+def _finalize_mosaic_inner(uid, chat_id, data):
+    photos = data['photos'][:9]
     n = len(photos)
-    aspect_label = data.get('aspect', '1:1')
+    aspect_label = data.get('aspect') or '1:1'
 
     if n < 2:
         bot.send_message(chat_id, "⚠️ Servono almeno 2 foto per il collage.")
         return
 
     # Layout per N=3 dipende dall'aspect ratio
-    IS_VERTICAL = aspect_label in ("9:16", "3:4")
     IS_HORIZONTAL = aspect_label in ("16:9", "4:3")
 
     # LAYOUTS: lista di righe, ogni riga = numero di colonne
@@ -2059,39 +2003,23 @@ def handle_photo(m):
 
     # ── MODALITÀ STEREO ───────────────────────────────────────────────────────
     if stereo_waiting.pop(uid, False):
-        bot.send_message(m.chat.id,
-            "🎥 <b>Elaborazione stereo avviata!</b>\n"
-            "⏳ Attendi ~30 secondi.")
         executor.submit(_run_stereo, m.chat.id, uid, username, img_data)
         return
 
     # ── MODALITÀ MIRROR ───────────────────────────────────────────────────────
     if mirror_waiting.pop(uid, False):
-        mirror_last_img[uid] = img_data
-        wait = bot.send_message(m.chat.id, "🔍 <b>Analizzo l'outfit...</b>")
-        outfit_desc, err = analyze_scene(img_data, gemini)
-        try: bot.delete_message(m.chat.id, wait.message_id)
-        except Exception: pass
-        if not outfit_desc:
-            bot.send_message(m.chat.id, err or "⚠️ Analisi fallita.", parse_mode="HTML")
-            return
-        prompt = _build_mirror_prompt(outfit_desc)
-        # Invia prompt in anteprima con pulsante conferma
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🚀 Genera", callback_data="mirror_confirm"))
-        markup.add(types.InlineKeyboardButton("❌ Annulla", callback_data="mirror_menu"))
-        chunks = [prompt[i:i+3800] for i in range(0, len(prompt), 3800)]
-        for idx, chunk in enumerate(chunks):
-            header = "🪞 <b>Mirror Outfits — Prompt generato:</b>\n\n" if idx == 0 else f"<i>(continua {idx+1}/{len(chunks)})</i>\n\n"
-            bot.send_message(m.chat.id, f"{header}<code>{html.escape(chunk)}</code>",
-                reply_markup=markup if idx == len(chunks)-1 else None)
-        # Salva prompt per uso nel callback
-        mirror_pending_prompt[uid] = prompt
+        # 2.2.2: una sola analisi — _run_mirror analizza e invia il prompt finale
+        executor.submit(_run_mirror, m.chat.id, uid, username, img_data)
         return
 
     # ── MODALITÀ MOSAIC ───────────────────────────────────────────────────────
     if uid in mosaic_collecting:
         session = mosaic_collecting[uid]
+        if len(session['photos']) >= 9:
+            # 2.2.2: oltre 9 foto _finalize_mosaic non ha un layout — foto rifiutata
+            bot.reply_to(m, "⚠️ Hai già 9 foto, il massimo per il collage. "
+                            "Premi <b>✅ Procedi</b> oppure /done.")
+            return
         if session.get('timer'):
             session['timer'].cancel()
         session['photos'].append(img_data)
@@ -2133,7 +2061,7 @@ def handle_photo(m):
                 reply_markup=markup)
         else:
             # n == 1
-            bot.reply_to(m, f"📷 Prima foto ricevuta. Invia almeno un'altra per il collage.")
+            bot.reply_to(m, "📷 Prima foto ricevuta. Invia almeno un'altra per il collage.")
 
         # Timer 5 minuti safety net
         t = threading.Timer(300, _finalize_mosaic, args=[uid, m.chat.id])
@@ -2156,13 +2084,12 @@ def handle_photo(m):
     elif fkey == "artistic_style" and uid not in user_artist:
         # Artista non ancora scelto — mostra menu categorie artisti
         bot.reply_to(m, "🎨 <b>Stile Artistico</b>\n\nScegli la categoria:",
-            parse_mode="HTML", reply_markup=artist_cat_keyboard())
+            parse_mode="HTML", reply_markup=get_artist_cat_keyboard())
     elif fkey == "director_style" and uid not in user_director:
         # Regista non ancora scelto — mostra lista registi diretta
         bot.reply_to(m, "🎬 <b>Director's Cut</b>\n\nScegli il regista:",
             parse_mode="HTML", reply_markup=get_director_keyboard())
     else:
-        fname = FILTERS[fkey]["label"]
         logger.info(f"🚀 {username} (id={uid}) → avvio diretto | filtro: {fkey}")
         artist_key = user_artist.get(uid) if fkey == "artistic_style" else None
         director_key = user_director.get(uid) if fkey == "director_style" else None
@@ -2697,15 +2624,18 @@ def _run_lego_galaxy(chat_id, uid, username, img_bytes):
         src = PILImage.open(io.BytesIO(img_bytes)).convert("RGB")
         w, h = src.size
 
-        bokeh_mode = _detect_bokeh_mode(src)
-        logger.info(f"🌌 lego_galaxy: bokeh_mode={bokeh_mode}")
-
         if w >= h:
             cols, rows = A3_LONG, A3_SHORT
         else:
             cols, rows = A3_SHORT, A3_LONG
 
-        src_bokeh      = _apply_bokeh_fast(src, bokeh_mode)
+        # 2.2.2: bokeh calcolato su una copia ridotta (8 px per stud) invece che sulla
+        # foto intera pixel per pixel — il risultato viene comunque ridotto a cols×rows.
+        src_work = src.resize((cols * 8, rows * 8), PILImage.LANCZOS)
+        bokeh_mode = _detect_bokeh_mode(src_work)
+        logger.info(f"🌌 lego_galaxy: bokeh_mode={bokeh_mode}")
+
+        src_bokeh      = _apply_bokeh_fast(src_work, bokeh_mode)
         src_small      = src_bokeh.resize((cols, rows), PILImage.LANCZOS)
         src_orig_small = src.resize((cols, rows), PILImage.LANCZOS)
 
@@ -2807,31 +2737,26 @@ def _run_generation(chat_id, uid, username, data):
         artist_key = data.get('artist_key') or user_artist.get(uid)
         if artist_key and artist_key in ARTISTIC_STYLE_PROMPTS:
             filter_prompt = ARTISTIC_STYLE_PROMPTS[artist_key]
-            fname = f"🎨 {artist_key}"
         else:
             # fallback casuale
-            filter_prompt, style_label = build_artistic_style_prompt()
-            fname = f"🎨 {style_label.split(' — ')[0]}"
+            filter_prompt, _ = build_artistic_style_prompt()
         pending_artistic_style.pop(uid, None)
     elif fkey == "director_style":
         director_key = data.get('director_key') or user_director.get(uid)
         if director_key and director_key in DIRECTOR_STYLE_PROMPTS:
             filter_prompt = DIRECTOR_STYLE_PROMPTS[director_key]
-            fname = director_key
         else:
             # fallback casuale
-            filter_prompt, style_label = build_director_style_prompt()
-            fname = style_label
+            filter_prompt, _ = build_director_style_prompt()
         pending_director_style.pop(uid, None)
     else:
         filter_prompt = resolve_prompt(fkey)
-        fname = FILTERS[fkey]["label"]
     img_bytes = data['img']
 
     t_start = time.time()
     logger.info(f"   🎨 Inizio generazione | {username} | filtro: {fkey}")
 
-    # --- ANALISI OUTFIT REALE (fino a 2 tentativi) ---
+    # --- ANALISI OUTFIT REALE (un solo tentativo, analyze_scene) ---
     wait_analysis = bot.send_message(chat_id, "🔍 <b>Analizzo l'outfit...</b>")
     outfit_desc, err = analyze_scene(img_bytes, gemini)
     try: bot.delete_message(chat_id, wait_analysis.message_id)
@@ -2839,18 +2764,11 @@ def _run_generation(chat_id, uid, username, data):
 
     if not outfit_desc:
         bot.send_message(chat_id,
-            f"❌ <b>Analisi outfit fallita dopo 2 tentativi.</b>\n"
+            f"❌ <b>Analisi outfit fallita.</b>\n"
             f"Nessun prompt generato.\n\n{err or ''}"
         )
         logger.error(f"   ❌ _run_generation: analyze_scene fallita per {username} | filtro: {fkey}")
         return
-
-    # Wrapper editoriale per ridurre falsi positivi IMAGE_SAFETY
-    EDITORIAL_WRAPPER = (
-        "This is a professional editorial post-production request for a high-fashion photography project. "
-        "This is a legitimate creative and commercial photography workflow. "
-        "Apply the following filter: "
-    )
 
     try:
         full_prompt = (
@@ -2875,7 +2793,7 @@ def _run_generation(chat_id, uid, username, data):
             types.InlineKeyboardButton("🆕 Nuova foto e nuovo filtro", callback_data="post_newboth")
         )
 
-        bot.send_message(chat_id, f"⚡ <b>Prompt pronto.</b> Usa Flow per generare l'immagine.")
+        bot.send_message(chat_id, "⚡ <b>Prompt pronto.</b> Usa Flow per generare l'immagine.")
         chunks = [full_prompt[i:i+3800] for i in range(0, len(full_prompt), 3800)]
         for idx, chunk in enumerate(chunks):
             header = "" if len(chunks) == 1 else f"<i>({idx+1}/{len(chunks)})</i>\n"
@@ -2930,7 +2848,6 @@ def cb_lego_list(call):
     try:
         import openpyxl
         from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-        from openpyxl.utils import get_column_letter
 
         cols_n, rows_n = data['cols'], data['rows']
         tipo_counts = data.get('tipo_counts', {})
@@ -2957,25 +2874,8 @@ def cb_lego_list(call):
             cell.alignment = Alignment(horizontal='center')
             cell.border = border
 
-        # Colori LEGO per l'evidenziazione
-        LEGO_HEX = {
-            "White": "F2F3F2", "Light Bluish Gray": "ABABAC", "Medium Stone Grey": "A3A2A5",
-            "Dark Bluish Gray": "6C6E68", "Dark Stone Grey": "4A4948", "Black": "1B2A34",
-            "Yellow": "F7D117", "Bright Yellow": "FFCD00", "Warm Gold": "AA7F2E",
-            "Tan": "DEC69C", "Light Nougat": "F9C198", "Nougat": "CC8E57",
-            "Medium Nougat": "AA7D55", "Dark Nougat": "AA550A", "Reddish Brown": "69402A",
-            "Dark Brown": "351F00", "Red": "B3000A", "Bright Red": "C80008",
-            "Dark Red": "720E0F", "Orange": "D56316", "Bright Orange": "FF7E14",
-            "Dark Orange": "9D4F0C", "Coral": "FF6D58", "Salmon": "FF9077",
-            "Light Pink": "FFADB9", "Pink": "FF698F", "Magenta": "901F76",
-            "Dark Pink": "C90046", "Bright Green": "00B900", "Green": "00924A",
-            "Dark Green": "00642E", "Lime Green": "7DBD00", "Medium Green": "ACCD98",
-            "Olive Green": "4B5420", "Sand Green": "78988A", "Blue": "0055BF",
-            "Bright Blue": "0072CE", "Dark Blue": "0020A0", "Medium Blue": "61AFFF",
-            "Sky Blue": "87CDE2", "Dark Azure": "0083CB", "Medium Azure": "00A8DE",
-            "Sand Blue": "5F7C94", "Purple": "510079", "Medium Lilac": "342B75",
-            "Lavender": "A0968C", "Medium Lavender": "A97FC8", "Sand Purple": "877880",
-        }
+        # Colori LEGO per l'evidenziazione — 2.2.2: presi da LEGO_PALETTE (unica fonte)
+        LEGO_HEX = {name: f"{r:02X}{g:02X}{b:02X}" for name, r, g, b in LEGO_PALETTE}
 
         # Dati ordinati per quantità decrescente
         sorted_items = sorted(tipo_counts.items(), key=lambda x: x[1], reverse=True)
@@ -3062,7 +2962,6 @@ def cb_lego_list(call):
 
 
 if __name__ == "__main__":
-    import time
     logger.info(f"🎨 Avvio Filtro v{VERSION}")
     server.start()
     if not gemini.available:
