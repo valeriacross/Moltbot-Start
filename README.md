@@ -10,13 +10,13 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 | Bot | File | Versione | Koyeb | Chiavi |
 |-----|------|---------|-------|--------|
-| VogueBot | `Vogue_433.py` | 4.3.3 | colossal-giselle/vogue | 2 |
+| VogueBot | `Vogue_434.py` | 4.3.4 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_312.py` | 3.1.2 | homely-annabelle/thearchitect | 1 |
 | AtelierBot | `Atelier_283.py` | 2.8.3 | flexible-denna/atelier | 5 |
-| FiltroBot | `Filtro_222.py` | 2.2.2 | screeching-jobina/filtro | 1 |
-| SurpriseBot | `Surprise_212.py` | 2.1.2 | surprise1/sorpresa | 1 |
+| FiltroBot | `Filtro_223.py` | 2.2.3 | screeching-jobina/filtro | 1 |
+| SurpriseBot | `Surprise_213.py` | 2.1.3 | surprise1/sorpresa | 1 |
 
-**Shared:** `C_shared100.py` v2.4.21 · **10 API key totali**
+**Shared:** `C_shared100.py` v2.4.22 · **10 API key totali**
 
 ---
 
@@ -24,11 +24,11 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 ```
 C_shared100.py       # Libreria condivisa
-Vogue_433.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
+Vogue_434.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
 Architect_312.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
 Atelier_283.py       # Outfit analysis → prompt con filtri (filtro persistente)
-Filtro_222.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
-Surprise_212.py      # Location + outfit random + /pride + /flag
+Filtro_223.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
+Surprise_213.py      # Location + outfit random + /pride + /flag
 requirements.txt
 README.md
 ```
@@ -79,11 +79,14 @@ openpyxl>=3.1.5
 | `TELEGRAM_TOKEN_SORPRESA` | SurpriseBot |
 | `GOOGLE_API_KEY` (+_2, +_3, +_4) | Chiavi Gemini — quantità varia per bot |
 | `ALLOWED_USERS` | `273003890` |
+| `GEMINI_HTTP_TIMEOUT_S` | opzionale, secondi di timeout per ogni chiamata Gemini (predefinito 120) |
 | `PORT` | `10000` |
 
 ---
 
 ## Fix robustezza (20/06/2026 → 13/11/2026)
+
+**Il 13/11 (sera inoltrata) — revisione degli altri quattro bot con Fable 5.2 e secondo giro di fix (shared 2.4.21 → 2.4.22, Vogue 4.3.3 → 4.3.4, Filtro 2.2.2 → 2.2.3, Surprise 2.1.2 → 2.1.3).** Quattro agenti Fable in sola lettura hanno riletto Vogue, Architect, Filtro e Surprise; una parte dei risultati è stata riverificata leggendo o eseguendo il codice, il resto viene dai loro report. Walter ha detto "Vai" alla proposta in tre lotti; regola "una modifica al giorno per bot" saltata (interpretazione di Claude del "Vai"). **Corretto: (1) Surprise** — dopo `/start` o un riavvio, un tocco su una tastiera vecchia del flusso Manuale andava in `KeyError` all'ultimo step senza alcun messaggio: ora avvisa e riparte; con una location da foto il prompt aveva due righe LIGHTING e due MOOD in conflitto (quelle della foto e quelle scelte): ora entrano solo BACKGROUND e CAMERA della foto. **(2) Shared** — una risposta troncata da MAX_TOKENS veniva consegnata come completa (ora errore); l'ordine delle chiavi non dipende più dall'indice condiviso tra thread; su 429 del modello richiesto si provano prima le altre chiavi e poi i modelli di riserva; timeout HTTP di 120 s (verificato che il predefinito della libreria era nessun timeout); mappatura errori unica (`gemini_error_category`); il controllo di `review_and_fix()` protegge anche il prompt video di Vogue (prima una revisione che trasformava "video clip" in "single photorealistic image" passava). **(3) Vogue** — movimento da "### MOVEMENT" riconosciuto, errori di `analyze_video()` con la mappatura unica, caption con escape. **(4) Filtro** — 3D Stereo, Mirror e Mosaic restavano attivi dopo aver scelto altro e catturavano la foto successiva; timer orfani del mosaico; `getdata()` sostituito (Pillow 14); caption con escape. **Test su bot finti:** Surprise 36 controlli, shared 38, Filtro 16, guard sul prompt video reale di Vogue 9 mutilazioni respinte per modo, 69 prompt di Atelier identici carattere per carattere; la 2.4.21/2.1.2/2.2.2 fallisce i test dove previsto. **Non verificato:** avvio con librerie reali, Telegram, Flow, deploy; le due gare tra thread (indice chiave, timer dell'album) non sono state riprodotte sulle versioni vecchie — le correzioni sono per costruzione. **Nessun tetto Pillow in `requirements.txt`** (l'unica API affetta è stata sostituita). Lo stesso report che avevo dato diceva che la caption di Surprise non era in escape: era sbagliato, usa `parse_mode=None`. Dettaglio, elenco di ciò che non è stato corretto e lezioni #33–#34 nell'HANDOFF, sezione 2sextriginta.
 
 **Il 13/11 (sera) — tre fix dalla revisione del codice fatta con Fable 5.2 (shared 2.4.20 → 2.4.21, Atelier 2.8.2 → 2.8.3, `Atelier_283.py`).** Walter ha provato Fable 5.2 come agente separato in sola lettura sul codice di Atelier e shared; ogni problema è stato poi riverificato leggendo o eseguendo il codice. Regola "una modifica al giorno per bot" saltata da Walter in modo esplicito. **(1) Il controllo di completezza di `review_and_fix()` (2.4.19) accettava revisioni mutilate di Gemini:** con il prompt shooting mosaico reale venivano accettate la revisione senza l'intera analisi con gli HEX, senza MULTI-SUBJECT LOCK, avvolta in ``` , con il preambolo "Here is the corrected prompt:" e troncata subito dopo "BACKGROUND LOCK:**". Ora vengono scartate (si usa il prompt costruito dal codice) se mancano MULTI-SUBJECT LOCK, "Reference image analysis" o la riga finale "Technical:", se manca un HEX presente nell'originale, se c'è il ``` o un preambolo, se finisce su un'intestazione ":" o ":**". Prova: 272 revisioni mutilate simulate, prima ne passavano 228 (con il codice 2.4.20), ora 0; nessun falso positivo su 41 prompt reali (Atelier e Vogue video) e su revisioni legittime. **(2) `_classify_gemini_error()`:** il codice di stato è un numero a sé stante (un 400 con "token count (1048503)" non è più un 503), gli INVALID_ARGUMENT/400 non sono mai transitori, e 500, 502, 504, INTERNAL, DEADLINE_EXCEEDED, "disconnected", "remote protocol" sono ora transitori e ritentati (prima errore al primo tentativo, senza fallback). **(3) `html.escape`** sulla caption di Atelier, sul messaggio "Eccezione:" di `describe_outfit_from_image()` e sui tre messaggi d'errore di caption/mini caption/mini prompt in shared (un "<" o "&" faceva rispondere 400 a Telegram e l'utente non riceveva nulla). I prompt di Atelier non cambiano: 68 su 68 identici a 2.8.2. **Non cambiati, per scelta o perché non riguardano questo giro:** Vogue (anche la sua caption è inviata senza escape: stesso difetto, da sistemare in una sua versione), la whitelist (il nome e l'ID di Walter restano come valore di ripiego in shared: il repository è pubblico per sua scelta), e gli altri punti della revisione elencati nel TODO sotto. Non ancora testato in produzione. Rollback: ripristinare `Atelier_282.py` e `C_shared100.py` 2.4.20 dalla cronologia Git.
 
@@ -176,6 +179,8 @@ Dettagli storici in `HANDOFF-MASTER`, sezioni 2bis, 2ter, 2quater, 2quinquies, 2
 **TODO aperto (09/10):** deploy con `pyTelegramBotAPI==4.37.0` non ancora osservato — Walter deve controllare al primo redeploy su Koyeb che polling, callback inline ed edit dei messaggi funzionino su tutti i bot (refactor interno dichiarato nelle note della 4.37.0); se qualcosa si rompe, primo sospetto è questo bump, rollback `==4.36.0`. Da confermare anche l'upper bound `google-genai<3`.
 
 **Stato (12/11, sera):** deploy dei 5 bot fatto da Walter con i Run command nuovi (`Vogue_433.py`, `Architect_312.py`, `Atelier_281.py`, `Filtro_222.py`, `Surprise_212.py`); versioni, `/shared` di Atelier e bottoni `/pride` e `/flag` confermati. Da vedere quando capita: un prompt Vogue non deve contenere "attached reference photo". Aperto: allineare il DNA (occhiali, capelli, barba) tra shared e Vogue video, servono i dati veri di Walter; `/pride`, Minifig di Filtro e watermark di `/flag` restano come sono per sua decisione.
+
+**TODO aperto (13/11, sera inoltrata), priorità alta:** caricare `C_shared100.py` (2.4.22), `Vogue_434.py`, `Filtro_223.py`, `Surprise_213.py`, `README.md` e `HANDOFF-MASTER-13novembre2026.md`; portare i Run command Koyeb di vogue, filtro e sorpresa ai nuovi nomi (lezione #21), togliere `Vogue_433.py`, `Filtro_222.py`, `Surprise_212.py` dal repository, redeploy di tutti e 5. Dopo il deploy cercare nei log "troncata — MAX_TOKENS" e i timeout; se un'analisi video di Vogue scade, alzare `GEMINI_HTTP_TIMEOUT_S`. Punti della revisione dei quattro bot ancora non corretti (token Telegram nel messaggio d'errore di download, whitelist su `/help` `/info` `/shared` `/lastprompt` `/dna`, foto inviata come documento, prompt spezzati a metà parola, voci di Surprise e Filtro): elenco in HANDOFF sezione 2sextriginta, ognuno col suo "Vai".
 
 **TODO aperto (13/11, sera), priorità alta:** (1) caricare su GitHub `C_shared100.py` (2.4.21, stesso nome), `Atelier_283.py`, `README.md` e `HANDOFF-MASTER-13novembre2026.md`; **togliere dal repository `Atelier_281.py` (contiene la versione sbagliata del mattino) e, se è stato caricato, `Atelier_282.py`** (non serve più: `Atelier_283.py` contiene anche la rimozione di `/volto`); (2) portare il Run command Koyeb di `flexible-denna/atelier` a `python Atelier_283.py` (lezione #21) e rifare il redeploy anche degli altri 4 bot, perché usano tutti `C_shared100.py`; (3) dopo il deploy: `/volto` non risponde più, `/info` mostra versione 2.8.3 e shared 2.4.21, `/shared` risponde, un prompt finisce con "**Technical:** 8K, cinematic, photorealistic."; nel log di Atelier cercare "review_and_fix: risposta non utilizzabile (...)" con i nuovi motivi ("codici colore persi", "avvolta in un blocco di codice", "inizia con un preambolo", "finisce su un'intestazione", "manca la riga finale Technical") e "finish_reason=": dicono come Gemini rovina davvero le revisioni. Il TODO sul test di `/volto testo` (23/10) qui sotto è SUPERATO.
 

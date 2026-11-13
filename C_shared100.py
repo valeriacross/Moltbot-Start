@@ -1,9 +1,41 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.21
+Versione: 2.4.22
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+CHANGELOG 2.4.22 (13/11/2026, sera): seconda revisione del 13/11, chiesta da Walter dopo la
+  verifica di tutti i bot (regola "una modifica al giorno per bot" saltata da lui in modo
+  esplicito). Il DNA di Valeria NON è stato toccato.
+  - generate(): una risposta con finish_reason MAX_TOKENS ritornava il testo troncato come se
+    fosse completo (la 2.4.19 lo scriveva solo nel log). Ora solleva un errore non
+    transitorio ("risposta troncata — MAX_TOKENS"): review_and_fix() usa il prompt del codice,
+    gli altri chiamanti mostrano l'errore invece di consegnare un testo tagliato.
+  - generate(): la chiave di partenza veniva riletta da self._key_index a ogni giro, quindi con
+    più thread (Atelier/Surprise/Filtro 4, Vogue 2) la rotazione di un altro thread poteva far
+    saltare una chiave sana o rivisitare una già esaurita, fino a un errore "quota" con chiavi
+    buone ancora da provare. Ora ogni richiesta fissa all'inizio l'ordine delle chiavi
+    (partenza + giro completo) e non dipende più dall'indice condiviso; la rotazione condivisa
+    avanza solo se è ancora ferma sulla chiave esaurita (_rotate_key(from_idx=...)).
+  - generate(): su 429 del modello richiesto si provava il modello di riserva (lite) sulla STESSA
+    chiave prima di provare la stessa richiesta sulle altre chiavi. La quota è per chiave+modello:
+    ora prima si prova il modello richiesto su tutte le chiavi, e solo dopo i modelli di riserva
+    sulle chiavi saltate. Con una sola chiave il comportamento è identico a prima. Un 503 non
+    cambia: continua a scorrere la catena dei modelli sulla stessa chiave.
+  - genai.Client() senza timeout: verificato nella libreria (google-genai 2.34, HttpOptions.timeout
+    predefinito None, nel client sincrono timeout=None) — una chiamata appesa bloccava uno dei
+    pochi thread del bot all'infinito. Ora GEMINI_HTTP_TIMEOUT_S (predefinito 120 s,
+    variabile d'ambiente). Un timeout è un errore transitorio: ritenta con la catena.
+  - Nuovo gemini_error_category(): una sola mappatura degli errori (usa _classify_gemini_error,
+    quindi niente più "503" cercato come sottostringa). La usano analyze_scene(),
+    generate_caption() e generate_mini_caption(); Vogue 4.3.4 la usa per le sue analisi.
+  - review_and_fix(): il controllo della revisione ora copre anche il prompt video di Vogue.
+    Provato prima: una revisione che cambiava "video clip" in "single photorealistic image"
+    veniva accettata (il controllo vedeva solo 3 blocchi). Ora, se l'originale li contiene,
+    devono restare "--- SCENE REFERENCE ---", "--- GENERATION INSTRUCTIONS ---", "single short
+    video clip", "single continuous shot", la barba "dense grey-white beard", "EYEGLASSES — MANDATORY" e la
+    riga sul movimento (riprodotto o inventato). Prompt di Atelier, Surprise e Filtro: nessun
+    cambiamento, i blocchi non ci sono.
 CHANGELOG 2.4.21 (13/11/2026): tre fix dalla revisione del codice del 13/11, chiesti da
   Walter (regola "una modifica al giorno per bot" saltata da lui in modo esplicito).
   Il DNA di Valeria NON è stato toccato. Nessun bot cambia chiamate: cambiano solo il
@@ -685,10 +717,11 @@ MODEL_FALLBACKS = [MODEL_LITE] + [
 GEMINI_RETRY_PASSES = int(os.environ.get("GEMINI_RETRY_PASSES", "4"))   # giri sulla catena modelli in overload (503)
 GEMINI_BACKOFF_BASE = float(os.environ.get("GEMINI_BACKOFF_BASE", "4.0"))  # secondi; attesa = base * 2**giro + jitter 0-1.5s
 GEMINI_MAX_ATTEMPTS = 16     # tetto assoluto di chiamate API per singolo generate()
+GEMINI_HTTP_TIMEOUT_S = float(os.environ.get("GEMINI_HTTP_TIMEOUT_S", "120"))   # 2.4.22 — timeout di ogni chiamata HTTP
 
 # Versione
-VERSION = "2.4.21"
-SHARED_VERSION = "2.4.21"   # aggiornare ad ogni modifica
+VERSION = "2.4.22"
+SHARED_VERSION = "2.4.22"   # aggiornare ad ogni modifica
 SHARED_DATE    = "13/11/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
@@ -1010,12 +1043,17 @@ def generate_caption(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | No
     except Exception as e:
         err_text = str(e)
         logger.error(f"❌ generate_caption(): {err_text}", exc_info=True)
-        if "429" in err_text or "503" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower() or "unavailable" in err_text.lower():
-            return None, ("❌ <b>Servizio Gemini non disponibile.</b> Sovraccarico temporaneo. Riprova tra qualche minuto." if "503" in err_text or "unavailable" in err_text.lower() else "❌ <b>Quota API esaurita.</b> Reset alle 08:00 ora Lisbona.")
-        elif "SAFETY" in err_text:
+        cat = gemini_error_category(err_text)   # 2.4.22
+        if cat == "overload":
+            return None, "❌ <b>Servizio Gemini non disponibile.</b> Sovraccarico temporaneo. Riprova tra qualche minuto."
+        elif cat == "quota":
+            return None, "❌ <b>Quota API esaurita.</b> Reset alle 08:00 ora Lisbona."
+        elif cat == "safety":
             return None, "❌ <b>Safety block di Gemini.</b> Prova con un'immagine diversa."
-        elif "timeout" in err_text.lower() or "deadline" in err_text.lower():
-            return None, "❌ <b>Timeout Gemini.</b> Riprova tra qualche secondo."
+        elif cat == "truncated":
+            return None, "⚠️ <b>Risposta Gemini troncata.</b> Riprova."
+        elif cat == "timeout":
+            return None, "❌ <b>Gemini non risponde.</b> Timeout o connessione interrotta. Riprova tra qualche secondo."
         else:
             return None, f"❌ <b>Errore caption:</b>\n<code>{html.escape(err_text)}</code>"
 
@@ -1051,12 +1089,17 @@ def generate_mini_caption(text: str, client: 'GeminiClient') -> tuple[str | None
     except Exception as e:
         err_text = str(e)
         logger.error(f"❌ generate_mini_caption(): {err_text}", exc_info=True)
-        if "429" in err_text or "503" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower() or "unavailable" in err_text.lower():
-            return None, ("❌ <b>Servizio Gemini non disponibile.</b> Sovraccarico temporaneo. Riprova tra qualche minuto." if "503" in err_text or "unavailable" in err_text.lower() else "❌ <b>Quota API esaurita.</b> Reset alle 08:00 ora Lisbona.")
-        elif "SAFETY" in err_text:
+        cat = gemini_error_category(err_text)   # 2.4.22
+        if cat == "overload":
+            return None, "❌ <b>Servizio Gemini non disponibile.</b> Sovraccarico temporaneo. Riprova tra qualche minuto."
+        elif cat == "quota":
+            return None, "❌ <b>Quota API esaurita.</b> Reset alle 08:00 ora Lisbona."
+        elif cat == "safety":
             return None, "❌ <b>Safety block di Gemini.</b> Riprova."
-        elif "timeout" in err_text.lower() or "deadline" in err_text.lower():
-            return None, "❌ <b>Timeout Gemini.</b> Riprova tra qualche secondo."
+        elif cat == "truncated":
+            return None, "⚠️ <b>Risposta Gemini troncata.</b> Riprova."
+        elif cat == "timeout":
+            return None, "❌ <b>Gemini non risponde.</b> Timeout o connessione interrotta. Riprova tra qualche secondo."
         else:
             return None, f"❌ <b>Errore mini caption:</b>\n<code>{html.escape(err_text)}</code>"
 
@@ -1149,6 +1192,15 @@ _REVIEW_REQUIRED = (
     ("MULTI-SUBJECT LOCK", r"MULTI-SUBJECT LOCK"),            # 2.4.21
     ("Reference image analysis", r"Reference image analysis"),  # 2.4.21
     ("Technical", r"Technical:"),                             # 2.4.21
+    # 2.4.22 — prompt video di Vogue
+    ("SCENE REFERENCE", r"--- SCENE REFERENCE ---"),
+    ("GENERATION INSTRUCTIONS", r"--- GENERATION INSTRUCTIONS ---"),
+    ("clip video", r"single short video clip"),
+    ("ripresa unica", r"single continuous shot"),
+    ("barba video", r"dense grey-white beard"),
+    ("EYEGLASSES MANDATORY", r"EYEGLASSES\s*[\u2014\u2013-]+\s*MANDATORY"),
+    ("movimento riprodotto", r"Reproduce the exact movement"),
+    ("movimento inventato", r"Invent a natural, cinematic movement"),
 )
 # 2.4.21 — un preambolo tipo "Here is the corrected prompt:" e le intestazioni che finiscono
 # con ":" o ":**" (troncamento subito dopo il titolo di un blocco) non sono revisioni valide.
@@ -1394,34 +1446,39 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
     except Exception as e:
         err_text = str(e)
         logger.error(f"❌ analyze_scene: {err_text}")
-        # Classifica l'errore per un messaggio utente chiaro
-        if "429" in err_text or "503" in err_text or "quota" in err_text.lower() or "exhausted" in err_text.lower() or "unavailable" in err_text.lower():
-            if "503" in err_text or "unavailable" in err_text.lower():
-                friendly = (
-                    "❌ <b>Servizio Gemini non disponibile.</b>\n"
-                    "Sovraccarico temporaneo. Riprova tra qualche minuto."
-                )
-            else:
-                friendly = (
-                    "❌ <b>Quota API esaurita.</b>\n"
-                    "Quota giornaliera finita su tutte le chiavi disponibili.\n"
-                    "Reset alle 08:00 ora Lisbona."
-                )
-        elif "SAFETY" in err_text or "SAFETY BLOCK" in err_text or "PROHIBITED_CONTENT" in err_text or "sconosciuto" in err_text:
+        # Classifica l'errore per un messaggio utente chiaro (2.4.22: gemini_error_category)
+        cat = gemini_error_category(err_text)
+        if cat == "overload":
+            friendly = (
+                "❌ <b>Servizio Gemini non disponibile.</b>\n"
+                "Sovraccarico temporaneo. Riprova tra qualche minuto."
+            )
+        elif cat == "quota":
+            friendly = (
+                "❌ <b>Quota API esaurita.</b>\n"
+                "Quota giornaliera finita su tutte le chiavi disponibili.\n"
+                "Reset alle 08:00 ora Lisbona."
+            )
+        elif cat == "truncated":
+            friendly = (
+                "⚠️ <b>Risposta Gemini troncata.</b>\n"
+                "L'analisi era troppo lunga e Gemini l'ha interrotta. Riprova."
+            )
+        elif cat == "safety":
             friendly = (
                 "⚠️ <b>Immagine bloccata dai filtri Gemini.</b>\n"
                 "Gemini rifiuta questa foto (contenuto sensibile).\n"
                 "Prova con un'immagine diversa."
             )
-        elif "API key" in err_text or "API_KEY" in err_text or "credentials" in err_text.lower():
+        elif cat == "apikey":
             friendly = (
                 "❌ <b>Errore chiave API.</b>\n"
                 "La chiave Google non è valida o non è configurata correttamente."
             )
-        elif "timeout" in err_text.lower() or "deadline" in err_text.lower():
+        elif cat == "timeout":
             friendly = (
-                "❌ <b>Timeout Gemini.</b>\n"
-                "La risposta ha impiegato troppo tempo. Riprova tra qualche secondo."
+                "❌ <b>Gemini non risponde.</b>\n"
+                "Timeout o connessione interrotta. Riprova tra qualche secondo."
             )
         else:
             friendly = f"❌ <b>Errore API Gemini:</b>\n<code>{html.escape(err_text)}</code>"
@@ -1448,6 +1505,24 @@ def _classify_gemini_error(err_text: str):
                                       "remote protocol", "reset by peer"))):
         return "transient"
     return None
+
+
+def gemini_error_category(err_text: str) -> str:
+    """2.4.22 — categoria unica per il messaggio all'utente: "overload", "quota", "truncated",
+    "safety", "apikey", "timeout" (timeout/connessione/5xx) oppure "other". Usa
+    _classify_gemini_error(), quindi un numero come 1048503 non diventa un "503"."""
+    kind = _classify_gemini_error(err_text)
+    if kind in ("overload", "quota"):
+        return kind
+    if "MAX_TOKENS" in err_text:
+        return "truncated"
+    if "SAFETY" in err_text or "PROHIBITED_CONTENT" in err_text or "sconosciuto" in err_text:
+        return "safety"
+    if "API key" in err_text or "API_KEY" in err_text or "credentials" in err_text.lower():
+        return "apikey"
+    if kind == "transient":
+        return "timeout"
+    return "other"
 
 
 # ============================================================
@@ -1487,7 +1562,8 @@ class GeminiClient:
 
         self._keys = keys
         self._key_index = 0
-        self._clients = [genai.Client(api_key=k) for k in keys] if keys else []
+        self._clients = [genai.Client(api_key=k, http_options=genai_types.HttpOptions(timeout=int(GEMINI_HTTP_TIMEOUT_S * 1000)))
+                         for k in keys] if keys else []
         self._client = self._clients[0] if self._clients else None
         self._rotation_callbacks = []
         self._key_use_callbacks = []        # callback ad ogni chiamata (chiave, count)
@@ -1510,11 +1586,15 @@ class GeminiClient:
         if self._clients:
             self._schedule_daily_reset()
 
-    def _rotate_key(self):
-        """Ruota alla chiave successiva — chiamato su 429/quota."""
+    def _rotate_key(self, from_idx=None):
+        """Ruota alla chiave successiva — chiamato su 429/quota.
+        2.4.22: con from_idx, ruota solo se l'indice condiviso è ancora fermo su quella chiave;
+        se un altro thread l'ha già spostato non si salta un'altra chiave."""
         if len(self._clients) <= 1:
             return False
         with self._state_lock:
+            if from_idx is not None and self._key_index != from_idx:
+                return True
             self._key_index = (self._key_index + 1) % len(self._clients)
             self._client = self._clients[self._key_index]
             new_num = self._key_index + 1
@@ -1659,16 +1739,22 @@ class GeminiClient:
                 max_output_tokens=max_tokens,
             )
         )
-        try:  # 2.4.19 — solo diagnostica: segnala risposte non concluse normalmente
+        _truncated = False
+        try:  # 2.4.19 — segnala risposte non concluse normalmente
             _cands = getattr(response, "candidates", None) or []
             _fr = getattr(_cands[0], "finish_reason", None) if _cands else None
             _fr_name = getattr(_fr, "name", str(_fr)) if _fr is not None else None
             if _fr_name and _fr_name not in ("STOP", "FINISH_REASON_UNSPECIFIED"):
                 logger.warning(f"⚠️ GeminiClient: finish_reason={_fr_name} su {model} (chiave #{idx + 1}, "
                                f"max_tokens={max_tokens}) — la risposta può essere parziale")
+            _truncated = _fr_name == "MAX_TOKENS"
         except Exception:
             pass
         if response.text:
+            if _truncated:
+                # 2.4.22 — testo tagliato dal limite di token: non va consegnato come completo
+                raise RuntimeError(f"Gemini ha risposto ma la risposta è troncata — MAX_TOKENS "
+                                   f"(max_tokens={max_tokens}, {model}, {len(response.text)} caratteri)")
             return response.text.strip()
         # Risposta vuota — estrai il motivo reale da finish_reason
         raise RuntimeError(f"Gemini ha risposto senza testo — {self._empty_reason(response)}")
@@ -1704,6 +1790,7 @@ class GeminiClient:
         with self._state_lock:
             if len(self._clients) > 1:
                 self._rotate_key()
+            start_idx = self._key_index          # 2.4.22 — la richiesta parte da qui e non rilegge l'indice condiviso
             _cur_key = self._key_index + 1
             _cur_total = self._total_calls + 1   # la prima chiamata viene contata nel ciclo sotto
         # Notifica on_key_use callbacks — una sola volta per richiesta
@@ -1743,57 +1830,82 @@ class GeminiClient:
         last_exc = None
         req_fail_code = None    # codice con cui è fallito il modello richiesto ("503"/"429"/"transient")
         attempts = 0
+        saw_overload = False
+
+        def _attempt(idx, m, pass_no):
+            """Una chiamata API reale. Ritorna (True, testo, None) se riuscita, (False, None, kind) se
+            fallita in modo transitorio; solleva se l'errore non è transitorio."""
+            nonlocal attempts, last_exc, req_fail_code, saw_overload
+            attempts += 1
+            with self._state_lock:   # 2.4.20 — conta OGNI chiamata API reale, anche i retry
+                self._total_calls += 1
+                if idx < len(self._call_counts):
+                    self._call_counts[idx] += 1
+            try:
+                text = self._call_model(idx, m, payload, safety, max_tokens)
+            except Exception as e:
+                err_text = str(e)
+                kind = _classify_gemini_error(err_text)
+                if kind is None:
+                    # Errore non transitorio (SAFETY, parametro errato, MAX_TOKENS, ecc.) — stop
+                    logger.error(f"❌ GeminiClient.generate() [{m}, chiave #{idx + 1}]: {e}", exc_info=True)
+                    raise
+                last_exc = e
+                code = "503" if kind == "overload" else ("429" if kind == "quota" else "transient")
+                if m == model:
+                    req_fail_code = code
+                if kind == "quota":
+                    dead.add((idx, m))
+                else:
+                    saw_overload = True
+                logger.warning(f"⚠️ GeminiClient: {code} su {m} (chiave #{idx + 1}, giro {pass_no + 1}/{GEMINI_RETRY_PASSES}): {err_text[:160]}")
+                return False, None, kind
+            if m != model:
+                # Fallback realmente usato: solo ora si imposta il codice mostrato
+                # all'utente (2.4.12), così non resta impostato se il modello
+                # richiesto riesce al giro successivo.
+                self.last_fallback_code = req_fail_code or "transient"
+                logger.info(f"✅ GeminiClient: risposta da fallback {m} (chiave #{idx + 1}, {req_fail_code or 'transient'} su {model})")
+            return True, text, None
 
         for pass_no in range(GEMINI_RETRY_PASSES):
             saw_overload = False
-            for key_step in range(n_keys):
-                with self._state_lock:
-                    idx = self._key_index
+            # 2.4.22 — ordine delle chiavi fissato per questa richiesta: non dipende da altri thread
+            order = [(start_idx + k) % n_keys for k in range(n_keys)]
+            deferred = []       # chiavi dove il modello richiesto è in 429: i modelli di riserva si provano dopo
+            for key_step, idx in enumerate(order):
+                last_key = key_step == n_keys - 1
                 for m in chain:
                     if (idx, m) in dead:
                         continue
                     if attempts >= GEMINI_MAX_ATTEMPTS:
                         break
-                    attempts += 1
-                    with self._state_lock:   # 2.4.20 — conta OGNI chiamata API reale, anche i retry
-                        self._total_calls += 1
-                        if idx < len(self._call_counts):
-                            self._call_counts[idx] += 1
-                    try:
-                        text = self._call_model(idx, m, payload, safety, max_tokens)
-                        if m != model:
-                            # Fallback realmente usato: solo ora si imposta il codice
-                            # mostrato all'utente (2.4.12), così non resta impostato
-                            # se il modello richiesto riesce al giro successivo.
-                            self.last_fallback_code = req_fail_code or "transient"
-                            logger.info(f"✅ GeminiClient: risposta da fallback {m} (chiave #{idx + 1}, {req_fail_code or 'transient'} su {model})")
+                    ok, text, kind = _attempt(idx, m, pass_no)
+                    if ok:
                         return text
-                    except Exception as e:
-                        err_text = str(e)
-                        kind = _classify_gemini_error(err_text)
-                        if kind is None:
-                            # Errore non transitorio (SAFETY, parametro errato, ecc.) — stop
-                            logger.error(f"❌ GeminiClient.generate() [{m}, chiave #{idx + 1}]: {e}", exc_info=True)
-                            raise
-                        last_exc = e
-                        code = "503" if kind == "overload" else ("429" if kind == "quota" else "transient")
-                        if m == model:
-                            req_fail_code = code
-                        if kind == "quota":
-                            dead.add((idx, m))
-                        else:
-                            saw_overload = True
-                        logger.warning(f"⚠️ GeminiClient: {code} su {m} (chiave #{idx + 1}, giro {pass_no + 1}/{GEMINI_RETRY_PASSES}): {err_text[:160]}")
+                    if kind == "quota" and m == model and not last_key:
+                        # la quota è per chiave+modello: prima il modello richiesto sulle altre chiavi
+                        deferred.append(idx)
+                        break
                 if attempts >= GEMINI_MAX_ATTEMPTS:
                     break
-                # Fine catena sulla chiave corrente. Si ruota chiave SOLO se almeno
-                # una coppia di questa chiave è in quota esaurita (429): su un
-                # 503 un'altra chiave non cambia nulla, l'overload è del modello.
-                if (any((idx, m) in dead for m in chain)
-                        and key_step < n_keys - 1
-                        and self._rotate_key()):
+                # Fine catena sulla chiave corrente. Si passa alla chiave dopo SOLO se almeno
+                # una coppia di questa chiave è in quota esaurita (429): su un 503 un'altra
+                # chiave non cambia nulla, l'overload è del modello.
+                if any((idx, m) in dead for m in chain) and not last_key:
+                    self._rotate_key(from_idx=idx)
                     continue
                 break
+            # modelli di riserva sulle chiavi saltate (tutte le chiavi col modello richiesto hanno fallito)
+            for idx in deferred:
+                for m in chain[1:]:
+                    if (idx, m) in dead:
+                        continue
+                    if attempts >= GEMINI_MAX_ATTEMPTS:
+                        break
+                    ok, text, kind = _attempt(idx, m, pass_no)
+                    if ok:
+                        return text
             if attempts >= GEMINI_MAX_ATTEMPTS or not saw_overload:
                 # Solo quota esaurita ovunque (o budget tentativi finito): ripetere il giro non serve
                 break
