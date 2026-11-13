@@ -46,7 +46,7 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 ## 2. STATO FILE ATTUALE (13/11/2026)
 
-**Nota (13/11, notte):** Walter ha tolto da `CLAUDE.md` la regola "una sola modifica al giorno per bot": le modifiche si fanno quando servono, tutte le volte che servono. Restano le altre regole (ramo separato con pull request, controllo di `VERSION` con grep, data con `date`, README e HANDOFF aggiornati a ogni modifica, niente patch temporanee). Nessun file di codice cambiato.
+**Nota (13/11, notte):** Walter ha tolto da `CLAUDE.md` la regola "una sola modifica al giorno per bot": le modifiche si fanno quando servono, tutte le volte che servono. Tolta anche la regola del ramo separato e della pull request: le modifiche si fanno direttamente su `main` (ogni push può far partire il deploy su Koyeb). Restano le altre regole (controllo di `VERSION` con grep, data con `date`, README e HANDOFF aggiornati a ogni modifica, niente patch temporanee). Nessun file di codice cambiato.
 
 **Nota (13/11, sera inoltrata):** secondo giro dopo la revisione di tutti i bot. Cambiano `C_shared100.py` (2.4.22, stesso nome) e tre bot, **tutti e tre con file rinominati**: `Vogue_434.py` (4.3.4), `Filtro_223.py` (2.2.3), `Surprise_213.py` (2.1.3). **I Run command Koyeb di `colossal-giselle/vogue`, `screeching-jobina/filtro` e `surprise1/sorpresa` vanno portati ai nuovi nomi** (lezione #21); Atelier (`Atelier_283.py`) e Architect (`Architect_312.py`) non cambiano file ma vanno ridistribuiti per prendere shared 2.4.22. `Vogue_433.py`, `Filtro_222.py` e `Surprise_212.py` vanno tolti dal repository dopo il cambio dei Run command. Vedi sezione 2sextriginta. Non ancora in produzione né testato su Telegram/Flow.
 
