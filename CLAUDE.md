@@ -6,7 +6,7 @@ Progetto di bot Telegram che generano prompt di fotografia editoriale di moda pe
 
 - Non creare, modificare o generare nulla che non sia stato chiesto esplicitamente.
 - Lavora sempre su un ramo separato e apri una pull request. Non fare push né merge sul ramo principale: il deploy su Koyeb potrebbe partire da solo.
-- Una sola modifica al giorno per bot. Niente patch temporanee.
+- Niente patch temporanee.
 - A fine lavoro elenca i file modificati e, per ogni bot, la versione prima e dopo.
 
 ## Versioni
