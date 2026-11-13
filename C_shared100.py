@@ -1,9 +1,38 @@
 """
 C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.20
+Versione: 2.4.21
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
 Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+CHANGELOG 2.4.21 (13/11/2026): tre fix dalla revisione del codice del 13/11, chiesti da
+  Walter (regola "una modifica al giorno per bot" saltata da lui in modo esplicito).
+  Il DNA di Valeria NON è stato toccato. Nessun bot cambia chiamate: cambiano solo il
+  controllo interno di review_and_fix(), la classificazione degli errori Gemini e
+  l'escape di tre messaggi di errore.
+  - _review_result_problem() (il controllo introdotto in 2.4.19) lasciava passare
+    revisioni mutilate di Gemini. Provato con il prompt shooting mosaico reale:
+    venivano accettate la revisione senza l'intera "Reference image analysis" (HEX
+    compresi), senza il blocco MULTI-SUBJECT LOCK, avvolta in ``` , con un preambolo
+    tipo "Here is the corrected prompt:" e troncata subito dopo l'intestazione
+    "BACKGROUND LOCK:**" (i caratteri * e ` valevano come fine frase). Ora si scarta
+    la revisione e si usa il prompt costruito dal codice se: (a) mancano
+    MULTI-SUBJECT LOCK, "Reference image analysis" o "Technical:" e c'erano
+    nell'originale; (b) manca un codice colore HEX presente nell'originale; (c) la
+    risposta è avvolta in ``` o inizia con un preambolo e l'originale no; (d) finisce
+    su un'intestazione che termina con ":" o ":**", oppure se l'originale chiude con la riga
+    "Technical:" e la revisione no. Tutti i controlli valgono solo per
+    ciò che l'originale contiene, quindi i prompt di Vogue, Surprise e Filtro non
+    cambiano comportamento.
+  - _classify_gemini_error(): il codice di stato si cerca come numero a sé stante, non
+    come sottostringa (un 400 con "token count (1048503)" non è più un "503 overload").
+    Gli errori INVALID_ARGUMENT / 400 non sono mai transitori. Ora sono transitori,
+    quindi ritentati con la catena modelli e il backoff: 500, 502, 504, INTERNAL,
+    DEADLINE_EXCEEDED, "disconnected", "remote protocol", "reset by peer".
+    Prima un 500 o un "Server disconnected" davano errore al primo tentativo, senza
+    fallback.
+  - html.escape sul testo d'errore in generate_caption(), generate_mini_caption() e
+    generate_mini_prompt(): un errore con "<" o "&" faceva rispondere 400 a Telegram
+    (parse_mode HTML) e l'utente non riceveva nulla.
 CHANGELOG 2.4.20 (12/11/2026): revisione del codice su richiesta di Walter. Il DNA
   di Valeria (volto, capelli, occhiali, barba, corpo) NON è stato toccato.
   - review_and_fix(): la regola 6 (togli "Valeria Cross") contraddiceva la regola 5
@@ -658,9 +687,9 @@ GEMINI_BACKOFF_BASE = float(os.environ.get("GEMINI_BACKOFF_BASE", "4.0"))  # sec
 GEMINI_MAX_ATTEMPTS = 16     # tetto assoluto di chiamate API per singolo generate()
 
 # Versione
-VERSION = "2.4.20"
-SHARED_VERSION = "2.4.20"   # aggiornare ad ogni modifica
-SHARED_DATE    = "12/11/2026"  # aggiornare ad ogni modifica
+VERSION = "2.4.21"
+SHARED_VERSION = "2.4.21"   # aggiornare ad ogni modifica
+SHARED_DATE    = "13/11/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
 
@@ -988,7 +1017,7 @@ def generate_caption(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | No
         elif "timeout" in err_text.lower() or "deadline" in err_text.lower():
             return None, "❌ <b>Timeout Gemini.</b> Riprova tra qualche secondo."
         else:
-            return None, f"❌ <b>Errore caption:</b>\n<code>{err_text}</code>"
+            return None, f"❌ <b>Errore caption:</b>\n<code>{html.escape(err_text)}</code>"
 
 
 def generate_mini_caption(text: str, client: 'GeminiClient') -> tuple[str | None, str | None]:
@@ -1029,7 +1058,7 @@ def generate_mini_caption(text: str, client: 'GeminiClient') -> tuple[str | None
         elif "timeout" in err_text.lower() or "deadline" in err_text.lower():
             return None, "❌ <b>Timeout Gemini.</b> Riprova tra qualche secondo."
         else:
-            return None, f"❌ <b>Errore mini caption:</b>\n<code>{err_text}</code>"
+            return None, f"❌ <b>Errore mini caption:</b>\n<code>{html.escape(err_text)}</code>"
 
 
 def generate_mini_prompt(text: str, client=None) -> tuple:
@@ -1101,7 +1130,7 @@ def generate_mini_prompt(text: str, client=None) -> tuple:
         return result, None
 
     except Exception as e:
-        return None, f"❌ <b>Errore mini prompt:</b> <code>{str(e)}</code>"
+        return None, f"❌ <b>Errore mini prompt:</b> <code>{html.escape(str(e))}</code>"
 
 
 _REVIEW_MIN_RATIO = 0.6
@@ -1117,7 +1146,17 @@ _REVIEW_REQUIRED = (
     ("BACKGROUND LOCK", r"BACKGROUND LOCK"),
     ("Pose options", r"Pose options"),
     ("Framing options", r"Framing options"),
+    ("MULTI-SUBJECT LOCK", r"MULTI-SUBJECT LOCK"),            # 2.4.21
+    ("Reference image analysis", r"Reference image analysis"),  # 2.4.21
+    ("Technical", r"Technical:"),                             # 2.4.21
 )
+# 2.4.21 — un preambolo tipo "Here is the corrected prompt:" e le intestazioni che finiscono
+# con ":" o ":**" (troncamento subito dopo il titolo di un blocco) non sono revisioni valide.
+_REVIEW_PREAMBLE = re.compile(
+    r"^\W*(here(?:'s| is| are)\b|sure\b|certainly\b|of course\b|below is\b|"
+    r"the (?:corrected|revised)\b|corrected prompt\b|revised prompt\b|ecco\b)", re.I)
+_REVIEW_HEADING_END = re.compile(r":\**\s*$")
+_HEX_RE = re.compile(r"#[0-9A-Fa-f]{6}\b")
 
 
 def _review_result_problem(original: str, reviewed: str):
@@ -1136,6 +1175,21 @@ def _review_result_problem(original: str, reviewed: str):
                if re.search(pat, o) and not re.search(pat, r)]
     if missing:
         return "blocchi mancanti: " + ", ".join(missing)
+    # 2.4.21 — i codici colore HEX dell'originale devono esserci ancora tutti
+    lost = sorted({h.upper() for h in _HEX_RE.findall(o)} - {h.upper() for h in _HEX_RE.findall(r)})
+    if lost:
+        return "codici colore persi: " + ", ".join(lost[:4]) + ("..." if len(lost) > 4 else "")
+    if "```" in r and "```" not in o:
+        return "avvolta in un blocco di codice"
+    if _REVIEW_PREAMBLE.match(r) and not _REVIEW_PREAMBLE.match(o):
+        return f"inizia con un preambolo ({r[:40]!r})"
+    _o_last = o.splitlines()[-1] if o else ""
+    if _REVIEW_HEADING_END.search(r.splitlines()[-1]) and not _REVIEW_HEADING_END.search(_o_last):
+        return f"finisce su un'intestazione (...{r[-40:]!r})"
+    # se l'originale chiude con la riga "**Technical:** ...", la revisione deve chiudere allo stesso
+    # modo (in alcuni filtri "Technical:" compare anche prima, nel testo della scena)
+    if re.match(r"\W*Technical:", _o_last) and "Technical:" not in r.splitlines()[-1]:
+        return f"manca la riga finale Technical (...{r[-40:]!r})"
     return None
 
 
@@ -1379,11 +1433,19 @@ def _classify_gemini_error(err_text: str):
     Ritorna "overload" (503/unavailable/overloaded), "quota" (429/quota/exhausted),
     "transient" (timeout/connessione) oppure None se non transitorio."""
     low = err_text.lower()
-    if "503" in err_text or "unavailable" in low or "overloaded" in low:
+    # 2.4.21 — richiesta sbagliata: mai transitoria (anche se il testo contiene un numero tipo 503)
+    if "INVALID_ARGUMENT" in err_text or re.match(r"\s*400\b", err_text):
+        return None
+    def _has(code):   # il codice come numero a sé stante, non come parte di un numero più lungo
+        return re.search(r"(?<!\d)" + code + r"(?!\d)", err_text) is not None
+    if _has("503") or "unavailable" in low or "overloaded" in low:
         return "overload"
-    if "429" in err_text or "quota" in low or "exhausted" in low:
+    if _has("429") or "quota" in low or "exhausted" in low:
         return "quota"
-    if "timeout" in low or "timed out" in low or "connection" in low:
+    if (_has("500") or _has("502") or _has("504")
+            or re.search(r"\b(INTERNAL|DEADLINE_EXCEEDED|BAD_GATEWAY)\b", err_text)
+            or any(x in low for x in ("timeout", "timed out", "connection", "disconnected",
+                                      "remote protocol", "reset by peer"))):
         return "transient"
     return None
 
