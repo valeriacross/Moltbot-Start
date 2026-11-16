@@ -27,3 +27,10 @@ Progetto di bot Telegram che generano prompt di fotografia editoriale di moda pe
 - Mai token, chiavi API o credenziali nel codice, nei commit o nei messaggi. Vanno nelle variabili d'ambiente di Koyeb.
 - Se trovi un segreto nel repository o nella cronologia, segnalalo subito senza copiarlo.
 - Non leggere, non modificare e non aggiungere al repository i file Excel di tracciamento (`VERSIONI_BOT_*.xlsx`): contengono credenziali e li gestisce Walter.
+
+# token diet
+most of my usage is you re-reading this chat. keep it short.
+wait for background jobs to ping you. never check on them in a loop.
+never wake an idle agent to ask for status. send it a real next step.
+when a job is done, tell me to run /compact or write a handoff for a fresh chat.
+max 2 helper agents at a time. use a cheaper model for jobs that only read files.
