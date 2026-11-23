@@ -28,6 +28,7 @@ Vogue_434.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no tes
 Architect_312.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
 Atelier_284.py       # Outfit analysis → prompt con filtri (filtro persistente)
 atelier.py           # Ingresso fisso per Koyeb: avvia il file indicato in BOT_FILE
+vogue.py, architect.py, filtro.py, surprise.py   # Ingressi fissi per Koyeb, uno per bot, come atelier.py
 Filtro_223.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
 Surprise_213.py      # Location + outfit random + /pride + /flag
 requirements.txt
@@ -86,6 +87,8 @@ openpyxl>=3.1.5
 ---
 
 ## Fix robustezza (20/06/2026 → 23/11/2026)
+
+**Il 23/11 (notte) — ingressi fissi per tutti i bot (`vogue.py`, `architect.py`, `filtro.py`, `surprise.py`, nessun cambio di VERSION).** Stesso meccanismo di `atelier.py` (già provato su Koyeb: healthy), uno per bot perché un errore in un lanciatore non fermi gli altri. Ognuno avvia il file indicato in `BOT_FILE` (`Vogue_434.py`, `Architect_312.py`, `Filtro_223.py`, `Surprise_213.py`) e avvisa nei log se esiste una versione più recente. **Run command Koyeb da portare a `python <bot>.py`, uno alla volta, controllando healthy** (finché non lo cambi, i bot girano come prima). A ogni nuova versione di un bot si aggiorna `BOT_FILE` nel suo lanciatore: regola aggiunta a `CLAUDE.md`. Provati con file finti; non provati con le librerie reali né su Koyeb.
 
 **Il 23/11 (sera) — ingresso fisso per Atelier (`atelier.py`, nessun cambio di VERSION).** Nessuno strumento di Claude arriva a Koyeb (nessun connettore, nessun browser collegato, password non digitabili), quindi il Run command va cambiato da Walter a mano e finora andava ricambiato a ogni nuova versione. `atelier.py` avvia il file versionato indicato in `BOT_FILE` (ora `Atelier_284.py`) e stampa un avviso nei log se nella cartella c'è un `Atelier_NNN.py` più recente. **Il Run command Koyeb di `flexible-denna/atelier` va portato una volta sola a `python atelier.py`**; da lì in poi a ogni nuova versione di Atelier si aggiorna `BOT_FILE` e Koyeb non si tocca. Solo Atelier: gli altri quattro bot restano com'erano. Provato con file finti (`__name__`, `__file__`, import dalla cartella, avviso sulla versione più nuova); non provato con le librerie reali né su Koyeb.
 

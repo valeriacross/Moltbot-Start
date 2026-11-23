@@ -46,7 +46,7 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 ## 2. STATO FILE ATTUALE (23/11/2026)
 
-**Nota (23/11):** Il file HANDOFF porta ora nel nome la data dell'ultimo aggiornamento: `HANDOFF-MASTER-23novembre2026.md` (prima `HANDOFF-MASTER-13novembre2026.md`); i riferimenti al vecchio nome più sotto (TODO e incidenti del 13/11) sono storici e restano com'erano. Atelier passa a 2.8.4 (`Atelier_284.py`): cambia solo l'etichetta del messaggio sul contatore call. Aggiunto `atelier.py` (ingresso fisso, senza VERSION): **il Run command Koyeb di `flexible-denna/atelier` va portato una volta sola a `python atelier.py`**; da lì in poi **a ogni nuova versione di Atelier si aggiorna `BOT_FILE` in `atelier.py`** e Koyeb non si tocca (se ci si dimentica, Koyeb avvia la versione vecchia e nei log compare un avviso). `Atelier_283.py` va tolto dal repository dopo il deploy. Resto invariato (shared 2.4.22, gli altri bot). Vedi sezione 2septtriginta.
+**Nota (23/11):** Il file HANDOFF porta ora nel nome la data dell'ultimo aggiornamento: `HANDOFF-MASTER-23novembre2026.md` (prima `HANDOFF-MASTER-13novembre2026.md`); i riferimenti al vecchio nome più sotto (TODO e incidenti del 13/11) sono storici e restano com'erano. Atelier passa a 2.8.4 (`Atelier_284.py`): cambia solo l'etichetta del messaggio sul contatore call. Aggiunto `atelier.py` (ingresso fisso, senza VERSION): **il Run command Koyeb di `flexible-denna/atelier` va portato una volta sola a `python atelier.py`**; da lì in poi **a ogni nuova versione di Atelier si aggiorna `BOT_FILE` in `atelier.py`** e Koyeb non si tocca (se ci si dimentica, Koyeb avvia la versione vecchia e nei log compare un avviso). `Atelier_283.py` va tolto dal repository dopo il deploy. Stesso ingresso fisso per gli altri quattro bot (`vogue.py`, `architect.py`, `filtro.py`, `surprise.py`): i Run command Koyeb vanno portati a `python <bot>.py` uno alla volta, e a ogni nuova versione di un bot si aggiorna `BOT_FILE` nel suo lanciatore (regola in `CLAUDE.md`). Resto invariato (shared 2.4.22). Vedi sezione 2septtriginta.
 
 **Nota (13/11, notte):** Walter ha tolto da `CLAUDE.md` la regola "una sola modifica al giorno per bot": le modifiche si fanno quando servono, tutte le volte che servono. Tolta anche la regola del ramo separato e della pull request: le modifiche si fanno direttamente su `main` (ogni push può far partire il deploy su Koyeb). Restano le altre regole (controllo di `VERSION` con grep, data con `date`, README e HANDOFF aggiornati a ogni modifica, niente patch temporanee). Nessun file di codice cambiato.
 
@@ -67,11 +67,11 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 | File | Versione | Koyeb service | Run command | Chiavi API |
 |------|---------|---------------|--------------|-----------|
 | `C_shared100.py` | **2.4.22** | (comune a tutti) | — | — |
-| `Vogue_434.py` | **4.3.4** | colossal-giselle/vogue | `python Vogue_434.py` | 2 |
-| `Architect_312.py` | **3.1.2** | homely-annabelle/thearchitect | `python Architect_312.py` | 1 |
+| `Vogue_434.py` | **4.3.4** | colossal-giselle/vogue | `python vogue.py` (ingresso fisso → `BOT_FILE`) | 2 |
+| `Architect_312.py` | **3.1.2** | homely-annabelle/thearchitect | `python architect.py` (ingresso fisso → `BOT_FILE`) | 1 |
 | `Atelier_284.py` | **2.8.4** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
-| `Filtro_223.py` | **2.2.3** | screeching-jobina/filtro | `python Filtro_223.py` | 1 |
-| `Surprise_213.py` | **2.1.3** | surprise1/sorpresa | `python Surprise_213.py` | 1 |
+| `Filtro_223.py` | **2.2.3** | screeching-jobina/filtro | `python filtro.py` (ingresso fisso → `BOT_FILE`) | 1 |
+| `Surprise_213.py` | **2.1.3** | surprise1/sorpresa | `python surprise.py` (ingresso fisso → `BOT_FILE`) | 1 |
 
 **Totale chiavi API: 10** (Atelier 5 + Vogue 2 + Architect 1 + Filtro 1 + Surprise 1) — tutte e 10 confermate su progetti Google Cloud distinti il 04/07 (vedi sezione 2quinquies). Prima di quella verifica, Filtro e Surprise condividevano la stessa chiave fisica per un errore di assegnazione: risolto.
 
@@ -95,7 +95,7 @@ Repository: `valeriacross/Moltbot-Start` — region Frankfurt.
 
 *Implementazione.* Atelier 2.8.3 → 2.8.4 (`Atelier_284.py`): `_notify_key_use` scrive "Key N · call totali #M"; commento e changelog aggiunti. Shared non toccato (resta il commento sbagliato). Vogue ha la stessa etichetta in `Vogue_434.py`: non toccato, non richiesto. Verifiche: compilazione e diff riga per riga con 2.8.3 (solo changelog, VERSION, commento ed etichetta). Nessun avvio con librerie reali, nessun deploy. Rollback: `Atelier_283.py` dalla cronologia Git e Run command.
 
-*Ingresso fisso (23/11, sera).* Claude non può cambiare il Run command (nessun connettore Koyeb nel registro, nessun browser collegato, password non digitabili) e Walter ha scelto un file d'ingresso fisso solo per Atelier. `atelier.py` avvia il file in `BOT_FILE` con `runpy.run_path(..., run_name="__main__")` e stampa un avviso se in cartella c'è un `Atelier_NNN.py` più recente. **Regola: a ogni nuova versione di Atelier si aggiorna `BOT_FILE`.** Provato con file finti (stesso `__name__`, `__file__`, import dalla cartella, avviso); non provato con le librerie reali né su Koyeb. Gli altri quattro bot non cambiano.
+*Ingresso fisso (23/11, sera).* Claude non può cambiare il Run command (nessun connettore Koyeb nel registro, nessun browser collegato, password non digitabili) e Walter ha scelto un file d'ingresso fisso solo per Atelier. `atelier.py` avvia il file in `BOT_FILE` con `runpy.run_path(..., run_name="__main__")` e stampa un avviso se in cartella c'è un `Atelier_NNN.py` più recente. **Regola: a ogni nuova versione di Atelier si aggiorna `BOT_FILE`.** Provato con file finti (stesso `__name__`, `__file__`, import dalla cartella, avviso); non provato con le librerie reali né su Koyeb. Più tardi, lo stesso giorno, Walter ha chiesto lo stesso per gli altri quattro: creati `vogue.py`, `architect.py`, `filtro.py`, `surprise.py`, uno per bot (un errore in un lanciatore non ferma gli altri; un file unico con tutte le versioni è stato scartato per questo). Ognuno punta a `Vogue_434.py`, `Architect_312.py`, `Filtro_223.py`, `Surprise_213.py`. Regola in `CLAUDE.md`: a ogni nuova versione di un bot si aggiorna `BOT_FILE`. Provati con file finti, non con le librerie reali né su Koyeb; Run command da cambiare uno alla volta.
 
 ---
 
