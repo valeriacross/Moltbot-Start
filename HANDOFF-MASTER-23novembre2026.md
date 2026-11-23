@@ -46,6 +46,8 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 ## 2. STATO FILE ATTUALE (23/11/2026)
 
+**Nota (23/11, notte, dopo il push):** Atelier 3.0.0 → 3.0.1 (`Atelier_301.py`): la data di produzione non compariva nel `/start` di Atelier senza filtro attivo (errore di Claude, trovato da Walter dallo screenshot dopo il redeploy). Gli altri quattro bot non hanno il problema.
+
 **Nota (23/11, notte):** nuovi nomi per tutti i file e salto di versione maggiore (decisione di Walter): shared `C_shared100.py` 2.4.22 → `shared300.py` 3.0.0; Atelier 2.8.4 → 3.0.0 (`Atelier_300.py`), Vogue 4.3.4 → 5.0.0 (`Vogue_500.py`), Architect 3.1.2 → 4.0.0 (`Architect_400.py`), Filtro 2.2.3 → 3.0.0 (`Filtro_300.py`), Surprise 2.1.3 → 3.0.0 (`Surprise_300.py`). **I Run command su Koyeb NON cambiano** (restano `python <bot>.py`): i lanciatori puntano ai nuovi file. Nome file = VERSION senza punti vale per i bot; shared resta in-place con nome fisso.
 
 **Nota (23/11):** Il file HANDOFF porta ora nel nome la data dell'ultimo aggiornamento: `HANDOFF-MASTER-23novembre2026.md` (prima `HANDOFF-MASTER-13novembre2026.md`); i riferimenti al vecchio nome più sotto (TODO e incidenti del 13/11) sono storici e restano com'erano. Atelier passa a 2.8.4 (`Atelier_284.py`): cambia solo l'etichetta del messaggio sul contatore call. Aggiunto `atelier.py` (ingresso fisso, senza VERSION): **il Run command Koyeb di `flexible-denna/atelier` va portato una volta sola a `python atelier.py`**; da lì in poi **a ogni nuova versione di Atelier si aggiorna `BOT_FILE` in `atelier.py`** e Koyeb non si tocca (se ci si dimentica, Koyeb avvia la versione vecchia e nei log compare un avviso). `Atelier_283.py` va tolto dal repository dopo il deploy. Stesso ingresso fisso per gli altri quattro bot (`vogue.py`, `architect.py`, `filtro.py`, `surprise.py`): i Run command Koyeb vanno portati a `python <bot>.py` uno alla volta, e a ogni nuova versione di un bot si aggiorna `BOT_FILE` nel suo lanciatore (regola in `CLAUDE.md`). Resto invariato (shared 2.4.22). Vedi sezione 2septtriginta.
@@ -71,7 +73,7 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 | `shared300.py` | **3.0.0** | (comune a tutti) | — | — |
 | `Vogue_500.py` | **5.0.0** | colossal-giselle/vogue | `python vogue.py` (ingresso fisso → `BOT_FILE`) | 2 |
 | `Architect_400.py` | **4.0.0** | homely-annabelle/thearchitect | `python architect.py` (ingresso fisso → `BOT_FILE`) | 1 |
-| `Atelier_300.py` | **3.0.0** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
+| `Atelier_301.py` | **3.0.1** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
 | `Filtro_300.py` | **3.0.0** | screeching-jobina/filtro | `python filtro.py` (ingresso fisso → `BOT_FILE`) | 1 |
 | `Surprise_300.py` | **3.0.0** | surprise1/sorpresa | `python surprise.py` (ingresso fisso → `BOT_FILE`) | 1 |
 
@@ -91,7 +93,7 @@ Repository: `valeriacross/Moltbot-Start` — region Frankfurt.
 
 *Decisioni di Walter (risposte alle domande).* Shared: `shared300.py`, VERSION 3.0.0 (non `shared200.py`: la VERSION interna era già 2.4.22 e scendere a 2.0.0 sarebbe stato un passo indietro). Vogue: nel salto a 5.0.0 correggere anche l'etichetta "call totali #" come in Atelier. Due versioni dello stesso bot nello stesso giorno: "direi mai".
 
-*Implementazione.* `git mv` per tutti (storia dei file conservata). Nuova costante `VERSION_DATE` accanto a `VERSION` in ogni bot (da aggiornare a ogni versione, data da `date`); il `/start` mostra `v{VERSION} · {VERSION_DATE}` (Atelier in entrambi i rami del `/start`). Import cambiato in `from shared300 import ...` e riga "📦 shared300.py v… — data" nei comandi di versione. `BOT_FILE` aggiornato nei 5 lanciatori. Nessuna modifica ai prompt né al DNA di Valeria; shared senza modifiche al codice (solo nome, VERSION, SHARED_DATE, docstring). Il docstring errato di `on_key_use` ("per quella chiave") in shared NON è stato toccato: non richiesto.
+*Implementazione.* `git mv` per tutti (storia dei file conservata). Nuova costante `VERSION_DATE` accanto a `VERSION` in ogni bot (da aggiornare a ogni versione, data da `date`); il `/start` mostra `v{VERSION} · {VERSION_DATE}` (Atelier: vedi 3.0.1 — nella 3.0.0 la data era solo nel ramo "filtro attivo" e in `/info`, non nel `/start` senza filtro; corretto nella 3.0.1). Import cambiato in `from shared300 import ...` e riga "📦 shared300.py v… — data" nei comandi di versione. `BOT_FILE` aggiornato nei 5 lanciatori. Nessuna modifica ai prompt né al DNA di Valeria; shared senza modifiche al codice (solo nome, VERSION, SHARED_DATE, docstring). Il docstring errato di `on_key_use` ("per quella chiave") in shared NON è stato toccato: non richiesto.
 
 *Verifiche.* `py_compile` su 6 file; ogni nome importato dai bot esiste in `shared300.py` (controllo AST); `grep` dei vecchi nomi: restano solo menzioni storiche in commenti di changelog e nelle sezioni vecchie di README/HANDOFF. **Non provato in produzione** (il sandbox non ha google-genai: import runtime non eseguito).
 
@@ -977,10 +979,11 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 7. ATELIER — STORICO E STATO (v3.0.0)
+## 7. ATELIER — STORICO E STATO (v3.0.1)
 
 **Nota (29/09):** lista ferma alla 2.5.4 da prima del 29/08 — mancano i bump 2.6.0/2.6.1 (multi-soggetto, 01-02/08), 2.6.2 (checklist mosaico condizionale), 2.7.0 (codice errore nell'header fallback), tutti narrati nelle sezioni 2duovicies/2trevicies ma mai riportati qui puntualmente. Non ricostruito su indicazione di Walter — aggiunto solo il bump verificato di questa settimana.
 
+- **v3.0.1 (23/11/2026):** `Atelier_301.py`; la data nel `/start` mancava nel ramo senza filtro attivo (quello che si vede dopo ogni riavvio). Nessun altro cambiamento.
 - **v3.0.0 (23/11/2026):** `Atelier_300.py`; shared → `shared300.py`; `VERSION_DATE` mostrata nel `/start`. Nessun cambio ai prompt.
 - **v2.8.4 (23/11/2026):** il messaggio "Key N · call #M" diventa "Key N · call totali #M" (M è il totale di tutte le chiavi, non della chiave N). Nessun'altra modifica. File `Atelier_284.py`. Vedi sezione 2septtriginta.
 - **v2.8.3 (13/11/2026, sera):** `html.escape` sulla caption e sul messaggio "Eccezione:" di `describe_outfit_from_image()` (una caption con "<" o "&" faceva rispondere 400 a Telegram e l'utente non riceveva nulla). Prompt invariati: 68 su 68 identici a 2.8.2 (verificato a runtime con shared 2.4.21). Richiede shared >= 2.4.21 per i fix collegati, ma gira anche con 2.4.20. Contiene la rimozione di `/volto` della 2.8.2. Non ancora testato in produzione.

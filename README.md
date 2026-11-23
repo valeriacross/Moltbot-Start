@@ -12,7 +12,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 |-----|------|---------|-------|--------|
 | VogueBot | `Vogue_500.py` | 5.0.0 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_400.py` | 4.0.0 | homely-annabelle/thearchitect | 1 |
-| AtelierBot | `Atelier_300.py` | 3.0.0 | flexible-denna/atelier | 5 |
+| AtelierBot | `Atelier_301.py` | 3.0.1 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_300.py` | 3.0.0 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_300.py` | 3.0.0 | surprise1/sorpresa | 1 |
 
@@ -26,7 +26,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 shared300.py         # Libreria condivisa
 Vogue_500.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
 Architect_400.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
-Atelier_300.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Atelier_301.py       # Outfit analysis → prompt con filtri (filtro persistente)
 atelier.py           # Ingresso fisso per Koyeb: avvia il file indicato in BOT_FILE
 vogue.py, architect.py, filtro.py, surprise.py   # Ingressi fissi per Koyeb, uno per bot, come atelier.py
 Filtro_300.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
@@ -87,6 +87,8 @@ openpyxl>=3.1.5
 ---
 
 ## Fix robustezza (20/06/2026 → 23/11/2026)
+
+**Il 23/11 (notte) — data nel `/start` di Atelier anche senza filtro attivo (Atelier 3.0.0 → 3.0.1, `Atelier_301.py`).** Nella 3.0.0 la data era solo nel ramo "filtro attivo" e in `/info`: dopo un riavvio il `/start` non la mostrava. Errore mio, trovato da Walter dallo screenshot. Gli altri quattro bot hanno la data nel loro unico `/start`.
 
 **Il 23/11 (notte) — nuovi nomi file e versioni maggiori (Atelier 2.8.4 → 3.0.0, Vogue 4.3.4 → 5.0.0, Architect 3.1.2 → 4.0.0, Filtro 2.2.3 → 3.0.0, Surprise 2.1.3 → 3.0.0, shared 2.4.22 → 3.0.0).** `C_shared100.py` diventa `shared300.py` (la "C" non serve più); i bot diventano `Atelier_300.py`, `Vogue_500.py`, `Architect_400.py`, `Filtro_300.py`, `Surprise_300.py`. Il `/start` mostra la data di produzione accanto alla versione (nuova costante `VERSION_DATE`). Vogue: etichetta "Key N · call totali #M" come Atelier. I Run command su Koyeb non cambiano. Nessuna modifica ai prompt.
 

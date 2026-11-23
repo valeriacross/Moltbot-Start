@@ -310,7 +310,10 @@ logger = logging.getLogger(__name__)
 #   1) Il modulo comune si chiama ora shared300.py (era C_shared100.py): import aggiornati.
 #   2) /start mostra la data di produzione accanto alla versione: nuova costante
 #   VERSION_DATE, da aggiornare a ogni nuova versione (data da `date`).
-VERSION = "3.0.0"
+# CHANGELOG 3.0.1 (23/11/2026): la data di produzione mancava nel /start di Atelier quando non c'è
+# un filtro attivo (il caso dopo ogni riavvio): nella 3.0.0 era stata aggiunta solo al ramo con filtro
+# attivo e a /info. Ora c'è in tutti i rami del /start. Nessun altro cambiamento.
+VERSION = "3.0.1"
 VERSION_DATE = "23/11/2026"
 TOKEN   = os.environ.get("TELEGRAM_TOKEN_CLOSET")
 
@@ -919,7 +922,7 @@ def cmd_start(m):
         return
     user_settings[uid] = {'mode': 'single'}
     bot.send_message(m.chat.id,
-        f"<b>✦ ATELIER v{VERSION}</b>\n\nFoto singola o mosaico di 4?",
+        f"<b>✦ ATELIER v{VERSION} · {VERSION_DATE}</b>\n\nFoto singola o mosaico di 4?",
         reply_markup=get_mode_keyboard())
 
 @bot.message_handler(commands=['help'])
