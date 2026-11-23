@@ -1,7 +1,7 @@
 import os, html, logging, threading
 import telebot
 from concurrent.futures import ThreadPoolExecutor
-from C_shared100 import GeminiClient, HealthServer, is_allowed, genai_types, detect_mime_type, SHARED_VERSION, SHARED_DATE, MODEL
+from shared300 import GeminiClient, HealthServer, is_allowed, genai_types, detect_mime_type, SHARED_VERSION, SHARED_DATE, MODEL
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -70,7 +70,13 @@ logger = logging.getLogger(__name__)
 # scena" ripetuto. /help: "/lastprompt" reinvia il prompt in chat (non più un
 # file dalla 3.0.2). /info: il modello mostrato è letto da shared (MODEL), non
 # più scritto a mano. Nessuna modifica al prompt di analisi.
-VERSION = "3.1.2"
+# CHANGELOG 4.0.0 (23/11/2026): salto di versione maggiore su richiesta di Walter, insieme al
+# cambio di nome di tutti i file. Il comportamento dei prompt non cambia.
+#   1) Il modulo comune si chiama ora shared300.py (era C_shared100.py): import aggiornati.
+#   2) /start mostra la data di produzione accanto alla versione: nuova costante
+#   VERSION_DATE, da aggiornare a ogni nuova versione (data da `date`).
+VERSION = "4.0.0"
+VERSION_DATE = "23/11/2026"
 TOKEN   = os.environ.get("TELEGRAM_TOKEN_ARCHITECT")
 
 gemini   = GeminiClient()
@@ -183,7 +189,7 @@ def start(m):
         last_prompt.pop(uid, None)
     logger.info(f"🔄 /start da {username} (id={uid})")
     bot.send_message(m.chat.id,
-        f"<b>📐 ARCHITECT v{VERSION}</b>\n\n"
+        f"<b>📐 ARCHITECT v{VERSION} · {VERSION_DATE}</b>\n\n"
         f"Inviami una foto: ti restituisco in chat il prompt completo "
         f"della scena — soggetto, outfit, accessori, sfondo, luce, tutto quello che è "
         f"visibile — senza alcun DNA Valeria Cross. Descrizione fedele, pronta all'uso."
@@ -234,7 +240,7 @@ def cmd_lastprompt(m):
 
 @bot.message_handler(commands=['shared'])
 def cmd_shared(m):
-    bot.send_message(m.chat.id, f"📦 <b>C_shared100.py</b> v{SHARED_VERSION} — {SHARED_DATE}")
+    bot.send_message(m.chat.id, f"📦 <b>shared300.py</b> v{SHARED_VERSION} — {SHARED_DATE}")
 
 # --- HANDLER TESTO — guida chi scrive per abitudine, nessuna modalità testo ---
 @bot.message_handler(content_types=['text'])

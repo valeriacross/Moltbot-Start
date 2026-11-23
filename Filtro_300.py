@@ -4,8 +4,8 @@ from telebot import types
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from telebot.handler_backends import BaseMiddleware, CancelUpdate
-from C_shared100 import GeminiClient, CaptionGenerator, HealthServer, is_allowed, SHARED_VERSION, SHARED_DATE
-from C_shared100 import analyze_scene
+from shared300 import GeminiClient, CaptionGenerator, HealthServer, is_allowed, SHARED_VERSION, SHARED_DATE
+from shared300 import analyze_scene
 
 # --- VERSIONE ---
 # CHANGELOG 2.2.1 (06/10/2026): aggiunta DIRECTOR_INTEGRATION_CLAUSE — il
@@ -119,7 +119,13 @@ from C_shared100 import analyze_scene
 #    usate da Filtro non danno avvisi su Pillow 13 (provato). Nessun tetto in
 #    requirements.txt: il tetto <14 non serve più e bloccherebbe le patch di sicurezza.
 #  - /caption: il testo di Gemini passa da html.escape (parse_mode HTML di default).
-VERSION = "2.2.3"
+# CHANGELOG 3.0.0 (23/11/2026): salto di versione maggiore su richiesta di Walter, insieme al
+# cambio di nome di tutti i file. Il comportamento dei prompt non cambia.
+#   1) Il modulo comune si chiama ora shared300.py (era C_shared100.py): import aggiornati.
+#   2) /start mostra la data di produzione accanto alla versione: nuova costante
+#   VERSION_DATE, da aggiornare a ogni nuova versione (data da `date`).
+VERSION = "3.0.0"
+VERSION_DATE = "23/11/2026"
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -1166,7 +1172,7 @@ def cmd_start(m):
     logger.info(f"🔄 /start da {username} (id={uid})")
     bot.send_message(m.chat.id, "✅ <b>Reset completo.</b> Tutte le sessioni cancellate.")
     bot.send_message(m.chat.id,
-        f"<b>🎨 Filtro v{VERSION}</b>\n\n"
+        f"<b>🎨 Filtro v{VERSION} · {VERSION_DATE}</b>\n\n"
         f"Invia una foto e scegli un filtro.\n"
         f"Usa /filtro per scegliere il filtro prima della foto, o invia la foto direttamente.",
         reply_markup=cat_keyboard()
@@ -2868,7 +2874,7 @@ def _run_generation(chat_id, uid, username, data):
 @bot.message_handler(commands=['shared'])
 def cmd_shared(m):
     bot.send_message(m.chat.id,
-        f"📦 <b>C_shared100.py</b> v{SHARED_VERSION} — {SHARED_DATE}"
+        f"📦 <b>shared300.py</b> v{SHARED_VERSION} — {SHARED_DATE}"
     )
 
 

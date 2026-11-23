@@ -1,8 +1,8 @@
 import os, logging, re, telebot, html, threading
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from C_shared100 import GeminiClient, HealthServer, is_allowed, genai_types, analyze_scene, gemini_error_category
-from C_shared100 import VALERIA_BODY_STRONG, VALERIA_WATERMARK, VALERIA_TEXTURE_LOCK
-from C_shared100 import generate_caption, review_and_fix, SHARED_VERSION, SHARED_DATE, body_art_clause, multi_subject_clause, MODEL
+from shared300 import GeminiClient, HealthServer, is_allowed, genai_types, analyze_scene, gemini_error_category
+from shared300 import VALERIA_BODY_STRONG, VALERIA_WATERMARK, VALERIA_TEXTURE_LOCK
+from shared300 import generate_caption, review_and_fix, SHARED_VERSION, SHARED_DATE, body_art_clause, multi_subject_clause, MODEL
 
 # --- VERSIONE ---
 # CHANGELOG 2.1.0 (17/07/2026): cambio di motore, non un patch — versione
@@ -229,7 +229,16 @@ from C_shared100 import generate_caption, review_and_fix, SHARED_VERSION, SHARED
 #   e il movimento veniva inventato invece di essere copiato dalla clip.
 # - Caption (/caption): il testo di Gemini viene passato da html.escape (parse_mode HTML
 #   di default: con "<" o "&" Telegram rispondeva 400 e non arrivava nulla).
-VERSION = "4.3.4"
+# CHANGELOG 5.0.0 (23/11/2026): salto di versione maggiore su richiesta di Walter, insieme al
+# cambio di nome di tutti i file. Il comportamento dei prompt non cambia.
+#   1) Il modulo comune si chiama ora shared300.py (era C_shared100.py): import aggiornati.
+#   2) /start mostra la data di produzione accanto alla versione: nuova costante
+#   VERSION_DATE, da aggiornare a ogni nuova versione (data da `date`).
+#   3) Etichetta del messaggio "Key N · call #M" corretta in "call totali #M" (come
+#   Atelier 2.8.4): M è il totale di TUTTE le chiavi (shared: _total_calls), non della
+#   chiave mostrata.
+VERSION = "5.0.0"
+VERSION_DATE = "23/11/2026"
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -320,7 +329,7 @@ _active_cid: int | None = None
 def _notify_key_use(key_num: int, call_count: int):
     if _active_cid:
         try:
-            bot.send_message(_active_cid, f"🔑 <b>Key {key_num}</b> · call #{call_count}", parse_mode="HTML")
+            bot.send_message(_active_cid, f"🔑 <b>Key {key_num}</b> · call totali #{call_count}", parse_mode="HTML")
         except Exception:
             pass
 
@@ -342,7 +351,7 @@ def _expire_caption(uid: int):
     if pending_caption.pop(uid, False):
         logger.info(f"⏱️ /caption scaduto per uid={uid}")
 
-# --- ANALISI FOTO — usa analyze_scene() centralizzata da C_shared100 ---
+# --- ANALISI FOTO — usa analyze_scene() centralizzata da shared300 ---
 def analyze_photo(img_bytes):
     """Wrapper su analyze_scene() — interfaccia invariata per il resto del bot."""
     result, err = analyze_scene(img_bytes, client=gemini)
@@ -561,7 +570,7 @@ def cmd_start(m):
     gemini.reset_counters()  # azzera contatori call ad ogni /start
     logger.info(f"👠 /start da {username} (id={uid})")
     bot.send_message(m.chat.id,
-        f"<b>👠 VOGUE v{VERSION}</b>\n\n"
+        f"<b>👠 VOGUE v{VERSION} · {VERSION_DATE}</b>\n\n"
         f"Cosa mi mandi?",
         reply_markup=get_mode_keyboard()
     )
@@ -581,7 +590,7 @@ def cmd_info(m):
 @bot.message_handler(commands=['shared'])
 def cmd_shared(m):
     bot.send_message(m.chat.id,
-        f"📦 <b>C_shared100.py</b> v{SHARED_VERSION} — {SHARED_DATE}"
+        f"📦 <b>shared300.py</b> v{SHARED_VERSION} — {SHARED_DATE}"
     )
 
 # --- /dna ---

@@ -2,9 +2,9 @@ import os, telebot, html, threading, logging, time
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from C_shared100 import GeminiClient, HealthServer, is_allowed, analyze_scene, SHARED_VERSION, SHARED_DATE, MODEL
-from C_shared100 import EDITORIAL_WRAPPER, build_valeria_identity, generate_caption, review_and_fix, body_art_clause, multi_subject_clause, has_multiple_figures
-from C_shared100 import VALERIA_HAIR_TEXT
+from shared300 import GeminiClient, HealthServer, is_allowed, analyze_scene, SHARED_VERSION, SHARED_DATE, MODEL
+from shared300 import EDITORIAL_WRAPPER, build_valeria_identity, generate_caption, review_and_fix, body_art_clause, multi_subject_clause, has_multiple_figures
+from shared300 import VALERIA_HAIR_TEXT
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -305,7 +305,13 @@ logger = logging.getLogger(__name__)
 #    get_loop_keyboard() e i callback loop_*, shooting_menu, shooting_new,
 #    cabina_newprompt, alias shooting_single/shooting_mosaic, CaptionGenerator e
 #    import inutilizzati (PIL, io, genai_types, VALERIA_FACE/BODY_*/WATERMARK/DNA).
-VERSION = "2.8.4"
+# CHANGELOG 3.0.0 (23/11/2026): salto di versione maggiore su richiesta di Walter, insieme al
+# cambio di nome di tutti i file. Il comportamento dei prompt non cambia.
+#   1) Il modulo comune si chiama ora shared300.py (era C_shared100.py): import aggiornati.
+#   2) /start mostra la data di produzione accanto alla versione: nuova costante
+#   VERSION_DATE, da aggiornare a ogni nuova versione (data da `date`).
+VERSION = "3.0.0"
+VERSION_DATE = "23/11/2026"
 TOKEN   = os.environ.get("TELEGRAM_TOKEN_CLOSET")
 
 # GeminiClient da C_shared100 v2.2.0 — gestisce nativamente la rotation
@@ -906,7 +912,7 @@ def cmd_start(m):
         flt_label = FILTERS[user_filter[uid]]["label"]
         mode_label = "🗂️ Mosaico 4 foto" if mode == "mosaic" else "📷 Foto singola"
         bot.send_message(m.chat.id,
-            f"<b>✦ ATELIER v{VERSION}</b>\n\n"
+            f"<b>✦ ATELIER v{VERSION} · {VERSION_DATE}</b>\n\n"
             f"Filtro attivo: <b>{flt_label}</b> · {mode_label}\n\n"
             f"📸 Invia una foto, oppure premi 🏠 Home per cambiare filtro o modalità.",
             reply_markup=get_confirm_keyboard())
@@ -934,7 +940,7 @@ def cmd_info(m):
     flt = user_filter.get(uid)
     flt_label = FILTERS[flt]["label"] if flt else "Nessuno"
     bot.send_message(m.chat.id,
-        f"<b>✦ ATELIER v{VERSION}</b>\n\n"
+        f"<b>✦ ATELIER v{VERSION} · {VERSION_DATE}</b>\n\n"
         f"Filtro attivo: <b>{flt_label}</b>\n"
         f"Modello: <code>{MODEL}</code>\n\n"
         f"<i>Output: prompt Flow-ready + caption. Nessuna generazione immagini diretta.</i>"
@@ -1249,7 +1255,7 @@ def handle_photo(m):
 @bot.message_handler(commands=['shared'])
 def cmd_shared(m):
     bot.send_message(m.chat.id,
-        f"📦 <b>C_shared100.py</b> v{SHARED_VERSION} — {SHARED_DATE}"
+        f"📦 <b>shared300.py</b> v{SHARED_VERSION} — {SHARED_DATE}"
     )
 
 @bot.message_handler(content_types=['text'])

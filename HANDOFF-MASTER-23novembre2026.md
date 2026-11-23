@@ -1,5 +1,5 @@
 # HANDOFF MASTER — Valeria Cross AI · Moltbot
-**Generato:** 13/11/2026, sera inoltrata — secondo giro; aggiornato il 23/11/2026 (Atelier 2.8.4)
+**Generato:** 13/11/2026, sera inoltrata — secondo giro; aggiornato il 23/11/2026 (notte: nuovi nomi file, versioni 3.0.0+)
 **Da:** Walter Caponi
 **Per:** prossima sessione Claude
 
@@ -30,7 +30,7 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 **Regole operative TASSATIVE:**
 1. MAI modificare o creare file senza "Vai" esplicito di Walter
-2. `C_shared100.py` sempre in-place — mai rinominare
+2. `shared300.py` sempre in-place — mai rinominare (era `C_shared100.py` fino al 23/11/2026)
 3. Tutti gli altri bot → nomi incrementali — **MAI riusare un nome file già deployato su Koyeb**, anche per errore
 4. Testare SEMPRE con `ast.parse()` + verifica integrità decorator (`@bot.message_handler`, `@bot.callback_query_handler`) prima di consegnare
 5. Presentare sempre con `present_files`
@@ -45,6 +45,8 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 ---
 
 ## 2. STATO FILE ATTUALE (23/11/2026)
+
+**Nota (23/11, notte):** nuovi nomi per tutti i file e salto di versione maggiore (decisione di Walter): shared `C_shared100.py` 2.4.22 → `shared300.py` 3.0.0; Atelier 2.8.4 → 3.0.0 (`Atelier_300.py`), Vogue 4.3.4 → 5.0.0 (`Vogue_500.py`), Architect 3.1.2 → 4.0.0 (`Architect_400.py`), Filtro 2.2.3 → 3.0.0 (`Filtro_300.py`), Surprise 2.1.3 → 3.0.0 (`Surprise_300.py`). **I Run command su Koyeb NON cambiano** (restano `python <bot>.py`): i lanciatori puntano ai nuovi file. Nome file = VERSION senza punti vale per i bot; shared resta in-place con nome fisso.
 
 **Nota (23/11):** Il file HANDOFF porta ora nel nome la data dell'ultimo aggiornamento: `HANDOFF-MASTER-23novembre2026.md` (prima `HANDOFF-MASTER-13novembre2026.md`); i riferimenti al vecchio nome più sotto (TODO e incidenti del 13/11) sono storici e restano com'erano. Atelier passa a 2.8.4 (`Atelier_284.py`): cambia solo l'etichetta del messaggio sul contatore call. Aggiunto `atelier.py` (ingresso fisso, senza VERSION): **il Run command Koyeb di `flexible-denna/atelier` va portato una volta sola a `python atelier.py`**; da lì in poi **a ogni nuova versione di Atelier si aggiorna `BOT_FILE` in `atelier.py`** e Koyeb non si tocca (se ci si dimentica, Koyeb avvia la versione vecchia e nei log compare un avviso). `Atelier_283.py` va tolto dal repository dopo il deploy. Stesso ingresso fisso per gli altri quattro bot (`vogue.py`, `architect.py`, `filtro.py`, `surprise.py`): i Run command Koyeb vanno portati a `python <bot>.py` uno alla volta, e a ogni nuova versione di un bot si aggiorna `BOT_FILE` nel suo lanciatore (regola in `CLAUDE.md`). Resto invariato (shared 2.4.22). Vedi sezione 2septtriginta.
 
@@ -66,12 +68,12 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 | File | Versione | Koyeb service | Run command | Chiavi API |
 |------|---------|---------------|--------------|-----------|
-| `C_shared100.py` | **2.4.22** | (comune a tutti) | — | — |
-| `Vogue_434.py` | **4.3.4** | colossal-giselle/vogue | `python vogue.py` (ingresso fisso → `BOT_FILE`) | 2 |
-| `Architect_312.py` | **3.1.2** | homely-annabelle/thearchitect | `python architect.py` (ingresso fisso → `BOT_FILE`) | 1 |
-| `Atelier_284.py` | **2.8.4** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
-| `Filtro_223.py` | **2.2.3** | screeching-jobina/filtro | `python filtro.py` (ingresso fisso → `BOT_FILE`) | 1 |
-| `Surprise_213.py` | **2.1.3** | surprise1/sorpresa | `python surprise.py` (ingresso fisso → `BOT_FILE`) | 1 |
+| `shared300.py` | **3.0.0** | (comune a tutti) | — | — |
+| `Vogue_500.py` | **5.0.0** | colossal-giselle/vogue | `python vogue.py` (ingresso fisso → `BOT_FILE`) | 2 |
+| `Architect_400.py` | **4.0.0** | homely-annabelle/thearchitect | `python architect.py` (ingresso fisso → `BOT_FILE`) | 1 |
+| `Atelier_300.py` | **3.0.0** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
+| `Filtro_300.py` | **3.0.0** | screeching-jobina/filtro | `python filtro.py` (ingresso fisso → `BOT_FILE`) | 1 |
+| `Surprise_300.py` | **3.0.0** | surprise1/sorpresa | `python surprise.py` (ingresso fisso → `BOT_FILE`) | 1 |
 
 **Totale chiavi API: 10** (Atelier 5 + Vogue 2 + Architect 1 + Filtro 1 + Surprise 1) — tutte e 10 confermate su progetti Google Cloud distinti il 04/07 (vedi sezione 2quinquies). Prima di quella verifica, Filtro e Surprise condividevano la stessa chiave fisica per un errore di assegnazione: risolto.
 
@@ -80,6 +82,20 @@ Repository: `valeriacross/Moltbot-Start` — region Frankfurt.
 **Nota versioning (corretta il 10/07):** il numero nel nome file **corrisponde sempre esattamente** alla VERSION interna, senza punti (es. `2.0.4` → `Atelier_204.py`, `3.0.2` → `Architect_302.py`) — non è un contatore progressivo indipendente. Su un salto di versione non incrementale (es. `2.0.6` → `3.0.0`), il nome file deve riflettere il nuovo numero di versione per intero, non "il prossimo della sequenza". Vedi sezione 2duodecies per il dettaglio dell'errore fatto e corretto in questa data.
 
 **Nota chiavi (25/06):** una chiave spostata da Architect (2→1) ad Atelier (4→5). `C_shared100.py` ora legge fino a `GOOGLE_API_KEY_5`.
+
+---
+
+## 2octotriginta. SESSIONE 23/11/2026 (NOTTE) — NUOVI NOMI FILE E VERSIONI 3.0.0+ (TUTTO L'ECOSISTEMA)
+
+*Richiesta di Walter.* Dopo i lanciatori fissi, nomi dei file "puliti" e data di produzione visibile. Idea iniziale: nome file con la data (aammgg). Claude ha segnalato i difetti (due versioni nello stesso giorno = stesso nome; si perde il legame nome ↔ versione; la data è già in git) e Walter ha scelto l'alternativa: nome file = versione come prima, **data di produzione mostrata nel `/start`**. Walter ha anche chiesto di dare a tutti un nome nuovo con un salto di versione maggiore e di togliere la "C" da shared (la "C" voleva dire "fatto da Claude", ai tempi in cui esisteva anche un file fatto da Gemini).
+
+*Decisioni di Walter (risposte alle domande).* Shared: `shared300.py`, VERSION 3.0.0 (non `shared200.py`: la VERSION interna era già 2.4.22 e scendere a 2.0.0 sarebbe stato un passo indietro). Vogue: nel salto a 5.0.0 correggere anche l'etichetta "call totali #" come in Atelier. Due versioni dello stesso bot nello stesso giorno: "direi mai".
+
+*Implementazione.* `git mv` per tutti (storia dei file conservata). Nuova costante `VERSION_DATE` accanto a `VERSION` in ogni bot (da aggiornare a ogni versione, data da `date`); il `/start` mostra `v{VERSION} · {VERSION_DATE}` (Atelier in entrambi i rami del `/start`). Import cambiato in `from shared300 import ...` e riga "📦 shared300.py v… — data" nei comandi di versione. `BOT_FILE` aggiornato nei 5 lanciatori. Nessuna modifica ai prompt né al DNA di Valeria; shared senza modifiche al codice (solo nome, VERSION, SHARED_DATE, docstring). Il docstring errato di `on_key_use` ("per quella chiave") in shared NON è stato toccato: non richiesto.
+
+*Verifiche.* `py_compile` su 6 file; ogni nome importato dai bot esiste in `shared300.py` (controllo AST); `grep` dei vecchi nomi: restano solo menzioni storiche in commenti di changelog e nelle sezioni vecchie di README/HANDOFF. **Non provato in produzione** (il sandbox non ha google-genai: import runtime non eseguito).
+
+*Prima volta in produzione.* Il push su `main` può far partire da solo il deploy di tutti e 5 i servizi Koyeb insieme; se il deploy non parte da solo, redeploy manuale di ciascuno (Run command invariati). Atteso su `/start`: es. "ATELIER v3.0.0 · 23/11/2026".
 
 ---
 
@@ -861,8 +877,9 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 4. C_SHARED100.PY — STORICO COMPLETO FIX (v2.3.0 → v2.4.22)
+## 4. SHARED300.PY (ex C_SHARED100.PY) — STORICO COMPLETO FIX (v2.3.0 → v3.0.0)
 
+- **v3.0.0 (23/11/2026):** file rinominato `C_shared100.py` → `shared300.py` e portato a 3.0.0 su richiesta di Walter; nessuna modifica al codice né al DNA.
 - **v2.4.22 (13/11/2026, sera inoltrata):** `generate()` solleva su `finish_reason` MAX_TOKENS invece di consegnare il testo troncato; ordine delle chiavi fissato per richiesta (niente più dipendenza da `self._key_index` tra thread) e `_rotate_key(from_idx)`; su 429 del modello richiesto prima le altre chiavi con lo stesso modello e poi i modelli di riserva; `genai.Client` con timeout HTTP (`GEMINI_HTTP_TIMEOUT_S`, 120 s); nuova `gemini_error_category()` usata da `analyze_scene()`, `generate_caption()`, `generate_mini_caption()` (e da Vogue); `_REVIEW_REQUIRED` esteso al prompt video di Vogue. DNA non toccato; 69 prompt di Atelier identici alla 2.4.21. Non ancora testato in produzione. Vedi sezione 2sextriginta.
 - **v2.4.21 (13/11/2026, sera):** `_review_result_problem()` scarta le revisioni di `review_and_fix()` che perdono MULTI-SUBJECT LOCK, "Reference image analysis", la riga finale "Technical:" o un codice HEX presente nell'originale, che sono avvolte in ``` o iniziano con un preambolo, o finiscono su un'intestazione ":"/":**"; `_classify_gemini_error()` cerca il codice di stato come numero a sé stante, esclude INVALID_ARGUMENT/400 e tratta come transitori 500/502/504, INTERNAL, DEADLINE_EXCEEDED, "disconnected", "remote protocol"; `html.escape` sul testo d'errore di `generate_caption()`, `generate_mini_caption()`, `generate_mini_prompt()`. DNA non toccato. Non ancora testato in produzione. Vedi sezione 2quinquetriginta.
 - **v2.4.20 (12/11/2026):** revisione del codice — regole 5/6 di `review_and_fix()` non più in contraddizione sul watermark; nuovo `face_mode="described"`; riconoscimento robusto di "nessun tatuaggio / una sola figura"; `analyze_scene()` a 8192 token; reset contatori alle 08:00 di Lisbona tutto l'anno; contatori che contano i tentativi ripetuti, sotto lock; rimossa `sanitize_user_input()`. DNA non toccato. Vedi sezione 2tertriginta. Non ancora testato in produzione.
@@ -911,10 +928,11 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 5. VOGUE — STORICO E STATO (v4.3.4)
+## 5. VOGUE — STORICO E STATO (v5.0.0)
 
 **Nota (29/09):** questa lista era ferma alla 2.1.0 da prima del 29/08 — mancano i bump 2.2.0 (multi-soggetto, 01/08), 3.0.0/3.1.0 (video, 05-10/08), 4.0-4.3 (sempre video, 11-14/08), già narrati nelle sezioni 2duovicies/2quattuorvicies/2quinvicies ma mai riportati qui puntualmente. Non ricostruito in questa sessione su indicazione esplicita di Walter ("bypassa le versioni mancanti") — aggiunti solo i due bump verificati questa settimana.
 
+- **v5.0.0 (23/11/2026):** `Vogue_500.py`; shared → `shared300.py`; etichetta "Key N · call totali #M"; `VERSION_DATE` mostrata nel `/start`.
 - **v4.3.4 (13/11/2026, sera inoltrata):** `analyze_video()` con `gemini_error_category()` (e messaggio "risposta troncata"), `_has_described_movement()` riconosce "### MOVEMENT" senza due punti, caption di `/caption` con `html.escape`; il prompt video è ora protetto dal controllo di `review_and_fix()` (shared 2.4.22). Testo del prompt invariato. File `Vogue_434.py`. Vedi sezione 2sextriginta.
 - **v4.3.3 (12/11/2026):** revisione del codice — `review_and_fix(face_mode="described")`, tolta la riga "Stocky, heavyset", `/dna` con il DNA video, `_has_described_movement()` più robusta, `analyze_video()` a 8192 token. File `Vogue_433.py`. Vedi sezione 2tertriginta.
 - **v4.3.2 (26/09/2026):** `MODEL_TEXT` (solo display, `/info`) allineata a `gemini-3.8-flash` — nessuna modifica funzionale. Vedi sezione 2septvicies.
@@ -934,10 +952,11 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 6. ARCHITECT — STORICO E STATO (v3.1.2)
+## 6. ARCHITECT — STORICO E STATO (v4.0.0)
 
 **Nota (29/09):** lista ferma alla 3.0.2 da prima del 29/08 — manca il bump 3.1.0 (multi-soggetto, 01/08, sezione 2duovicies). Non ricostruito su indicazione di Walter — aggiunto solo il bump verificato di questa settimana.
 
+- **v4.0.0 (23/11/2026):** `Architect_400.py`; shared → `shared300.py`; `VERSION_DATE` mostrata nel `/start`. Nessun cambio ai prompt.
 - **v3.1.2 (12/11/2026):** revisione del codice — analisi a 8192 token, testi di `/start` e `/help`, `/info` con `MODEL` da shared. File `Architect_312.py`. Vedi sezione 2tertriginta.
 - **v3.1.1 (26/09/2026):** stringa modello in `/info` (solo display) allineata a `gemini-3.8-flash` — nessuna modifica funzionale. Vedi sezione 2septvicies.
 - **v3.0.2 (11/07):** consegna cambiata da file `.txt` a testo diretto in chat, coerente con Vogue/Atelier/Filtro/Surprise — il prompt è sufficientemente breve da non richiedere un file, su osservazione di Walter. Aggiunta `send_prompt_text()` (chunking a 3800 caratteri, stesso pattern di Vogue). Rimossi `bot.send_document()`, `io.BytesIO`, import `io`. `/lastprompt` ora reinvia testo, non un file. Vedi sezione 2quaterdecies. **Non ancora testato in produzione.**
@@ -958,10 +977,11 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 7. ATELIER — STORICO E STATO (v2.8.4)
+## 7. ATELIER — STORICO E STATO (v3.0.0)
 
 **Nota (29/09):** lista ferma alla 2.5.4 da prima del 29/08 — mancano i bump 2.6.0/2.6.1 (multi-soggetto, 01-02/08), 2.6.2 (checklist mosaico condizionale), 2.7.0 (codice errore nell'header fallback), tutti narrati nelle sezioni 2duovicies/2trevicies ma mai riportati qui puntualmente. Non ricostruito su indicazione di Walter — aggiunto solo il bump verificato di questa settimana.
 
+- **v3.0.0 (23/11/2026):** `Atelier_300.py`; shared → `shared300.py`; `VERSION_DATE` mostrata nel `/start`. Nessun cambio ai prompt.
 - **v2.8.4 (23/11/2026):** il messaggio "Key N · call #M" diventa "Key N · call totali #M" (M è il totale di tutte le chiavi, non della chiave N). Nessun'altra modifica. File `Atelier_284.py`. Vedi sezione 2septtriginta.
 - **v2.8.3 (13/11/2026, sera):** `html.escape` sulla caption e sul messaggio "Eccezione:" di `describe_outfit_from_image()` (una caption con "<" o "&" faceva rispondere 400 a Telegram e l'utente non riceveva nulla). Prompt invariati: 68 su 68 identici a 2.8.2 (verificato a runtime con shared 2.4.21). Richiede shared >= 2.4.21 per i fix collegati, ma gira anche con 2.4.20. Contiene la rimozione di `/volto` della 2.8.2. Non ancora testato in produzione.
 - **v2.8.2 (13/11/2026):** rimosso il comando `/volto` (Walter non lo usa; default sempre modalità foto). Tolti handler, stato `user_face_mode`, righe in `/help`/`/info`, nota negli header, passaggio di `face_mode` da `_process()`; dormienti `_face_locks()` e il parametro `face_mode` dei builder (default `"photo"`). Parte dalla 2.8.1 del 12/11, che resta intatta. 68 prompt identici alla 2.8.1, verificato a runtime con shared 2.4.20. Nuovo nome file per via dell'incidente descritto nella sezione 2quattuortriginta. Non ancora testato in produzione.
@@ -996,8 +1016,9 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 8. FILTRO — STORICO E STATO (v2.2.3)
+## 8. FILTRO — STORICO E STATO (v3.0.0)
 
+- **v3.0.0 (23/11/2026):** `Filtro_300.py`; shared → `shared300.py`; `VERSION_DATE` mostrata nel `/start`. Nessun cambio ai prompt.
 - **v2.2.3 (13/11/2026, sera inoltrata):** stereo, mirror e mosaic non restano più attivi dopo aver scelto altro (`_clear_input_modes`); il timer del mosaico chiude solo la propria sessione, modifiche sotto lock; `getdata()` → `get_flattened_data()` (Pillow 14); `html.escape` sulla caption di `/caption`. File `Filtro_223.py`. Vedi sezione 2sextriginta.
 - **v2.2.2 (12/11/2026):** revisione del codice — whitelist con middleware a classe (prima scartata), mosaic massimo 9 foto, Mirror con un'analisi sola, Stereo che rimanda alla foto allegata, tastiere artisti corrette, LEGO Galaxy più veloce, colori Excel dalla palette. File `Filtro_222.py`. Vedi sezione 2tertriginta.
 - **v2.2.1 (06/10/2026):** `DIRECTOR_INTEGRATION_CLAUSE` — il soggetto restava con luce/colore della foto di riferimento originale invece di essere reintegrato nell'atmosfera dello sfondo generato (taglia-e-incolla, segnalato da Walter su un test con il filtro Villeneuve). Applicata una sola volta in fase di costruzione del dizionario finale, non duplicata nei 12 prompt singoli. Verificato a runtime su tutti e 12. Vedi sezione 2triginta.
@@ -1013,8 +1034,9 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 9. SURPRISE — STORICO E STATO (v2.1.3)
+## 9. SURPRISE — STORICO E STATO (v3.0.0)
 
+- **v3.0.0 (23/11/2026):** `Surprise_300.py`; shared → `shared300.py`; `VERSION_DATE` mostrata nel `/start`. Nessun cambio ai prompt.
 - **v2.1.3 (13/11/2026, sera inoltrata):** flusso Manuale che non va più in `KeyError` con tastiere vecchie (avviso e ripartenza); con una location da foto nel prompt entrano solo BACKGROUND e CAMERA (luce e mood restano quelli scelti). Prompt senza foto identici alla 2.1.2. File `Surprise_213.py`. Vedi sezione 2sextriginta.
 - **v2.1.2 (12/11/2026):** revisione del codice — bottoni di `/pride` e `/flag` funzionanti, `/lastprompt` con i due prompt, caption che non blocca più il prompt, codice morto rimosso; testo dei prompt Flow identico. File `Surprise_212.py`. Vedi sezione 2tertriginta.
 - **v2.1.1 (03/10/2026):** peso Valeria 85kg → 75kg, due righe locali duplicate (riepilogo testuale, Surprise non importa il DNA da shared) — stesso fix di shared 2.4.17, causa diversa (duplicazione locale). Vedi sezione 2triginta.

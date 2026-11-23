@@ -10,27 +10,27 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 | Bot | File | Versione | Koyeb | Chiavi |
 |-----|------|---------|-------|--------|
-| VogueBot | `Vogue_434.py` | 4.3.4 | colossal-giselle/vogue | 2 |
-| ArchitectBot | `Architect_312.py` | 3.1.2 | homely-annabelle/thearchitect | 1 |
-| AtelierBot | `Atelier_284.py` | 2.8.4 | flexible-denna/atelier | 5 |
-| FiltroBot | `Filtro_223.py` | 2.2.3 | screeching-jobina/filtro | 1 |
-| SurpriseBot | `Surprise_213.py` | 2.1.3 | surprise1/sorpresa | 1 |
+| VogueBot | `Vogue_500.py` | 5.0.0 | colossal-giselle/vogue | 2 |
+| ArchitectBot | `Architect_400.py` | 4.0.0 | homely-annabelle/thearchitect | 1 |
+| AtelierBot | `Atelier_300.py` | 3.0.0 | flexible-denna/atelier | 5 |
+| FiltroBot | `Filtro_300.py` | 3.0.0 | screeching-jobina/filtro | 1 |
+| SurpriseBot | `Surprise_300.py` | 3.0.0 | surprise1/sorpresa | 1 |
 
-**Shared:** `C_shared100.py` v2.4.22 · **10 API key totali**
+**Shared:** `shared300.py` v3.0.0 · **10 API key totali**
 
 ---
 
 ## Struttura file
 
 ```
-C_shared100.py       # Libreria condivisa
-Vogue_434.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
-Architect_312.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
-Atelier_284.py       # Outfit analysis → prompt con filtri (filtro persistente)
+shared300.py         # Libreria condivisa
+Vogue_500.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
+Architect_400.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
+Atelier_300.py       # Outfit analysis → prompt con filtri (filtro persistente)
 atelier.py           # Ingresso fisso per Koyeb: avvia il file indicato in BOT_FILE
 vogue.py, architect.py, filtro.py, surprise.py   # Ingressi fissi per Koyeb, uno per bot, come atelier.py
-Filtro_223.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
-Surprise_213.py      # Location + outfit random + /pride + /flag
+Filtro_300.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
+Surprise_300.py      # Location + outfit random + /pride + /flag
 requirements.txt
 README.md
 ```
@@ -87,6 +87,8 @@ openpyxl>=3.1.5
 ---
 
 ## Fix robustezza (20/06/2026 → 23/11/2026)
+
+**Il 23/11 (notte) — nuovi nomi file e versioni maggiori (Atelier 2.8.4 → 3.0.0, Vogue 4.3.4 → 5.0.0, Architect 3.1.2 → 4.0.0, Filtro 2.2.3 → 3.0.0, Surprise 2.1.3 → 3.0.0, shared 2.4.22 → 3.0.0).** `C_shared100.py` diventa `shared300.py` (la "C" non serve più); i bot diventano `Atelier_300.py`, `Vogue_500.py`, `Architect_400.py`, `Filtro_300.py`, `Surprise_300.py`. Il `/start` mostra la data di produzione accanto alla versione (nuova costante `VERSION_DATE`). Vogue: etichetta "Key N · call totali #M" come Atelier. I Run command su Koyeb non cambiano. Nessuna modifica ai prompt.
 
 **Il 23/11 (notte) — ingressi fissi per tutti i bot (`vogue.py`, `architect.py`, `filtro.py`, `surprise.py`, nessun cambio di VERSION).** Stesso meccanismo di `atelier.py` (già provato su Koyeb: healthy), uno per bot perché un errore in un lanciatore non fermi gli altri. Ognuno avvia il file indicato in `BOT_FILE` (`Vogue_434.py`, `Architect_312.py`, `Filtro_223.py`, `Surprise_213.py`) e avvisa nei log se esiste una versione più recente. **Run command Koyeb da portare a `python <bot>.py`, uno alla volta, controllando healthy** (finché non lo cambi, i bot girano come prima). A ogni nuova versione di un bot si aggiorna `BOT_FILE` nel suo lanciatore: regola aggiunta a `CLAUDE.md`. Provati con file finti; non provati con le librerie reali né su Koyeb.
 

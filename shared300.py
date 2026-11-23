@@ -1,9 +1,12 @@
 """
-C_shared100.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 2.4.22
+shared300.py — Valeria Cross AI · Oggetti comuni a tutti i bot
+Versione: 3.0.0
 
-REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome C_shared100.py.
-Non rinominare mai in C_shared101.py o simili — tutti i bot importano da C_shared100.
+REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome shared300.py.
+Non rinominare mai in shared301.py o simili — tutti i bot importano da shared300.
+CHANGELOG 3.0.0 (23/11/2026): file rinominato C_shared100.py → shared300.py su richiesta di Walter
+  (la "C" indicava "fatto da Claude" ai tempi in cui esisteva anche un file fatto da Gemini) e
+  portato a 3.0.0 in linea con i bot. Nessuna modifica al codice né al DNA di Valeria.
 CHANGELOG 2.4.22 (13/11/2026, sera): seconda revisione del 13/11, chiesta da Walter dopo la
   verifica di tutti i bot (regola "una modifica al giorno per bot" saltata da lui in modo
   esplicito). Il DNA di Valeria NON è stato toccato.
@@ -720,11 +723,11 @@ GEMINI_MAX_ATTEMPTS = 16     # tetto assoluto di chiamate API per singolo genera
 GEMINI_HTTP_TIMEOUT_S = float(os.environ.get("GEMINI_HTTP_TIMEOUT_S", "120"))   # 2.4.22 — timeout di ogni chiamata HTTP
 
 # Versione
-VERSION = "2.4.22"
-SHARED_VERSION = "2.4.22"   # aggiornare ad ogni modifica
-SHARED_DATE    = "13/11/2026"  # aggiornare ad ogni modifica
+VERSION = "3.0.0"
+SHARED_VERSION = "3.0.0"   # aggiornare ad ogni modifica
+SHARED_DATE    = "23/11/2026"  # aggiornare ad ogni modifica
 
-logger.info(f"📦 C_shared100.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
+logger.info(f"📦 shared300.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
 
 # ============================================================
 # WHITELIST — SICUREZZA

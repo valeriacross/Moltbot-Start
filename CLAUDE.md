@@ -15,7 +15,7 @@ Progetto di bot Telegram che generano prompt di fotografia editoriale di moda pe
 - Il nome del file corrisponde alla `VERSION` senza punti (esempio: 2.0.9 diventa `_209`).
 - Prima di scrivere una data in changelog, stringhe di versione, nomi di file o intestazioni, controlla la data reale del giorno con il comando `date`. Non riusare mai una data di un passaggio precedente.
 - Aggiorna README e HANDOFF a ogni modifica.
-- Ogni bot ha un lanciatore fisso (`atelier.py`, `vogue.py`, `architect.py`, `filtro.py`, `surprise.py`) che avvia il file versionato indicato in `BOT_FILE`. A ogni nuova versione di un bot aggiorna `BOT_FILE` nel suo lanciatore. Il Run command su Koyeb è `python <bot>.py` e non cambia più.
+- Ogni bot ha un lanciatore fisso (`atelier.py`, `vogue.py`, `architect.py`, `filtro.py`, `surprise.py`) che avvia il file versionato indicato in `BOT_FILE`. A ogni nuova versione di un bot aggiorna `BOT_FILE` nel suo lanciatore. Ogni bot ha anche `VERSION_DATE` (gg/mm/aaaa, da `date`) accanto a `VERSION`: aggiornala a ogni nuova versione, il `/start` la mostra. Il modulo comune è `shared300.py`, sempre in-place con nome fisso. Il Run command su Koyeb è `python <bot>.py` e non cambia più.
 
 ## Regole sul codice
 

@@ -1,8 +1,8 @@
 import os, re, random, logging, telebot, html, time
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from concurrent.futures import ThreadPoolExecutor
-from C_shared100 import GeminiClient, CaptionGenerator, HealthServer, is_allowed, generate_mini_caption, generate_mini_prompt, SHARED_VERSION, SHARED_DATE, MODEL
-from C_shared100 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_WATERMARK
+from shared300 import GeminiClient, CaptionGenerator, HealthServer, is_allowed, generate_mini_caption, generate_mini_prompt, SHARED_VERSION, SHARED_DATE, MODEL
+from shared300 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_WATERMARK
 
 # --- VERSIONE ---
 # CHANGELOG 2.1.1 (03/10/2026): peso Valeria 85kg → 75kg nelle due righe
@@ -90,7 +90,13 @@ from C_shared100 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_WATERMARK
 #    prompt entrano solo BACKGROUND e CAMERA: luce e mood restano quelli scelti da te o
 #    dal sorteggio. Il testo mostrato in chat dopo l'analisi resta completo.
 #    Se il testo non ha le intestazioni attese, viene usato per intero come prima.
-VERSION = "2.1.3"
+# CHANGELOG 3.0.0 (23/11/2026): salto di versione maggiore su richiesta di Walter, insieme al
+# cambio di nome di tutti i file. Il comportamento dei prompt non cambia.
+#   1) Il modulo comune si chiama ora shared300.py (era C_shared100.py): import aggiornati.
+#   2) /start mostra la data di produzione accanto alla versione: nuova costante
+#   VERSION_DATE, da aggiornare a ogni nuova versione (data da `date`).
+VERSION = "3.0.0"
+VERSION_DATE = "23/11/2026"
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -1118,7 +1124,7 @@ def handle_start(message):
     waiting_location_photo.pop(uid, None)
     logger.info(f"📍 /start da {username} (id={uid})")
     bot.send_message(message.chat.id,
-        f"<b>📍 SURPRISE v{VERSION}</b>\n\n"
+        f"<b>📍 SURPRISE v{VERSION} · {VERSION_DATE}</b>\n\n"
         f"Hai una foto da usare come location di sfondo?",
         reply_markup=get_photo_choice_keyboard())
 
@@ -1187,7 +1193,7 @@ def handle_location_photo(m):
     # questa funzione: qui serve solo la location, l'outfit lo genera
     # Surprise stesso in modo casuale altrove).
     try:
-        from C_shared100 import genai_types, detect_mime_type
+        from shared300 import genai_types, detect_mime_type
         mime = detect_mime_type(img_bytes)
         img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type=mime)
         location_prompt = (
@@ -1426,7 +1432,7 @@ def handle_callback(call):
 @bot.message_handler(commands=['shared'])
 def cmd_shared(m):
     bot.send_message(m.chat.id,
-        f"📦 <b>C_shared100.py</b> v{SHARED_VERSION} — {SHARED_DATE}"
+        f"📦 <b>shared300.py</b> v{SHARED_VERSION} — {SHARED_DATE}"
     )
 
 # ═══════════════════════════════════════════════════════════════════════════════
