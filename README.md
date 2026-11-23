@@ -1,6 +1,6 @@
 # Valeria Cross AI — Moltbot
 
-**Ultimo aggiornamento:** 13/11/2026
+**Ultimo aggiornamento:** 23/11/2026
 
 Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valeria Cross.
 
@@ -12,7 +12,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 |-----|------|---------|-------|--------|
 | VogueBot | `Vogue_434.py` | 4.3.4 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_312.py` | 3.1.2 | homely-annabelle/thearchitect | 1 |
-| AtelierBot | `Atelier_283.py` | 2.8.3 | flexible-denna/atelier | 5 |
+| AtelierBot | `Atelier_284.py` | 2.8.4 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_223.py` | 2.2.3 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_213.py` | 2.1.3 | surprise1/sorpresa | 1 |
 
@@ -26,7 +26,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 C_shared100.py       # Libreria condivisa
 Vogue_434.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
 Architect_312.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
-Atelier_283.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Atelier_284.py       # Outfit analysis → prompt con filtri (filtro persistente)
 Filtro_223.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
 Surprise_213.py      # Location + outfit random + /pride + /flag
 requirements.txt
@@ -84,7 +84,9 @@ openpyxl>=3.1.5
 
 ---
 
-## Fix robustezza (20/06/2026 → 13/11/2026)
+## Fix robustezza (20/06/2026 → 23/11/2026)
+
+**Il 23/11 — etichetta del contatore call di Atelier (Atelier 2.8.3 → 2.8.4, `Atelier_284.py`).** Walter non capiva il numero nel messaggio "🔑 Key 5 · call #371". Letto il codice: il numero è il totale delle chiamate API di tutte le chiavi (`_total_calls` in shared), non quelle della chiave mostrata, e conta ogni tentativo reale (retry e modelli di riserva compresi); si azzera alle 08:00 di Lisbona, a ogni `/start` e a ogni riavvio. Il commento di `on_key_use` in shared dice "per quella chiave": è sbagliato (shared non toccato). Su richiesta di Walter il messaggio ora dice "Key 5 · call totali #371". Nessun altro cambiamento: prompt e logica identici a 2.8.3. Lettura delle cifre dello screenshot: da #349 a #365 sono 16 = `GEMINI_MAX_ATTEMPTS` (la richiesta fallita delle 21:58 ha esaurito il tetto); da #365 a #371 sono 6 tentativi in una sola richiesta — **ipotesi non verificata:** 429 sul modello principale su tutte e 5 le chiavi e riuscita sul modello di riserva (spiegherebbe anche "Key 5" due volte di fila); servono i log Koyeb delle 22:20-22:22 (ora del telefono). Non ancora testato in produzione; eseguiti solo compilazione e confronto riga per riga con 2.8.3. **Il Run command Koyeb di `flexible-denna/atelier` va aggiornato a `python Atelier_284.py`**; `Atelier_283.py` va tolto dal repository dopo il deploy. Non cambiato: Vogue ha la stessa etichetta (`Vogue_434.py`), non toccato perché non richiesto. Rollback: ripristinare `Atelier_283.py` dalla cronologia Git e il Run command.
 
 **Il 13/11 (sera inoltrata) — revisione degli altri quattro bot con Fable 5.2 e secondo giro di fix (shared 2.4.21 → 2.4.22, Vogue 4.3.3 → 4.3.4, Filtro 2.2.2 → 2.2.3, Surprise 2.1.2 → 2.1.3).** Quattro agenti Fable in sola lettura hanno riletto Vogue, Architect, Filtro e Surprise; una parte dei risultati è stata riverificata leggendo o eseguendo il codice, il resto viene dai loro report. Walter ha detto "Vai" alla proposta in tre lotti; regola "una modifica al giorno per bot" saltata (interpretazione di Claude del "Vai"). **Corretto: (1) Surprise** — dopo `/start` o un riavvio, un tocco su una tastiera vecchia del flusso Manuale andava in `KeyError` all'ultimo step senza alcun messaggio: ora avvisa e riparte; con una location da foto il prompt aveva due righe LIGHTING e due MOOD in conflitto (quelle della foto e quelle scelte): ora entrano solo BACKGROUND e CAMERA della foto. **(2) Shared** — una risposta troncata da MAX_TOKENS veniva consegnata come completa (ora errore); l'ordine delle chiavi non dipende più dall'indice condiviso tra thread; su 429 del modello richiesto si provano prima le altre chiavi e poi i modelli di riserva; timeout HTTP di 120 s (verificato che il predefinito della libreria era nessun timeout); mappatura errori unica (`gemini_error_category`); il controllo di `review_and_fix()` protegge anche il prompt video di Vogue (prima una revisione che trasformava "video clip" in "single photorealistic image" passava). **(3) Vogue** — movimento da "### MOVEMENT" riconosciuto, errori di `analyze_video()` con la mappatura unica, caption con escape. **(4) Filtro** — 3D Stereo, Mirror e Mosaic restavano attivi dopo aver scelto altro e catturavano la foto successiva; timer orfani del mosaico; `getdata()` sostituito (Pillow 14); caption con escape. **Test su bot finti:** Surprise 36 controlli, shared 38, Filtro 16, guard sul prompt video reale di Vogue 9 mutilazioni respinte per modo, 69 prompt di Atelier identici carattere per carattere; la 2.4.21/2.1.2/2.2.2 fallisce i test dove previsto. **Non verificato:** avvio con librerie reali, Telegram, Flow, deploy; le due gare tra thread (indice chiave, timer dell'album) non sono state riprodotte sulle versioni vecchie — le correzioni sono per costruzione. **Nessun tetto Pillow in `requirements.txt`** (l'unica API affetta è stata sostituita). Lo stesso report che avevo dato diceva che la caption di Surprise non era in escape: era sbagliato, usa `parse_mode=None`. Dettaglio, elenco di ciò che non è stato corretto e lezioni #33–#34 nell'HANDOFF, sezione 2sextriginta.
 

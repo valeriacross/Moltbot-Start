@@ -1,5 +1,5 @@
 # HANDOFF MASTER — Valeria Cross AI · Moltbot
-**Generato:** 13/11/2026, sera inoltrata — secondo giro (aggiornato dalla versione di sera)
+**Generato:** 13/11/2026, sera inoltrata — secondo giro; aggiornato il 23/11/2026 (Atelier 2.8.4)
 **Da:** Walter Caponi
 **Per:** prossima sessione Claude
 
@@ -44,7 +44,9 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 ---
 
-## 2. STATO FILE ATTUALE (13/11/2026)
+## 2. STATO FILE ATTUALE (23/11/2026)
+
+**Nota (23/11):** Atelier passa a 2.8.4 (`Atelier_284.py`): cambia solo l'etichetta del messaggio sul contatore call. **Il Run command Koyeb di `flexible-denna/atelier` va aggiornato a `python Atelier_284.py`** (lezione #21); `Atelier_283.py` va tolto dal repository dopo il deploy. Resto invariato (shared 2.4.22, gli altri bot). Vedi sezione 2septtriginta.
 
 **Nota (13/11, notte):** Walter ha tolto da `CLAUDE.md` la regola "una sola modifica al giorno per bot": le modifiche si fanno quando servono, tutte le volte che servono. Tolta anche la regola del ramo separato e della pull request: le modifiche si fanno direttamente su `main` (ogni push può far partire il deploy su Koyeb). Restano le altre regole (controllo di `VERSION` con grep, data con `date`, README e HANDOFF aggiornati a ogni modifica, niente patch temporanee). Nessun file di codice cambiato.
 
@@ -67,7 +69,7 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 | `C_shared100.py` | **2.4.22** | (comune a tutti) | — | — |
 | `Vogue_434.py` | **4.3.4** | colossal-giselle/vogue | `python Vogue_434.py` | 2 |
 | `Architect_312.py` | **3.1.2** | homely-annabelle/thearchitect | `python Architect_312.py` | 1 |
-| `Atelier_283.py` | **2.8.3** | flexible-denna/atelier | `python Atelier_283.py` | 5 |
+| `Atelier_284.py` | **2.8.4** | flexible-denna/atelier | `python Atelier_284.py` | 5 |
 | `Filtro_223.py` | **2.2.3** | screeching-jobina/filtro | `python Filtro_223.py` | 1 |
 | `Surprise_213.py` | **2.1.3** | surprise1/sorpresa | `python Surprise_213.py` | 1 |
 
@@ -78,6 +80,20 @@ Repository: `valeriacross/Moltbot-Start` — region Frankfurt.
 **Nota versioning (corretta il 10/07):** il numero nel nome file **corrisponde sempre esattamente** alla VERSION interna, senza punti (es. `2.0.4` → `Atelier_204.py`, `3.0.2` → `Architect_302.py`) — non è un contatore progressivo indipendente. Su un salto di versione non incrementale (es. `2.0.6` → `3.0.0`), il nome file deve riflettere il nuovo numero di versione per intero, non "il prossimo della sequenza". Vedi sezione 2duodecies per il dettaglio dell'errore fatto e corretto in questa data.
 
 **Nota chiavi (25/06):** una chiave spostata da Architect (2→1) ad Atelier (4→5). `C_shared100.py` ora legge fino a `GOOGLE_API_KEY_5`.
+
+---
+
+## 2septtriginta. SESSIONE 23/11/2026 — SIGNIFICATO DEL CONTATORE "Key N · call #M" (ATELIER 2.8.4)
+
+*Punto di partenza.* Walter ha mandato lo screenshot della chat di Atelier (22:22 ora del telefono) con tre messaggi "🔑 Key 5 · call #349 / #365 / #371" e il messaggio "Servizio Gemini non disponibile" delle 22:03; ha chiesto cosa sia il numero e come si calcola.
+
+*Diagnosi (letti `C_shared100.py` 2.4.22 e `Atelier_283.py`).* M è `_total_calls + 1` letto all'inizio di `generate()`: il totale di tutte le chiavi, non della chiave N. `_attempt()` lo incrementa a ogni chiamata API reale, retry e modelli di riserva compresi; il messaggio parte una sola volta per `generate()`. Si azzera alle 08:00 di Lisbona, a `/start` e al riavvio. Una foto fa più `generate()` (analisi, `review_and_fix()`, ...). Il commento di `on_key_use` in shared ("per quella chiave") è sbagliato. Cifre: da #349 a #365 sono 16 = `GEMINI_MAX_ATTEMPTS`; da #365 a #371 sono 6.
+
+*Non verificato.* I 6 tentativi come "429 sul modello principale su tutte e 5 le chiavi, poi riuscita sul modello di riserva" (la rotazione dopo i 429 spiegherebbe anche "Key 5" due volte di fila) è un'ipotesi coerente con il codice, non confermata: servono i log Koyeb di quel momento. Lo screenshot non distingue 429 da 503.
+
+*Decisioni di Walter.* (1) Tolta la regola "una modifica al giorno per bot" anche dalla memoria di Claude (in `CLAUDE.md` era già tolta dal 13/11). (2) Contatore: totale con etichetta corretta. (3) L'Excel non è nel repository. (4) Il repository è pubblico perché Koyeb non lo vede se è privato (conferma la decisione del 13/11).
+
+*Implementazione.* Atelier 2.8.3 → 2.8.4 (`Atelier_284.py`): `_notify_key_use` scrive "Key N · call totali #M"; commento e changelog aggiunti. Shared non toccato (resta il commento sbagliato). Vogue ha la stessa etichetta in `Vogue_434.py`: non toccato, non richiesto. Verifiche: compilazione e diff riga per riga con 2.8.3 (solo changelog, VERSION, commento ed etichetta). Nessun avvio con librerie reali, nessun deploy. Rollback: `Atelier_283.py` dalla cronologia Git e Run command.
 
 ---
 
@@ -940,10 +956,11 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 7. ATELIER — STORICO E STATO (v2.8.3)
+## 7. ATELIER — STORICO E STATO (v2.8.4)
 
 **Nota (29/09):** lista ferma alla 2.5.4 da prima del 29/08 — mancano i bump 2.6.0/2.6.1 (multi-soggetto, 01-02/08), 2.6.2 (checklist mosaico condizionale), 2.7.0 (codice errore nell'header fallback), tutti narrati nelle sezioni 2duovicies/2trevicies ma mai riportati qui puntualmente. Non ricostruito su indicazione di Walter — aggiunto solo il bump verificato di questa settimana.
 
+- **v2.8.4 (23/11/2026):** il messaggio "Key N · call #M" diventa "Key N · call totali #M" (M è il totale di tutte le chiavi, non della chiave N). Nessun'altra modifica. File `Atelier_284.py`. Vedi sezione 2septtriginta.
 - **v2.8.3 (13/11/2026, sera):** `html.escape` sulla caption e sul messaggio "Eccezione:" di `describe_outfit_from_image()` (una caption con "<" o "&" faceva rispondere 400 a Telegram e l'utente non riceveva nulla). Prompt invariati: 68 su 68 identici a 2.8.2 (verificato a runtime con shared 2.4.21). Richiede shared >= 2.4.21 per i fix collegati, ma gira anche con 2.4.20. Contiene la rimozione di `/volto` della 2.8.2. Non ancora testato in produzione.
 - **v2.8.2 (13/11/2026):** rimosso il comando `/volto` (Walter non lo usa; default sempre modalità foto). Tolti handler, stato `user_face_mode`, righe in `/help`/`/info`, nota negli header, passaggio di `face_mode` da `_process()`; dormienti `_face_locks()` e il parametro `face_mode` dei builder (default `"photo"`). Parte dalla 2.8.1 del 12/11, che resta intatta. 68 prompt identici alla 2.8.1, verificato a runtime con shared 2.4.20. Nuovo nome file per via dell'incidente descritto nella sezione 2quattuortriginta. Non ancora testato in produzione.
 - **v2.8.1 (12/11/2026):** revisione del codice — `/shared` funzionante, `/start` mantiene la modalità, niente "full bust" nei filtri body_safe, Riviera '60 ripulita, lock "in every shot" in Mosaico, codice morto rimosso. File `Atelier_281.py`. Vedi sezione 2tertriginta.
