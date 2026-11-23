@@ -73,7 +73,7 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 | `shared300.py` | **3.0.0** | (comune a tutti) | — | — |
 | `Vogue_500.py` | **5.0.0** | colossal-giselle/vogue | `python vogue.py` (ingresso fisso → `BOT_FILE`) | 2 |
 | `Architect_400.py` | **4.0.0** | homely-annabelle/thearchitect | `python architect.py` (ingresso fisso → `BOT_FILE`) | 1 |
-| `Atelier_301.py` | **3.0.1** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
+| `Atelier_302.py` | **3.0.2** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
 | `Filtro_300.py` | **3.0.0** | screeching-jobina/filtro | `python filtro.py` (ingresso fisso → `BOT_FILE`) | 1 |
 | `Surprise_300.py` | **3.0.0** | surprise1/sorpresa | `python surprise.py` (ingresso fisso → `BOT_FILE`) | 1 |
 
@@ -84,6 +84,20 @@ Repository: `valeriacross/Moltbot-Start` — region Frankfurt.
 **Nota versioning (corretta il 10/07):** il numero nel nome file **corrisponde sempre esattamente** alla VERSION interna, senza punti (es. `2.0.4` → `Atelier_204.py`, `3.0.2` → `Architect_302.py`) — non è un contatore progressivo indipendente. Su un salto di versione non incrementale (es. `2.0.6` → `3.0.0`), il nome file deve riflettere il nuovo numero di versione per intero, non "il prossimo della sequenza". Vedi sezione 2duodecies per il dettaglio dell'errore fatto e corretto in questa data.
 
 **Nota chiavi (25/06):** una chiave spostata da Architect (2→1) ad Atelier (4→5). `C_shared100.py` ora legge fino a `GOOGLE_API_KEY_5`.
+
+---
+
+## 2novetriginta. SESSIONE 23/11/2026 (NOTTE) — FILTRI DI ATELIER CON IL CORPO DI SHOOTING EDITORIAL (ATELIER 3.0.2)
+
+*Segnalazione di Walter.* Il filtro Yacht genera immagini con corpo "assolutamente maschile e senza le forme tipiche di Valeria"; Shooting Editorial "funziona perfettamente". Walter chiede di verificare se tutti i filtri usano lo stesso DNA e, se no, di allinearli.
+
+*Diagnosi (letto il codice).* Il volto, i capelli e le clausole (COLOR/OUTFIT LOCK, body art, multi-soggetto) sono gli stessi in tutti i filtri. Cambiava solo il corpo: i filtri con `body_safe: True` (Selfie Spiaggia, Spiaggia Editoriale, Yacht, Surf) ricevevano `VALERIA_BODY_SAFE` ("soft feminine proportions", nessun seno, nessuna anca larga, nessuna coscia piena) e il lock locale "silhouette morbida"; Shooting Editorial e gli altri cinque filtri (Canvas Swimsuit, Letto, Beach Club, Riviera '60, Pool Party) ricevevano `VALERIA_BODY_STRONG` (D-cup, fianchi larghi, "BUST VOLUME — ALWAYS VISIBLE"). Il motivo originale di `body_safe` non è documentato in README/HANDOFF (non trovato); ipotesi non verificata: ridurre i blocchi di moderazione su scene di spiaggia.
+
+*Modifica (autorizzata da Walter: "verifica e modifica tutti i filtri").* Atelier 3.0.1 → 3.0.2: tolto `body_safe` dai quattro filtri, tolto il parametro `safe` da `_face_locks()` e la lettura del flag in `build_full_prompt()`. Scene invariate; shared non toccato (`VALERIA_BODY_SAFE` resta, inutilizzato da Atelier).
+
+*Verifiche.* `py_compile`; prompt costruito per tutti e 10 i filtri con `shared300.py` reale (librerie esterne simulate): tutti contengono "FULL D-CUP BUST" e il lock "full bust", nessuno contiene la silhouette morbida; `grep` di `body_safe`/`safe=` in Atelier: nessun uso residuo. **Non provato su Flow.** Nota: in quel momento Atelier usava il modello lite (429 quota esaurita fino alle 08:00); un contributo del lite alla revisione (`review_and_fix`) non è escluso, quindi riprovare Yacht dopo le 08:00 Lisbona (09:00 in Italia) prima di concludere.
+
+*Rischio.* Il blocco STRONG è più esplicito: se Flow rifiuta più immagini su Yacht, Surf, Selfie Spiaggia o Spiaggia Editoriale, tornare a `Atelier_301.py` (ripristino da Git) e dirlo a Claude.
 
 ---
 
@@ -979,10 +993,11 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 7. ATELIER — STORICO E STATO (v3.0.1)
+## 7. ATELIER — STORICO E STATO (v3.0.2)
 
 **Nota (29/09):** lista ferma alla 2.5.4 da prima del 29/08 — mancano i bump 2.6.0/2.6.1 (multi-soggetto, 01-02/08), 2.6.2 (checklist mosaico condizionale), 2.7.0 (codice errore nell'header fallback), tutti narrati nelle sezioni 2duovicies/2trevicies ma mai riportati qui puntualmente. Non ricostruito su indicazione di Walter — aggiunto solo il bump verificato di questa settimana.
 
+- **v3.0.2 (23/11/2026):** `Atelier_302.py`; tutti i filtri con `VALERIA_BODY_STRONG` come Shooting Editorial: tolto `body_safe` da Selfie Spiaggia, Spiaggia Editoriale, Yacht, Surf e il meccanismo `safe` da `build_full_prompt()`/`_face_locks()`. Vedi sezione 2novetriginta.
 - **v3.0.1 (23/11/2026):** `Atelier_301.py`; la data nel `/start` mancava nel ramo senza filtro attivo (quello che si vede dopo ogni riavvio). Nessun altro cambiamento.
 - **v3.0.0 (23/11/2026):** `Atelier_300.py`; shared → `shared300.py`; `VERSION_DATE` mostrata nel `/start`. Nessun cambio ai prompt.
 - **v2.8.4 (23/11/2026):** il messaggio "Key N · call #M" diventa "Key N · call totali #M" (M è il totale di tutte le chiavi, non della chiave N). Nessun'altra modifica. File `Atelier_284.py`. Vedi sezione 2septtriginta.

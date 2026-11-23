@@ -12,7 +12,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 |-----|------|---------|-------|--------|
 | VogueBot | `Vogue_500.py` | 5.0.0 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_400.py` | 4.0.0 | homely-annabelle/thearchitect | 1 |
-| AtelierBot | `Atelier_301.py` | 3.0.1 | flexible-denna/atelier | 5 |
+| AtelierBot | `Atelier_302.py` | 3.0.2 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_300.py` | 3.0.0 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_300.py` | 3.0.0 | surprise1/sorpresa | 1 |
 
@@ -26,7 +26,7 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 shared300.py         # Libreria condivisa
 Vogue_500.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
 Architect_400.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
-Atelier_301.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Atelier_302.py       # Outfit analysis → prompt con filtri (filtro persistente)
 atelier.py           # Ingresso fisso per Koyeb: avvia il file indicato in BOT_FILE
 vogue.py, architect.py, filtro.py, surprise.py   # Ingressi fissi per Koyeb, uno per bot, come atelier.py
 Filtro_300.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
@@ -87,6 +87,8 @@ openpyxl>=3.1.5
 ---
 
 ## Fix robustezza (20/06/2026 → 23/11/2026)
+
+**Il 23/11 (notte) — tutti i filtri di Atelier con lo stesso corpo di Shooting Editorial (Atelier 3.0.1 → 3.0.2, `Atelier_302.py`).** Walter: Yacht generava un corpo maschile senza le forme di Valeria, mentre Shooting Editorial funziona. Causa nel codice: quattro filtri (Selfie Spiaggia, Spiaggia Editoriale, Yacht, Surf) avevano `body_safe: True` e quindi `VALERIA_BODY_SAFE` (silhouette morbida, senza seno D-cup né fianchi larghi); Shooting Editorial e gli altri cinque filtri usano `VALERIA_BODY_STRONG`. Tolto il flag e il meccanismo `safe` da `build_full_prompt()` e `_face_locks()`. Verificato costruendo il prompt di tutti e 10 i filtri: tutti con "FULL D-CUP BUST". Non provato su Flow. `VALERIA_BODY_SAFE` resta in shared ma non è più usato. Rollback: `Atelier_301.py` da Git.
 
 **Il 23/11 (notte) — data nel `/start` di Atelier anche senza filtro attivo (Atelier 3.0.0 → 3.0.1, `Atelier_301.py`).** Nella 3.0.0 la data era solo nel ramo "filtro attivo" e in `/info`: dopo un riavvio il `/start` non la mostrava. Errore mio, trovato da Walter dallo screenshot. Gli altri quattro bot hanno la data nel loro unico `/start`.
 

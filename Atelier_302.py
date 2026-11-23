@@ -313,7 +313,15 @@ logger = logging.getLogger(__name__)
 # CHANGELOG 3.0.1 (23/11/2026): la data di produzione mancava nel /start di Atelier quando non c'è
 # un filtro attivo (il caso dopo ogni riavvio): nella 3.0.0 era stata aggiunta solo al ramo con filtro
 # attivo e a /info. Ora c'è in tutti i rami del /start. Nessun altro cambiamento.
-VERSION = "3.0.1"
+# CHANGELOG 3.0.2 (23/11/2026): tutti i filtri usano ora lo stesso corpo di Shooting Editorial
+# (VALERIA_BODY_STRONG: D-cup, fianchi larghi). Su richiesta di Walter: Yacht generava un corpo
+# maschile e senza le forme di Valeria. Causa trovata nel codice: quattro filtri (Selfie Spiaggia,
+# Spiaggia Editoriale, Yacht, Surf) avevano body_safe=True e quindi VALERIA_BODY_SAFE, una
+# descrizione più morbida senza seno ne fianchi larghi, mentre Shooting Editorial usa STRONG.
+# Tolto il flag dai quattro filtri e tolto il meccanismo safe da build_full_prompt() e
+# _face_locks() (non serviva più). Nessun cambio ai testi delle scene. VALERIA_BODY_SAFE resta
+# in shared ma Atelier non lo usa più. Rollback: ripristinare Atelier_301.py da Git.
+VERSION = "3.0.2"
 VERSION_DATE = "23/11/2026"
 TOKEN   = os.environ.get("TELEGRAM_TOKEN_CLOSET")
 
@@ -371,7 +379,6 @@ FILTERS = {
         ),
     },
     "selfie_spiaggia": {
-        "body_safe": True,
         "label": "🤳 Selfie Spiaggia",
         "is_dual": True,
         "variants": [
@@ -448,7 +455,6 @@ FILTERS = {
         ],
     },
     "spiaggia_editoriale": {
-        "body_safe": True,
         "label": "🌅 Spiaggia Editoriale",
         "is_dual": True,
         "variants": [
@@ -523,7 +529,6 @@ FILTERS = {
         ],
     },
     "yacht": {
-        "body_safe": True,
         "label": "⛵ Yacht",
         "is_dual": True,
         "variants": [
@@ -567,7 +572,6 @@ FILTERS = {
         ],
     },
     "surf": {
-        "body_safe": True,
         "label": "🏄 Surf",
         "is_dual": True,
         "variants": [
@@ -725,17 +729,14 @@ _MOSAIC_BLOCK = (
     "Background, lighting and outfit MUST remain identical across all 4 shots.\n\n"
 )
 
-def _face_locks(face_mode: str = "photo", scope: str = "single", safe: bool = False) -> str:
+def _face_locks(face_mode: str = "photo", scope: str = "single") -> str:
     """IDENTITY LOCK + HAIR LOCK locali, un'unica fonte per i tre punti di assemblaggio
     (build_full_prompt, build_shooting_prompt single e mosaic) — introdotta in 2.8.0.
     scope="single": filtro e scatto singolo. scope="mosaic": mosaico a 4 scatti.
     face_mode="photo": testo storico identico alla 2.7.2 (rimando alla foto allegata).
     face_mode="text": volto descritto in shared (VALERIA_FACE_TEXT), capelli da VALERIA_HAIR_TEXT."""
     mosaic = scope == "mosaic"
-    # 2.8.1: nei filtri body_safe il corpo è VALERIA_BODY_SAFE (silhouette morbida, senza
-    # riferimento al seno) — "full bust" lo contraddiceva.
-    shape = ("the soft feminine hourglass silhouette described above" if safe
-             else "the feminine hourglass silhouette and full bust described above")
+    shape = "the feminine hourglass silhouette and full bust described above"
     body = (
         "The body keeps " + shape + ", with completely "
         "smooth, hairless skin on the torso, arms and legs"
@@ -780,8 +781,7 @@ def _face_locks(face_mode: str = "photo", scope: str = "single", safe: bool = Fa
 def build_full_prompt(filter_key, outfit_description, scene_override=None, mode="single", face_mode="photo"):
     """Assembla il prompt completo: editorial wrapper + identita Valeria + scena filtro + outfit."""
     scene = scene_override if scene_override else FILTERS[filter_key]["scene"]
-    safe = FILTERS[filter_key].get("body_safe", False)
-    identity = build_valeria_identity(safe=safe, face_mode=face_mode)
+    identity = build_valeria_identity(safe=False, face_mode=face_mode)
     mosaic = _MOSAIC_BLOCK if mode == "mosaic" else ""
     return (
         f"{EDITORIAL_WRAPPER}\n"
@@ -800,7 +800,7 @@ def build_full_prompt(filter_key, outfit_description, scene_override=None, mode=
         f"richness of detail as the reference.\n\n"
         f"{body_art_clause(outfit_description)}"
         f"{multi_subject_clause(outfit_description)}"
-        f"{_face_locks(face_mode, 'mosaic' if mode == 'mosaic' else 'single', safe=safe)}"
+        f"{_face_locks(face_mode, 'mosaic' if mode == 'mosaic' else 'single')}"
         f"**Technical:** 8K, cinematic, photorealistic.\n"
     )
 
