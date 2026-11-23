@@ -27,6 +27,7 @@ C_shared100.py       # Libreria condivisa
 Vogue_434.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
 Architect_312.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
 Atelier_284.py       # Outfit analysis → prompt con filtri (filtro persistente)
+atelier.py           # Ingresso fisso per Koyeb: avvia il file indicato in BOT_FILE
 Filtro_223.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
 Surprise_213.py      # Location + outfit random + /pride + /flag
 requirements.txt
@@ -85,6 +86,8 @@ openpyxl>=3.1.5
 ---
 
 ## Fix robustezza (20/06/2026 → 23/11/2026)
+
+**Il 23/11 (sera) — ingresso fisso per Atelier (`atelier.py`, nessun cambio di VERSION).** Nessuno strumento di Claude arriva a Koyeb (nessun connettore, nessun browser collegato, password non digitabili), quindi il Run command va cambiato da Walter a mano e finora andava ricambiato a ogni nuova versione. `atelier.py` avvia il file versionato indicato in `BOT_FILE` (ora `Atelier_284.py`) e stampa un avviso nei log se nella cartella c'è un `Atelier_NNN.py` più recente. **Il Run command Koyeb di `flexible-denna/atelier` va portato una volta sola a `python atelier.py`**; da lì in poi a ogni nuova versione di Atelier si aggiorna `BOT_FILE` e Koyeb non si tocca. Solo Atelier: gli altri quattro bot restano com'erano. Provato con file finti (`__name__`, `__file__`, import dalla cartella, avviso sulla versione più nuova); non provato con le librerie reali né su Koyeb.
 
 **Il 23/11 — etichetta del contatore call di Atelier (Atelier 2.8.3 → 2.8.4, `Atelier_284.py`).** Walter non capiva il numero nel messaggio "🔑 Key 5 · call #371". Letto il codice: il numero è il totale delle chiamate API di tutte le chiavi (`_total_calls` in shared), non quelle della chiave mostrata, e conta ogni tentativo reale (retry e modelli di riserva compresi); si azzera alle 08:00 di Lisbona, a ogni `/start` e a ogni riavvio. Il commento di `on_key_use` in shared dice "per quella chiave": è sbagliato (shared non toccato). Su richiesta di Walter il messaggio ora dice "Key 5 · call totali #371". Nessun altro cambiamento: prompt e logica identici a 2.8.3. Lettura delle cifre dello screenshot: da #349 a #365 sono 16 = `GEMINI_MAX_ATTEMPTS` (la richiesta fallita delle 21:58 ha esaurito il tetto); da #365 a #371 sono 6 tentativi in una sola richiesta — **ipotesi non verificata:** 429 sul modello principale su tutte e 5 le chiavi e riuscita sul modello di riserva (spiegherebbe anche "Key 5" due volte di fila); servono i log Koyeb delle 22:20-22:22 (ora del telefono). Non ancora testato in produzione; eseguiti solo compilazione e confronto riga per riga con 2.8.3. **Il Run command Koyeb di `flexible-denna/atelier` va aggiornato a `python Atelier_284.py`**; `Atelier_283.py` va tolto dal repository dopo il deploy. Non cambiato: Vogue ha la stessa etichetta (`Vogue_434.py`), non toccato perché non richiesto. Rollback: ripristinare `Atelier_283.py` dalla cronologia Git e il Run command.
 
