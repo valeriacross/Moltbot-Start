@@ -7,7 +7,7 @@ import os
 import re
 import runpy
 
-BOT_FILE = "Vogue_501.py"
+BOT_FILE = "Vogue_502.py"
 
 
 def _num(path):

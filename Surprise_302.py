@@ -2,7 +2,7 @@ import os, re, random, logging, telebot, html, time
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from concurrent.futures import ThreadPoolExecutor
 from shared300 import GeminiClient, CaptionGenerator, HealthServer, is_allowed, generate_mini_caption, generate_mini_prompt, SHARED_VERSION, SHARED_DATE, MODEL
-from shared300 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_WATERMARK
+from shared300 import valeria_face, VALERIA_BODY_STRONG, VALERIA_WATERMARK
 
 # --- VERSIONE ---
 # CHANGELOG 2.1.1 (03/10/2026): peso Valeria 85kg → 75kg nelle due righe
@@ -95,13 +95,17 @@ from shared300 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_WATERMARK
 #   1) Il modulo comune si chiama ora shared300.py (era C_shared100.py): import aggiornati.
 #   2) /start mostra la data di produzione accanto alla versione: nuova costante
 #   VERSION_DATE, da aggiornare a ogni nuova versione (data da `date`).
+# CHANGELOG 3.0.2 (27/11/2026, sera): volto reale a confronto con le immagini di Flow (shared 3.0.2).
+# I prompt Flow usano valeria_face() invece della costante: occhiali di riserva (se la foto non è
+# allegata) in blu, verde o rosso a caso a ogni prompt; barba e capelli aggiornati da shared.
+# /pride non toccato. Rollback: Surprise_301.py da Git.
 # CHANGELOG 3.0.1 (27/11/2026): corpo tonico, su richiesta di Walter (vedi shared 3.0.1). I prompt
 # Flow di /start usano VALERIA_FACE e VALERIA_BODY_STRONG di shared: ereditano da soli il blocco
 # "SLIM, FIRM AND FIT BODY", i capelli e la barba aggiornati. Qui cambiano solo le due righe locali
 # (riepilogo "Body" mostrato in chat e corpo del mosaico /flag: "defined narrow waist, shapely
 # hips, slim firm toned figure"). /pride (Walter, Carlotta, Fufos, Fritz) NON è stato toccato,
 # per decisione di Walter. Rollback: Surprise_300.py da Git.
-VERSION = "3.0.1"
+VERSION = "3.0.2"
 VERSION_DATE = "27/11/2026"
 
 # --- LOGGING ---
@@ -852,7 +856,7 @@ def build_flow_prompt_single(scenario):
     )
     loc, outfit, sky, pose, mood, style = _scenario_fields(scenario)
     return (
-        f"{VALERIA_FACE}{VALERIA_BODY_STRONG}"
+        f"{valeria_face()}{VALERIA_BODY_STRONG}"
         f"{shooting_block}"
         f"LOCATION: {loc}\n\nOUTFIT: {outfit}\n\nLIGHTING / SKY: {sky}\n\n"
         f"POSE: {pose}\n\nMOOD / ATMOSPHERE: {mood}\n\nPHOTOGRAPHIC STYLE: {style}\n\n"
@@ -883,7 +887,7 @@ def build_flow_prompt_mosaic(scenario):
     )
     loc, outfit, sky, pose, mood, style = _scenario_fields(scenario)
     return (
-        f"{VALERIA_FACE}{VALERIA_BODY_STRONG}"
+        f"{valeria_face()}{VALERIA_BODY_STRONG}"
         f"{shooting_block}"
         f"LOCATION: {loc}\n\nOUTFIT: {outfit}\n\nLIGHTING / SKY: {sky}\n\n"
         f"POSE: {pose}\n\nMOOD / ATMOSPHERE: {mood}\n\nPHOTOGRAPHIC STYLE: {style}\n\n"

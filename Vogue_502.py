@@ -1,8 +1,8 @@
-import os, logging, re, telebot, html, threading
+import os, logging, re, random, telebot, html, threading
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from shared300 import GeminiClient, HealthServer, is_allowed, genai_types, analyze_scene, gemini_error_category
 from shared300 import VALERIA_BODY_STRONG, VALERIA_WATERMARK, VALERIA_TEXTURE_LOCK
-from shared300 import VALERIA_HAIR_TEXT, VALERIA_BEARD_TEXT, VALERIA_GLASSES_TEXT
+from shared300 import VALERIA_HAIR_TEXT, VALERIA_BEARD_TEXT, VALERIA_GLASSES_COLORS, glasses_text
 from shared300 import generate_caption, review_and_fix, SHARED_VERSION, SHARED_DATE, body_art_clause, multi_subject_clause, MODEL
 
 # --- VERSIONE ---
@@ -238,6 +238,12 @@ from shared300 import generate_caption, review_and_fix, SHARED_VERSION, SHARED_D
 #   3) Etichetta del messaggio "Key N · call #M" corretta in "call totali #M" (come
 #   Atelier 2.8.4): M è il totale di TUTTE le chiavi (shared: _total_calls), non della
 #   chiave mostrata.
+# CHANGELOG 5.0.2 (27/11/2026, sera): volto reale a confronto con le immagini di Flow (shared 3.0.2).
+# Occhiali: tre paia identici di Walter (tondi, panto, acetato trasparente di medio spessore) in blu,
+# verde e rosso; il colore è scelto a caso a OGNI prompt (build_dna_video() / build_face_video()
+# invece delle costanti fisse, che restano solo per /dna). Barba "neatly trimmed natural beard"
+# (grigio sale e pepe), capelli pettinati all'indietro fino alla nuca: costanti di shared. Il resto
+# del DNA video (pelle, rughe, corpo) non cambia. Rollback: Vogue_501.py da Git.
 # CHANGELOG 5.0.1 (27/11/2026): corpo tonico, capelli/barba allineati, occhiali blu sottili, su
 # richiesta di Walter (vedi shared 3.0.1). Il DNA del VIDEO usa ora VALERIA_BODY_STRONG con il
 # blocco "SLIM, FIRM AND FIT BODY" (addome piatto e sodo, braccia e gambe tonici) e le costanti
@@ -245,7 +251,7 @@ from shared300 import generate_caption, review_and_fix, SHARED_VERSION, SHARED_D
 # bianco-argento) e occhiali (montatura blu sottile e semplice). Prima: capelli "radi", barba
 # "dense grey-white" e occhiali bicolore asimmetrici, descrizioni diverse da quelle degli altri
 # bot. Il resto del volto video (pelle, rughe) non cambia. Rollback: Vogue_500.py da Git.
-VERSION = "5.0.1"
+VERSION = "5.0.2"
 VERSION_DATE = "27/11/2026"
 
 # --- LOGGING ---
@@ -465,18 +471,23 @@ EDITORIAL_WRAPPER_VIDEO = (
 # (in particolare la montatura degli occhiali bicolore asimmetrica) invece di un generico
 # "simile". Isolata qui, come tutto il resto dell'esperimento video — shared non toccato,
 # VALERIA_FACE resta invariata per Atelier (dove allegare la foto reale funziona bene).
-VALERIA_FACE_VIDEO = (
-    "**⚠️ FACE IDENTITY LOCK — ABSOLUTE PRIORITY:** Mature Italian male face in his 60s, oval "
-    "shape, weathered sun-tanned skin, deep horizontal forehead wrinkles, pronounced smile "
-    "creases beside the mouth, warm complexion.\n"
-    "**Hair:** " + VALERIA_HAIR_TEXT[:1].upper() + VALERIA_HAIR_TEXT[1:] + ".\n"
-    "**⚠️ BEARD — MANDATORY — NON-NEGOTIABLE:** " + VALERIA_BEARD_TEXT[:1].upper() + VALERIA_BEARD_TEXT[1:]
-    + ". Clearly visible in every shot, a permanent part of the identity.\n"
-    "**⚠️ EYEGLASSES — MANDATORY, ALWAYS PRESENT:** " + VALERIA_GLASSES_TEXT[:1].upper() + VALERIA_GLASSES_TEXT[1:]
-    + ", kept exactly as written in every shot.\n"
-    "**Rendering:** Subsurface Scattering, Global Illumination, Ambient Occlusion, Fresnel Effect. "
-    "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
-)
+def build_face_video(color=None):
+    """Volto del video. color: colore degli occhiali (a caso fra blu, verde e rosso se None)."""
+    color = color or random.choice(VALERIA_GLASSES_COLORS)
+    return (
+        "**⚠️ FACE IDENTITY LOCK — ABSOLUTE PRIORITY:** Mature Italian male face in his 60s, oval "
+        "shape, weathered sun-tanned skin, deep horizontal forehead wrinkles, pronounced smile "
+        "creases beside the mouth, warm complexion.\n"
+        "**Hair:** " + VALERIA_HAIR_TEXT[:1].upper() + VALERIA_HAIR_TEXT[1:] + ".\n"
+        "**⚠️ BEARD — MANDATORY — NON-NEGOTIABLE:** " + VALERIA_BEARD_TEXT[:1].upper() + VALERIA_BEARD_TEXT[1:]
+        + ". Clearly visible in every shot, a permanent part of the identity.\n"
+        "**⚠️ EYEGLASSES — MANDATORY, ALWAYS PRESENT:** " + glasses_text(color)[:1].upper() + glasses_text(color)[1:]
+        + ", kept exactly as written in every shot.\n"
+        "**Rendering:** Subsurface Scattering, Global Illumination, Ambient Occlusion, Fresnel Effect. "
+        "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
+    )
+
+VALERIA_FACE_VIDEO = build_face_video("blue")   # compatibilità: colore fisso blu; i bot usano build_face_video()
 
 # DNA video — Vogue 4.2.2. VALERIA_DNA (shared) termina con "The output is a single
 # photorealistic IMAGE" — hardcoded, contraddice in pieno il resto del prompt video
@@ -485,14 +496,19 @@ VALERIA_FACE_VIDEO = (
 # ma tenerla come costante di sistema generica non va toccata per questo esperimento — la
 # ricompongo qui dai singoli pezzi già condivisi (FACE/BODY_STRONG/TEXTURE_LOCK) con una
 # coda locale corretta per il video.
-VALERIA_DNA_VIDEO = (
-    f"{VALERIA_FACE_VIDEO}"
-    f"{VALERIA_BODY_STRONG}"
-    f"{VALERIA_TEXTURE_LOCK}"
-    f"WATERMARK: '{VALERIA_WATERMARK}' — elegant champagne cursive, very small, bottom center, 90% opacity.\n"
-    f"The output is a single short video clip. Hands are anatomically correct, five fingers each. "
-    f"No text appears anywhere in the video beyond the watermark specified above.\n"
-)
+def build_dna_video(color=None):
+    """DNA del video, con un colore di occhiali per prompt (a caso se None)."""
+    color = color or random.choice(VALERIA_GLASSES_COLORS)
+    return (
+        f"{build_face_video(color)}"
+        f"{VALERIA_BODY_STRONG}"
+        f"{VALERIA_TEXTURE_LOCK}"
+        f"WATERMARK: '{VALERIA_WATERMARK}' — elegant champagne cursive, very small, bottom center, 90% opacity.\n"
+        f"The output is a single short video clip. Hands are anatomically correct, five fingers each. "
+        f"No text appears anywhere in the video beyond the watermark specified above.\n"
+    )
+
+VALERIA_DNA_VIDEO = build_dna_video("blue")   # compatibilità: colore fisso blu; i bot usano build_dna_video()
 
 def build_prompt_video(scene_description):
     """Assembla il prompt con DNA Valeria (VALERIA_DNA, body_art_clause(),
@@ -520,7 +536,7 @@ def build_prompt_video(scene_description):
         )
     prompt = (
         f"{EDITORIAL_WRAPPER_VIDEO}\n"
-        f"{VALERIA_DNA_VIDEO}\n"
+        f"{build_dna_video()}\n"
         f"{body_art_clause(scene_description)}"
         f"{multi_subject_clause(scene_description)}"
         f"--- SCENE REFERENCE ---\n"
@@ -598,7 +614,7 @@ def cmd_shared(m):
 @bot.message_handler(commands=['dna'])
 def cmd_dna(m):
     bot.send_message(m.chat.id,
-        f"<b>🧬 DNA Valeria Cross (video):</b>\n\n<code>{html.escape(VALERIA_DNA_VIDEO)}</code>"
+        f"<b>🧬 DNA Valeria Cross (video):</b>\n\n<code>{html.escape(VALERIA_DNA_VIDEO)}</code>\n\n<i>Il colore degli occhiali è casuale (blu, verde o rosso) a ogni prompt.</i>"
     )
 
 # --- /caption ---

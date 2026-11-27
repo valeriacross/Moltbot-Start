@@ -46,6 +46,8 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 ## 2. STATO FILE ATTUALE (27/11/2026)
 
+**Nota (27/11/2026, sera):** volto reale a confronto con Flow — shared 3.0.2, Vogue 5.0.2 (`Vogue_502.py`), Atelier 3.0.4 (`Atelier_304.py`), Surprise 3.0.2 (`Surprise_302.py`); lanciatori aggiornati. Vedi sezione 2unquadragesima.
+
 **Nota (27/11/2026):** corpo tonico, capelli/barba allineati, occhiali blu sottili — shared 3.0.1 (stesso nome), Vogue 5.0.1 (`Vogue_501.py`), Atelier 3.0.3 (`Atelier_303.py`), Surprise 3.0.1 (`Surprise_301.py`). Architect e Filtro invariati. I lanciatori `vogue.py`, `atelier.py`, `surprise.py` puntano ai file nuovi; il Run command su Koyeb non cambia. Vedi sezione 2quadragesima.
 
 **Nota (23/11, notte, dopo il push):** Atelier 3.0.0 → 3.0.1 (`Atelier_301.py`): la data di produzione non compariva nel `/start` di Atelier senza filtro attivo (errore di Claude, trovato da Walter dallo screenshot dopo il redeploy). Gli altri quattro bot non hanno il problema.
@@ -72,12 +74,12 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 | File | Versione | Koyeb service | Run command | Chiavi API |
 |------|---------|---------------|--------------|-----------|
-| `shared300.py` | **3.0.1** | (comune a tutti) | — | — |
-| `Vogue_501.py` | **5.0.1** | colossal-giselle/vogue | `python vogue.py` (ingresso fisso → `BOT_FILE`) | 2 |
+| `shared300.py` | **3.0.2** | (comune a tutti) | — | — |
+| `Vogue_502.py` | **5.0.2** | colossal-giselle/vogue | `python vogue.py` (ingresso fisso → `BOT_FILE`) | 2 |
 | `Architect_400.py` | **4.0.0** | homely-annabelle/thearchitect | `python architect.py` (ingresso fisso → `BOT_FILE`) | 1 |
-| `Atelier_303.py` | **3.0.3** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
+| `Atelier_304.py` | **3.0.4** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
 | `Filtro_300.py` | **3.0.0** | screeching-jobina/filtro | `python filtro.py` (ingresso fisso → `BOT_FILE`) | 1 |
-| `Surprise_301.py` | **3.0.1** | surprise1/sorpresa | `python surprise.py` (ingresso fisso → `BOT_FILE`) | 1 |
+| `Surprise_302.py` | **3.0.2** | surprise1/sorpresa | `python surprise.py` (ingresso fisso → `BOT_FILE`) | 1 |
 
 **Totale chiavi API: 10** (Atelier 5 + Vogue 2 + Architect 1 + Filtro 1 + Surprise 1) — tutte e 10 confermate su progetti Google Cloud distinti il 04/07 (vedi sezione 2quinquies). Prima di quella verifica, Filtro e Surprise condividevano la stessa chiave fisica per un errore di assegnazione: risolto.
 
@@ -86,6 +88,22 @@ Repository: `valeriacross/Moltbot-Start` — region Frankfurt.
 **Nota versioning (corretta il 10/07):** il numero nel nome file **corrisponde sempre esattamente** alla VERSION interna, senza punti (es. `2.0.4` → `Atelier_204.py`, `3.0.2` → `Architect_302.py`) — non è un contatore progressivo indipendente. Su un salto di versione non incrementale (es. `2.0.6` → `3.0.0`), il nome file deve riflettere il nuovo numero di versione per intero, non "il prossimo della sequenza". Vedi sezione 2duodecies per il dettaglio dell'errore fatto e corretto in questa data.
 
 **Nota chiavi (25/06):** una chiave spostata da Architect (2→1) ad Atelier (4→5). `C_shared100.py` ora legge fino a `GOOGLE_API_KEY_5`.
+
+---
+
+## 2unquadragesima. SESSIONE 27/11/2026 (SERA) — VOLTO REALE A CONFRONTO CON FLOW (SHARED 3.0.2, VOGUE 5.0.2, ATELIER 3.0.4, SURPRISE 3.0.2)
+
+*Punto di partenza.* Walter ha dubitato che il DNA iniettato nel pomeriggio fosse coerente con la realtà e ha mandato: due immagini generate da Atelier 3.0.3 (Shooting Editorial) **senza foto allegata**, una generata **con il volto reale**, e una foto reale. Confronto: da solo testo la barba usciva lunga, folta e molto bianca (a volte fino al petto) e gli occhiali neri e spessi; con la foto la barba è corta e curata e gli occhiali tondi, sottili-medi, chiari. La foto reale: fronte alta con rughe, attaccatura arretrata, capelli grigio-argento all'indietro, barba grigia sale e pepe di lunghezza media-corta (più piena sul mento), baffi grigi, occhiali tondi panto in acetato trasparente di medio spessore, carnagione rosata.
+
+*Causa.* (1) Il testo della barba era esagerato ("full, wide, bushy, voluminous, silver-white"). (2) Atelier genera SEMPRE il prompt in modalità foto (`/volto` rimosso il 13/11): gli occhiali sono "come nella foto allegata", quindi senza foto Flow li inventa. La montatura blu sottile scritta nel pomeriggio valeva solo nel volto a testo, mai usato.
+
+*Decisioni di Walter.* Occhiali: ne ha tre paia identici in blu, verde e rosso e li usa tutti → colore a caso fra i tre a ogni prompt; il colore blu resta fra quelli. Capelli: fino alla nuca. Barba, sopracciglia e forma degli occhiali: dalla foto reale.
+
+*Cosa è cambiato.* **shared 3.0.2:** `VALERIA_BEARD_TEXT` = "neatly trimmed natural beard, salt-and-pepper grey…"; `VALERIA_HAIR_TEXT` = pettinati all'indietro da un'attaccatura alta e arretrata, più radi davanti e più lunghi dietro, fino alla nuca; sopracciglia "light grey, moderate thickness"; `glasses_text(color=None)` (round panto-style, medium-thick translucent acetate, colore a caso); `valeria_face()` e `valeria_face_text()` sono funzioni (le costanti `VALERIA_FACE`/`VALERIA_FACE_TEXT` restano con il blu fisso, per compatibilità); in modalità foto gli occhiali a parole compaiono solo come riserva ("If no reference photo is attached"), la foto resta autorevole; le regole di `review_and_fix()` dicono "blue, green or red: keep the colour already written in the prompt"; controllo della revisione sulla barba "neatly trimmed natural beard". **Vogue 5.0.2:** `build_face_video()` e `build_dna_video()` scelgono il colore a ogni prompt. **Atelier 3.0.4**, **Surprise 3.0.2:** ereditano; barba "neatly trimmed grey beard" nei blocchi locali; Surprise usa `valeria_face()`.
+
+*Lezione.* Un testo di DNA va confrontato con una foto reale, non solo con altre descrizioni scritte: il testo "silver-white, bushy, voluminous" derivava dall'ultimo aggiornamento scritto a mano e non dalla realtà. Evitare i centimetri (Flow li ignora) e aggettivi come full/bushy/voluminous, che spingono verso un volto più pesante.
+
+*Verificato offline:* pyflakes pulito; 120 prompt Atelier (foto e testo) e 60 di Vogue e Surprise contengono UN solo colore di occhiali e, su molti prompt, escono tutti e tre i colori; barba, capelli, corpo sodo presenti, nessuna vecchia frase; il prompt di `/pride` è identico; una revisione che perde barba o corpo viene scartata. **Non verificato:** quanto Flow rispetti il testo. **Non ancora testato in produzione.**
 
 ---
 
@@ -909,8 +927,9 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 4. SHARED300.PY (ex C_SHARED100.PY) — STORICO COMPLETO FIX (v2.3.0 → v3.0.1)
+## 4. SHARED300.PY (ex C_SHARED100.PY) — STORICO COMPLETO FIX (v2.3.0 → v3.0.2)
 
+- **v3.0.2 (27/11/2026, sera):** `glasses_text()` con colore a caso fra blu, verde e rosso; `valeria_face()` e `valeria_face_text()` al posto delle costanti (che restano, blu fisso); barba "neatly trimmed natural beard", capelli fino alla nuca, sopracciglia grigio chiaro; regole di `review_and_fix()` senza colore fisso. Vedi sezione 2unquadragesima.
 - **v3.0.1 (27/11/2026):** corpo tonico (`VALERIA_BODY_TONE` in `VALERIA_BODY_STRONG` e `VALERIA_BODY_SAFE`, parole "full/soft/wide" sostituite), costanti uniche `VALERIA_HAIR_TEXT`, `VALERIA_BEARD_TEXT`, `VALERIA_GLASSES_TEXT` (occhiali blu sottili), regole di `review_and_fix()` allineate, controlli della revisione aggiornati (barba video "bushy silver-white beard", blocco "SLIM, FIRM AND FIT BODY"). Vedi sezione 2quadragesima. Non ancora testato in produzione.
 
 - **v3.0.0 (23/11/2026):** file rinominato `C_shared100.py` → `shared300.py` e portato a 3.0.0 su richiesta di Walter; nessuna modifica al codice né al DNA.
@@ -962,8 +981,9 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 5. VOGUE — STORICO E STATO (v5.0.1)
+## 5. VOGUE — STORICO E STATO (v5.0.2)
 
+- **v5.0.2 (27/11/2026, sera):** `Vogue_502.py`; `build_dna_video()`/`build_face_video()` con occhiali di colore casuale a ogni prompt. Vedi sezione 2unquadragesima.
 - **v5.0.1 (27/11/2026):** `Vogue_501.py`; DNA del video con corpo tonico (shared 3.0.1), capelli/barba/occhiali dalle costanti di shared (prima: capelli radi, barba "dense grey-white", occhiali bicolore asimmetrici). Vedi sezione 2quadragesima.
 
 **Nota (29/09):** questa lista era ferma alla 2.1.0 da prima del 29/08 — mancano i bump 2.2.0 (multi-soggetto, 01/08), 3.0.0/3.1.0 (video, 05-10/08), 4.0-4.3 (sempre video, 11-14/08), già narrati nelle sezioni 2duovicies/2quattuorvicies/2quinvicies ma mai riportati qui puntualmente. Non ricostruito in questa sessione su indicazione esplicita di Walter ("bypassa le versioni mancanti") — aggiunti solo i due bump verificati questa settimana.
@@ -1013,8 +1033,9 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 7. ATELIER — STORICO E STATO (v3.0.3)
+## 7. ATELIER — STORICO E STATO (v3.0.4)
 
+- **v3.0.4 (27/11/2026, sera):** `Atelier_304.py`; occhiali di riserva a colore casuale nel volto in modalità foto, "neatly trimmed grey beard" nei blocchi locali. Vedi sezione 2unquadragesima.
 - **v3.0.3 (27/11/2026):** `Atelier_303.py`; `_face_locks()` con corpo "slim, firm, toned build", HAIR LOCK da `VALERIA_HAIR_TEXT` anche in modalità foto, barba silver-white, scene "Letto" con costruzione snella e tonica. Vedi sezione 2quadragesima.
 
 **Nota (29/09):** lista ferma alla 2.5.4 da prima del 29/08 — mancano i bump 2.6.0/2.6.1 (multi-soggetto, 01-02/08), 2.6.2 (checklist mosaico condizionale), 2.7.0 (codice errore nell'header fallback), tutti narrati nelle sezioni 2duovicies/2trevicies ma mai riportati qui puntualmente. Non ricostruito su indicazione di Walter — aggiunto solo il bump verificato di questa settimana.
@@ -1074,8 +1095,9 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 9. SURPRISE — STORICO E STATO (v3.0.1)
+## 9. SURPRISE — STORICO E STATO (v3.0.2)
 
+- **v3.0.2 (27/11/2026, sera):** `Surprise_302.py`; prompt con `valeria_face()` (occhiali di riserva a colore casuale). `/pride` non toccato. Vedi sezione 2unquadragesima.
 - **v3.0.1 (27/11/2026):** `Surprise_301.py`; i prompt ereditano corpo/capelli/barba da shared 3.0.1; righe locali "Body" e corpo di `/flag` aggiornate. `/pride` non toccato. Vedi sezione 2quadragesima.
 
 - **v3.0.0 (23/11/2026):** `Surprise_300.py`; shared → `shared300.py`; `VERSION_DATE` mostrata nel `/start`. Nessun cambio ai prompt.
@@ -1247,3 +1269,5 @@ Pool locale di location (254, verificato via `len(LOCATION_POOL)` — l'etichett
 72. **TODO aperto (13/11, sera inoltrata), da decidere con Walter, ognuno col suo "Vai".** Punti della revisione dei quattro bot non corretti: elenco completo in sezione 2sextriginta. In ordine di priorità proposto: token Telegram nel messaggio d'errore di download (Architect, Surprise, Vogue); whitelist su `/help`, `/info`, `/shared`, `/lastprompt`, `/dna`; foto inviata come documento; prompt spezzati a metà parola; Surprise (Pride Mini prompt, tastiera tolta da Mini caption/Mini prompt, TASK contro POSE); Filtro (frasi negative contro la regola di CLAUDE.md, `_run_generation` silenzioso).
 
 73. **TODO aperto (27/11/2026), priorità alta.** Dopo il deploy di shared 3.0.1, Vogue 5.0.1, Atelier 3.0.3 e Surprise 3.0.1: generare in Flow almeno 5-6 immagini al limite del safety (le stesse scene che davano il corpo maschile sovrappeso) e confrontare con quelle vecchie. Se il corpo è ancora flaccido, valutare con Walter se alzare il tono a "atletico naturale" (provato solo "magro e sodo"). Annotare quali parole spostano il risultato. Vedi sezione 2quadragesima.
+
+74. **TODO aperto (27/11/2026, sera), priorità alta.** Dopo il deploy generare in Flow, SENZA foto allegata, 4-6 immagini con le stesse scene delle due ricevute e confrontarle con la foto reale: barba (curata, grigia), occhiali (tondi, colore a caso), capelli (all'indietro, fino alla nuca), corpo (magro e sodo). Se Flow ignora ancora un dettaglio, annotare quale. Vedi sezione 2unquadragesima. (Resta aperto anche il TODO 73.)

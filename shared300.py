@@ -1,9 +1,23 @@
 """
 shared300.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 3.0.1
+Versione: 3.0.2
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome shared300.py.
 Non rinominare mai in shared301.py o simili — tutti i bot importano da shared300.
+CHANGELOG 3.0.2 (27/11/2026, sera): volto reale a confronto con le immagini di Flow, su richiesta di Walter.
+  - Occhiali: Walter ne ha tre paia identici (tondi, stile panto, acetato trasparente di medio
+    spessore) in blu, verde e rosso. Nuova glasses_text(color=None): il colore è scelto a caso fra
+    blu, verde e rosso OGNI volta che si costruisce un prompt (valeria_face(), valeria_face_text(),
+    build_valeria_identity()). In modalità foto la descrizione è solo di riserva, se la foto non è
+    allegata ("If no reference photo is attached"): la foto resta autorevole. VALERIA_GLASSES_TEXT
+    resta come compatibilità (blu fisso). Le regole di review_and_fix() non nominano più un colore:
+    "blue, green or red — keep the colour already written in the prompt".
+  - Barba (era troppo bianca e folta rispetto alla foto reale): "neatly trimmed natural beard,
+    salt-and-pepper grey", più lunga e arrotondata sul mento, corta e curata sulle guance, baffi
+    dello stesso grigio. Capelli: pettinati all'indietro da un'attaccatura alta e arretrata, più
+    radi davanti e più lunghi dietro, fino alla nuca. Sopracciglia: grigio chiaro, spessore medio.
+    Niente centimetri né parole come "full/bushy/voluminous" (spingono verso un volto più pesante).
+  - Controllo della revisione: la barba del prompt è "neatly trimmed natural beard".
 CHANGELOG 3.0.1 (27/11/2026): CORPO tonico, capelli/barba allineati, occhiali blu sottili, su richiesta
   di Walter (Flow, nelle scene al limite del safety, generava un corpo maschile sovrappeso e
   flaccido, lontano dalla clessidra del prompt: 180 cm, 75 kg reali).
@@ -709,6 +723,7 @@ __all__ = [
     'VALERIA_WATERMARK', 'VALERIA_TEXTURE_LOCK', 'VALERIA_MULTI_SUBJECT_LOCK',
     'VALERIA_DNA', 'EDITORIAL_WRAPPER',
     'VALERIA_FACE_TEXT', 'VALERIA_HAIR_TEXT', 'VALERIA_GLASSES_TEXT',
+    'VALERIA_BEARD_TEXT', 'VALERIA_GLASSES_COLORS', 'glasses_text', 'valeria_face', 'valeria_face_text',
     'build_valeria_identity', 'generate_caption', 'generate_mini_caption', 'generate_mini_prompt',
     'review_and_fix', 'multi_subject_clause', 'has_multiple_figures',
     'body_art_clause', 'BODY_ART_EXCEPTION_TEXT',
@@ -743,8 +758,8 @@ GEMINI_MAX_ATTEMPTS = 16     # tetto assoluto di chiamate API per singolo genera
 GEMINI_HTTP_TIMEOUT_S = float(os.environ.get("GEMINI_HTTP_TIMEOUT_S", "120"))   # 2.4.22 — timeout di ogni chiamata HTTP
 
 # Versione
-VERSION = "3.0.1"
-SHARED_VERSION = "3.0.1"   # aggiornare ad ogni modifica
+VERSION = "3.0.2"
+SHARED_VERSION = "3.0.2"   # aggiornare ad ogni modifica
 SHARED_DATE    = "27/11/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 shared300.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
@@ -779,35 +794,56 @@ def is_allowed(uid: int) -> bool:
 # Capelli, barba e occhiali descritti a parole: UNA sola fonte (3.0.1), usata da VALERIA_FACE,
 # VALERIA_FACE_TEXT, dalle regole di review_and_fix(), da Vogue video e dai blocchi di Atelier.
 VALERIA_HAIR_TEXT = (
-    "silver-grey hair swept back from the recessed hairline in a natural quiff, about 8\u201310 cm on top, "
-    "sides combed back above the ears, reaching the nape and ending well above the collar, "
-    "fine slightly wavy texture"
+    "silver-grey hair combed back from a high receding hairline, thinner at the front and longer at the "
+    "back, reaching the nape, natural slightly tousled texture"
 )
 VALERIA_BEARD_TEXT = (
-    "full, wide, bushy silver-white beard with a rounded lower edge sitting just below the chin, voluminous "
-    "along the cheeks and jaw, loose curling strands, a darker steel-grey patch at the centre of the chin, "
-    "thick darker-grey moustache over the upper lip"
+    "neatly trimmed natural beard, salt-and-pepper grey with silver tones, slightly longer and rounded at "
+    "the chin, short and tidy along the cheeks, with a grey moustache of the same shade"
 )
-VALERIA_GLASSES_TEXT = (
-    "glasses with a thin, simple blue frame in a classic shape, always worn"
+# 3.0.2 — occhiali: tre paia identici in tre colori, scelti a caso a ogni prompt.
+VALERIA_GLASSES_COLORS = ("blue", "green", "red")
+
+
+def glasses_text(color=None):
+    """Descrizione degli occhiali con un colore a caso fra blu, verde e rosso (o quello indicato)."""
+    color = color or random.choice(VALERIA_GLASSES_COLORS)
+    return ("round panto-style glasses with a medium-thick translucent " + color
+            + " acetate frame, always worn")
+
+
+VALERIA_GLASSES_TEXT = glasses_text("blue")   # compatibilità: colore fisso blu
+# Nelle regole di review_and_fix() il colore non è fisso: si lascia quello già scritto nel prompt.
+VALERIA_GLASSES_RULE_TEXT = (
+    "round panto-style glasses with a medium-thick translucent acetate frame (blue, green or red: keep "
+    "the colour already written in the prompt), always worn"
 )
 
-VALERIA_FACE = (
-    "**⚠️ FACE IDENTITY LOCK — ABSOLUTE PRIORITY:** The attached reference photo shows the exact face "
-    "to reproduce. The reference photo is authoritative for the face, eyeglasses and beard — if anything "
-    "below conflicts with it, the photo wins.\n"
-    "60-year-old Italian male face, oval-rectangular shape. "
-    "Ultra-detailed mature skin with visible pores, deep character wrinkles, crow's feet. "
-    "Calm half-smile, no teeth shown.\n"
-    "**Eyeglasses:** Exactly as shown in the attached reference photo — same shape, color and frame "
-    "thickness. Always present.\n"
-    "**Hair:** " + VALERIA_HAIR_TEXT[:1].upper() + VALERIA_HAIR_TEXT[1:] + ".\n"
-    "**⚠️ BEARD — MANDATORY — NON-NEGOTIABLE:** Exactly as shown in the attached reference photo — same "
-    "length, density, texture and shape, clearly visible in every shot. The beard is a permanent part of "
-    "the identity lock, matching the reference image precisely: " + VALERIA_BEARD_TEXT + ".\n"
-    "**Rendering:** Subsurface Scattering, Global Illumination, Ambient Occlusion, Fresnel Effect. "
-    "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
-)
+
+def _cap(t):
+    return t[:1].upper() + t[1:]
+
+
+def valeria_face(color=None):
+    """Volto con rimando alla foto allegata. color: colore degli occhiali di riserva (a caso se None)."""
+    return (
+        "**⚠️ FACE IDENTITY LOCK — ABSOLUTE PRIORITY:** The attached reference photo shows the exact face "
+        "to reproduce. The reference photo is authoritative for the face, eyeglasses and beard — if anything "
+        "below conflicts with it, the photo wins.\n"
+        "60-year-old Italian male face, oval-rectangular shape. "
+        "Ultra-detailed mature skin with visible pores, deep character wrinkles, crow's feet. "
+        "Calm half-smile, no teeth shown.\n"
+        "**Eyeglasses:** Exactly as shown in the attached reference photo — same shape, color and frame "
+        "thickness. Always present. If no reference photo is attached: " + glasses_text(color) + ".\n"
+        "**Hair:** " + VALERIA_HAIR_TEXT[:1].upper() + VALERIA_HAIR_TEXT[1:] + ".\n"
+        "**⚠️ BEARD — MANDATORY — NON-NEGOTIABLE:** Exactly as shown in the attached reference photo — same "
+        "length, density, texture and shape, clearly visible in every shot. The beard is a permanent part of "
+        "the identity lock, matching the reference image precisely: " + VALERIA_BEARD_TEXT + ".\n"
+        "**Rendering:** Subsurface Scattering, Global Illumination, Ambient Occlusion, Fresnel Effect. "
+        "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
+    )
+
+VALERIA_FACE = valeria_face("blue")   # compatibilità: colore fisso blu; i bot usano valeria_face()
 
 # FACE TEXT MODE — introdotta in 2.4.18 (vedi changelog). Alternativa a
 # VALERIA_FACE per quando in Flow NON si allega la foto reale del volto:
@@ -817,20 +853,24 @@ VALERIA_FACE = (
 # esplicita dell'utente (Atelier: /volto testo). HAIR e GLASSES sono costanti
 # separate perché servono anche a review_and_fix() e ai blocchi HAIR LOCK /
 # IDENTITY LOCK locali di Atelier — un'unica fonte, mai copiate a mano.
-VALERIA_FACE_TEXT = (
-    "**\u26a0\ufe0f FACE IDENTITY \u2014 ABSOLUTE PRIORITY:** The face is described completely below and is "
-    "reproduced exactly as written, identically in every image.\n"
-    "Mature male face of about 60, oval with average fullness, a tall wide forehead with moderate horizontal "
-    "lines, hairline receding at the temples. Warm dark-brown eyes with slightly hooded lids and light crow's "
-    "feet; bushy, untamed silver-white eyebrows. Medium nose with a rounded tip, in proportion to the face. "
-    "Ruddy, rosy complexion with light freckling, natural skin texture. "
-    + VALERIA_BEARD_TEXT[:1].upper() + VALERIA_BEARD_TEXT[1:] + ". "
-    + VALERIA_HAIR_TEXT[:1].upper() + VALERIA_HAIR_TEXT[1:] + ". "
-    + VALERIA_GLASSES_TEXT[:1].upper() + VALERIA_GLASSES_TEXT[1:] + ". "
-    "Soft expression lines around the eyes and mouth.\n"
-    "**Rendering:** Subsurface Scattering, Global Illumination, Ambient Occlusion, Fresnel Effect. "
-    "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
-)
+def valeria_face_text(color=None):
+    """Volto descritto a parole. color: colore degli occhiali (a caso se None)."""
+    return (
+        "**\u26a0\ufe0f FACE IDENTITY \u2014 ABSOLUTE PRIORITY:** The face is described completely below and is "
+        "reproduced exactly as written, identically in every image.\n"
+        "Mature male face of about 60, oval with average fullness, a tall wide forehead with moderate horizontal "
+        "lines, hairline receding at the temples. Warm dark-brown eyes with slightly hooded lids and light crow's "
+        "feet; light grey eyebrows of moderate thickness. Medium nose with a rounded tip, in proportion to the face. "
+        "Ruddy, rosy complexion with light freckling, natural skin texture. "
+        + VALERIA_BEARD_TEXT[:1].upper() + VALERIA_BEARD_TEXT[1:] + ". "
+        + VALERIA_HAIR_TEXT[:1].upper() + VALERIA_HAIR_TEXT[1:] + ". "
+        + _cap(glasses_text(color)) + ". "
+        "Soft expression lines around the eyes and mouth.\n"
+        "**Rendering:** Subsurface Scattering, Global Illumination, Ambient Occlusion, Fresnel Effect. "
+        "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
+    )
+
+VALERIA_FACE_TEXT = valeria_face_text("blue")   # compatibilità: colore fisso blu; i bot usano valeria_face_text()
 
 # 3.0.1 — corpo magro e sodo (180 cm, 75 kg reali): descrizione unica, in positivo, usata dai due
 # blocchi corpo qui sotto. Niente muscolatura vistosa.
@@ -1037,7 +1077,8 @@ def build_valeria_identity(safe: bool = False, face_mode: str = "photo") -> str:
     face_mode="photo" (default): VALERIA_FACE, che rimanda alla foto reale allegata in Flow.
     face_mode="text": VALERIA_FACE_TEXT, volto descritto per intero (2.4.18)."""
     body = VALERIA_BODY_SAFE if safe else VALERIA_BODY_STRONG
-    face = VALERIA_FACE_TEXT if face_mode == "text" else VALERIA_FACE
+    color = random.choice(VALERIA_GLASSES_COLORS)     # 3.0.2 — un colore per prompt
+    face = valeria_face_text(color) if face_mode == "text" else valeria_face(color)
     return face + body + VALERIA_TEXTURE_LOCK
 
 # ============================================================
@@ -1236,7 +1277,7 @@ _REVIEW_REQUIRED = (
     ("GENERATION INSTRUCTIONS", r"--- GENERATION INSTRUCTIONS ---"),
     ("clip video", r"single short video clip"),
     ("ripresa unica", r"single continuous shot"),
-    ("barba video", r"bushy silver-white beard"),             # 3.0.1 (prima: dense grey-white beard)
+    ("barba video", r"(?i)neatly trimmed natural beard"),     # 3.0.2 (3.0.1: bushy silver-white beard)
     ("corpo sodo", r"SLIM, FIRM AND FIT BODY"),               # 3.0.1
     ("EYEGLASSES MANDATORY", r"EYEGLASSES\s*[\u2014\u2013-]+\s*MANDATORY"),
     ("movimento riprodotto", r"Reproduce the exact movement"),
@@ -1298,15 +1339,15 @@ def _review_rules(face_mode: str = "photo"):
             f"Replace with: {VALERIA_HAIR_TEXT}.\n\n"
         )
         r2 = (
-            f"2. GLASSES MANDATORY: Valeria Cross ALWAYS wears {VALERIA_GLASSES_TEXT}. "
+            f"2. GLASSES MANDATORY: Valeria Cross ALWAYS wears {VALERIA_GLASSES_RULE_TEXT}. "
             "If the prompt does NOT mention glasses or eyeglasses, ADD this phrase in the "
-            f"Facial identity section: '{VALERIA_GLASSES_TEXT}'. "
+            f"Facial identity section: '{VALERIA_GLASSES_RULE_TEXT}'. "
             "Also ensure 'no glasses' does NOT appear anywhere in the prompt.\n\n"
         )
         r4 = (
             "4. SUBJECT BLEED: Remove any physical description belonging to the original reference subject. "
-            "Valeria Cross DNA: Male face 60yo, full silver-white beard, "
-            f"{VALERIA_GLASSES_TEXT}, {VALERIA_HAIR_TEXT}, slim toned hourglass body, smooth skin.\n\n"
+            "Valeria Cross DNA: Male face 60yo, neatly trimmed grey beard, "
+            f"{VALERIA_GLASSES_RULE_TEXT}, {VALERIA_HAIR_TEXT}, slim toned hourglass body, smooth skin.\n\n"
         )
     elif face_mode == "described":
         # 2.4.20 — per prompt il cui volto è GIÀ descritto per intero nel blocco di

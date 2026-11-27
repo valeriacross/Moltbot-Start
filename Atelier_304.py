@@ -321,6 +321,11 @@ logger = logging.getLogger(__name__)
 # Tolto il flag dai quattro filtri e tolto il meccanismo safe da build_full_prompt() e
 # _face_locks() (non serviva più). Nessun cambio ai testi delle scene. VALERIA_BODY_SAFE resta
 # in shared ma Atelier non lo usa più. Rollback: ripristinare Atelier_301.py da Git.
+# CHANGELOG 3.0.4 (27/11/2026, sera): volto reale a confronto con le immagini di Flow (shared 3.0.2).
+# Il volto in modalità foto ora contiene, solo come riserva se la foto non è allegata, gli occhiali
+# panto di Walter in blu, verde o rosso a caso a ogni prompt (build_valeria_identity()); barba
+# "neatly trimmed natural beard" e capelli fino alla nuca vengono da shared. Il blocco IDENTITY LOCK
+# a testo non nomina più un colore. Il resto non cambia. Rollback: Atelier_303.py da Git.
 # CHANGELOG 3.0.3 (27/11/2026): corpo tonico e capelli allineati, su richiesta di Walter (vedi shared
 # 3.0.1). _face_locks(): il corpo è "slanciato e sodo" (clessidra, seno pieno, addome piatto e
 # sodo, braccia e gambe tonici); il blocco HAIR LOCK usa VALERIA_HAIR_TEXT in modalità foto come
@@ -328,7 +333,7 @@ logger = logging.getLogger(__name__)
 # attuali); la barba è "silver-white" e gli occhiali del volto a testo "thin blue-framed". Nelle
 # scene "Letto" la frase sul corpo include la costruzione snella e tonica. Il testo delle altre
 # scene non cambia. Rollback: Atelier_302.py da Git.
-VERSION = "3.0.3"
+VERSION = "3.0.4"
 VERSION_DATE = "27/11/2026"
 TOKEN   = os.environ.get("TELEGRAM_TOKEN_CLOSET")
 
@@ -753,7 +758,7 @@ def _face_locks(face_mode: str = "photo", scope: str = "single") -> str:
     if face_mode == "text":
         identity = (
             "**\u26a0\ufe0f IDENTITY LOCK \u2014 ABSOLUTE PRIORITY:** The face stays mature, around 60 years old, with the "
-            "full silver-white beard and the thin blue-framed glasses always present, exactly as described in the "
+            "neatly trimmed grey beard and the round glasses always present, exactly as described in the "
             "face identity above, identical to the described identity with zero drift"
             + (", in EVERY shot" if mosaic else "")
             + ". " + body
@@ -768,7 +773,7 @@ def _face_locks(face_mode: str = "photo", scope: str = "single") -> str:
         return identity + hair
     identity = (
         "**\u26a0\ufe0f IDENTITY LOCK \u2014 ABSOLUTE PRIORITY:** The face stays mature, around 60 years old, with the "
-        "full silver-white beard and eyeglasses always present, exactly as shown in the attached reference photo, "
+        "neatly trimmed grey beard and eyeglasses always present, exactly as shown in the attached reference photo, "
         "identical to the reference identity with zero drift"
         + (", in EVERY shot" if mosaic else "")
         + ". " + body

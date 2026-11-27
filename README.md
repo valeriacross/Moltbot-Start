@@ -10,13 +10,13 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 | Bot | File | Versione | Koyeb | Chiavi |
 |-----|------|---------|-------|--------|
-| VogueBot | `Vogue_501.py` | 5.0.1 | colossal-giselle/vogue | 2 |
+| VogueBot | `Vogue_502.py` | 5.0.2 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_400.py` | 4.0.0 | homely-annabelle/thearchitect | 1 |
-| AtelierBot | `Atelier_303.py` | 3.0.3 | flexible-denna/atelier | 5 |
+| AtelierBot | `Atelier_304.py` | 3.0.4 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_300.py` | 3.0.0 | screeching-jobina/filtro | 1 |
-| SurpriseBot | `Surprise_301.py` | 3.0.1 | surprise1/sorpresa | 1 |
+| SurpriseBot | `Surprise_302.py` | 3.0.2 | surprise1/sorpresa | 1 |
 
-**Shared:** `shared300.py` v3.0.1 · **10 API key totali**
+**Shared:** `shared300.py` v3.0.2 · **10 API key totali**
 
 ---
 
@@ -24,13 +24,13 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 ```
 shared300.py         # Libreria condivisa
-Vogue_501.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
+Vogue_502.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
 Architect_400.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
-Atelier_303.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Atelier_304.py       # Outfit analysis → prompt con filtri (filtro persistente)
 atelier.py           # Ingresso fisso per Koyeb: avvia il file indicato in BOT_FILE
 vogue.py, architect.py, filtro.py, surprise.py   # Ingressi fissi per Koyeb, uno per bot, come atelier.py
 Filtro_300.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
-Surprise_301.py      # Location + outfit random + /pride + /flag
+Surprise_302.py      # Location + outfit random + /pride + /flag
 requirements.txt
 README.md
 ```
@@ -191,6 +191,8 @@ Dettagli storici in `HANDOFF-MASTER`, sezioni 2bis, 2ter, 2quater, 2quinquies, 2
 **TODO aperto (07/10):** Filtro 2.2.0/2.2.1 (Director's Cut + clausola di integrazione) non ancora ritestato dopo il fix del 06/10 — Walter deve verificare con la stessa foto di riferimento se il soggetto è ora correttamente reintegrato nella scena, su Villeneuve e idealmente su almeno un altro dei 12 registi. shared 2.4.17 (peso 75kg) non ancora verificato visivamente in produzione.
 
 **TODO aperto (09/10):** deploy con `pyTelegramBotAPI==4.37.0` non ancora osservato — Walter deve controllare al primo redeploy su Koyeb che polling, callback inline ed edit dei messaggi funzionino su tutti i bot (refactor interno dichiarato nelle note della 4.37.0); se qualcosa si rompe, primo sospetto è questo bump, rollback `==4.36.0`. Da confermare anche l'upper bound `google-genai<3`.
+
+**Il 27/11/2026, sera — volto reale a confronto con Flow (shared 3.0.2, Vogue 5.0.2, Atelier 3.0.4, Surprise 3.0.2).** Walter ha mandato tre immagini (due da solo testo, una con il volto reale) e una foto vera. Differenze trovate: barba del testo troppo bianca e folta (reale: grigia sale e pepe, curata, più lunga sul mento), occhiali neri e spessi senza foto allegata (reali: tondi panto, acetato trasparente di medio spessore), sopracciglia del testo troppo marcate. Ora: barba "neatly trimmed natural beard", capelli all'indietro da un'attaccatura alta, fino alla nuca, sopracciglia grigio chiaro; occhiali tondi panto in **blu, verde o rosso scelto a caso a ogni prompt** (Walter ne ha tre paia identici); in modalità foto la descrizione degli occhiali è solo una riserva se la foto non è allegata. Niente centimetri né "full/bushy/voluminous". **Non ancora testato in produzione.**
 
 **Il 27/11/2026 — corpo tonico, capelli e barba allineati, occhiali blu sottili (shared 3.0.1, Vogue 5.0.1, Atelier 3.0.3, Surprise 3.0.1).** Su richiesta di Walter: Flow, nelle scene al limite del safety, generava un corpo maschile sovrappeso e flaccido, lontano dalla clessidra del prompt (180 cm, 75 kg reali). Il DNA del corpo ora include `VALERIA_BODY_TONE` (magro e sodo: addome piatto e sodo, vita definita, braccia e gambe tonici, nessuna muscolatura vistosa) e non usa più le parole che spingevano verso un corpo pesante ("full thighs", "full figure", "soft", "wide rounded hips"). Capelli e barba hanno un'unica descrizione (quella di `/volto`), gli occhiali a parole sono una montatura blu sottile e semplice; dove il volto rimanda alla foto allegata resta "come nella foto". `/pride` e il Minifig di Filtro non sono stati toccati. **Non ancora testato in produzione:** Flow decide comunque il risultato, il testo può solo spingere. Architect e Filtro non cambiano (non iniettano il DNA).
 
