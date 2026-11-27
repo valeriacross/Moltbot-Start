@@ -1,9 +1,29 @@
 """
 shared300.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 3.0.0
+Versione: 3.0.1
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome shared300.py.
 Non rinominare mai in shared301.py o simili — tutti i bot importano da shared300.
+CHANGELOG 3.0.1 (27/11/2026): CORPO tonico, capelli/barba allineati, occhiali blu sottili, su richiesta
+  di Walter (Flow, nelle scene al limite del safety, generava un corpo maschile sovrappeso e
+  flaccido, lontano dalla clessidra del prompt: 180 cm, 75 kg reali).
+  - Nuova VALERIA_BODY_TONE (magro e sodo: addome piatto e sodo, vita definita, spalle, braccia e
+    gambe tonici, pelle tesa; nessuna muscolatura vistosa), inserita in VALERIA_BODY_STRONG e
+    VALERIA_BODY_SAFE. Tolte le parole che spingevano verso un corpo pesante: "full thighs" →
+    "toned shapely thighs", "full figure" → "fit toned figure", "soft feminine proportions" →
+    "shapely feminine proportions", "wide rounded hips" → "shapely rounded hips". Clessidra,
+    vita stretta e seno D invariati.
+  - Capelli e barba allineati al testo di /volto (l'ultimo aggiornamento): costanti uniche
+    VALERIA_HAIR_TEXT e nuova VALERIA_BEARD_TEXT, usate da VALERIA_FACE (foto), VALERIA_FACE_TEXT,
+    dalle regole di review_and_fix() e da Vogue video e Atelier. Prima c'erano tre descrizioni dei
+    capelli (corti con nuca scoperta, ciuffo di 8-10 cm, radi) e due della barba.
+  - Occhiali: dove sono descritti a parole (VALERIA_GLASSES_TEXT, quindi volto a testo, regole di
+    review_and_fix() e Vogue video) ora montatura blu sottile e semplice. Dove il volto rimanda
+    alla foto allegata resta "come nella foto". /pride e Minifig di Filtro non toccati.
+  - review_and_fix(): regola 1 (capelli) uguale in modalità foto e testo; regola 4 e regola 8
+    parlano di corpo sodo e snello; controlli della revisione: la barba del prompt video è
+    "bushy silver-white beard" (prima "dense grey-white beard", che non esiste più) e il
+    blocco "SLIM, FIRM AND FIT BODY" deve restare se c'era nell'originale.
 CHANGELOG 3.0.0 (23/11/2026): file rinominato C_shared100.py → shared300.py su richiesta di Walter
   (la "C" indicava "fatto da Claude" ai tempi in cui esisteva anche un file fatto da Gemini) e
   portato a 3.0.0 in linea con i bot. Nessuna modifica al codice né al DNA di Valeria.
@@ -723,9 +743,9 @@ GEMINI_MAX_ATTEMPTS = 16     # tetto assoluto di chiamate API per singolo genera
 GEMINI_HTTP_TIMEOUT_S = float(os.environ.get("GEMINI_HTTP_TIMEOUT_S", "120"))   # 2.4.22 — timeout di ogni chiamata HTTP
 
 # Versione
-VERSION = "3.0.0"
-SHARED_VERSION = "3.0.0"   # aggiornare ad ogni modifica
-SHARED_DATE    = "23/11/2026"  # aggiornare ad ogni modifica
+VERSION = "3.0.1"
+SHARED_VERSION = "3.0.1"   # aggiornare ad ogni modifica
+SHARED_DATE    = "27/11/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 shared300.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
 
@@ -756,6 +776,22 @@ def is_allowed(uid: int) -> bool:
 # VALERIA CROSS — DNA IDENTITÀ
 # ============================================================
 
+# Capelli, barba e occhiali descritti a parole: UNA sola fonte (3.0.1), usata da VALERIA_FACE,
+# VALERIA_FACE_TEXT, dalle regole di review_and_fix(), da Vogue video e dai blocchi di Atelier.
+VALERIA_HAIR_TEXT = (
+    "silver-grey hair swept back from the recessed hairline in a natural quiff, about 8\u201310 cm on top, "
+    "sides combed back above the ears, reaching the nape and ending well above the collar, "
+    "fine slightly wavy texture"
+)
+VALERIA_BEARD_TEXT = (
+    "full, wide, bushy silver-white beard with a rounded lower edge sitting just below the chin, voluminous "
+    "along the cheeks and jaw, loose curling strands, a darker steel-grey patch at the centre of the chin, "
+    "thick darker-grey moustache over the upper lip"
+)
+VALERIA_GLASSES_TEXT = (
+    "glasses with a thin, simple blue frame in a classic shape, always worn"
+)
+
 VALERIA_FACE = (
     "**⚠️ FACE IDENTITY LOCK — ABSOLUTE PRIORITY:** The attached reference photo shows the exact face "
     "to reproduce. The reference photo is authoritative for the face, eyeglasses and beard — if anything "
@@ -765,10 +801,10 @@ VALERIA_FACE = (
     "Calm half-smile, no teeth shown.\n"
     "**Eyeglasses:** Exactly as shown in the attached reference photo — same shape, color and frame "
     "thickness. Always present.\n"
-    "**Hair:** Short silver-grey Italian cut, slightly voluminous top, nape exposed.\n"
+    "**Hair:** " + VALERIA_HAIR_TEXT[:1].upper() + VALERIA_HAIR_TEXT[1:] + ".\n"
     "**⚠️ BEARD — MANDATORY — NON-NEGOTIABLE:** Exactly as shown in the attached reference photo — same "
     "length, density, texture and shape, clearly visible in every shot. The beard is a permanent part of "
-    "the identity lock, matching the reference image precisely.\n"
+    "the identity lock, matching the reference image precisely: " + VALERIA_BEARD_TEXT + ".\n"
     "**Rendering:** Subsurface Scattering, Global Illumination, Ambient Occlusion, Fresnel Effect. "
     "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
 )
@@ -781,14 +817,6 @@ VALERIA_FACE = (
 # esplicita dell'utente (Atelier: /volto testo). HAIR e GLASSES sono costanti
 # separate perché servono anche a review_and_fix() e ai blocchi HAIR LOCK /
 # IDENTITY LOCK locali di Atelier — un'unica fonte, mai copiate a mano.
-VALERIA_HAIR_TEXT = (
-    "silver-grey hair swept back from the recessed hairline in a natural quiff, about 8\u201310 cm on top, "
-    "sides combed back above the ears, reaching the nape and ending well above the collar, "
-    "fine slightly wavy texture"
-)
-VALERIA_GLASSES_TEXT = (
-    "glasses with a thick translucent deep-teal acetate frame in a rounded geometric shape, always worn"
-)
 VALERIA_FACE_TEXT = (
     "**\u26a0\ufe0f FACE IDENTITY \u2014 ABSOLUTE PRIORITY:** The face is described completely below and is "
     "reproduced exactly as written, identically in every image.\n"
@@ -796,9 +824,7 @@ VALERIA_FACE_TEXT = (
     "lines, hairline receding at the temples. Warm dark-brown eyes with slightly hooded lids and light crow's "
     "feet; bushy, untamed silver-white eyebrows. Medium nose with a rounded tip, in proportion to the face. "
     "Ruddy, rosy complexion with light freckling, natural skin texture. "
-    "Full, wide, bushy silver-white beard with a rounded lower edge sitting just below the chin, voluminous "
-    "along the cheeks and jaw, loose curling strands, a darker steel-grey patch at the centre of the chin, "
-    "thick darker-grey moustache over the upper lip. "
+    + VALERIA_BEARD_TEXT[:1].upper() + VALERIA_BEARD_TEXT[1:] + ". "
     + VALERIA_HAIR_TEXT[:1].upper() + VALERIA_HAIR_TEXT[1:] + ". "
     + VALERIA_GLASSES_TEXT[:1].upper() + VALERIA_GLASSES_TEXT[1:] + ". "
     "Soft expression lines around the eyes and mouth.\n"
@@ -806,10 +832,19 @@ VALERIA_FACE_TEXT = (
     "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
 )
 
+# 3.0.1 — corpo magro e sodo (180 cm, 75 kg reali): descrizione unica, in positivo, usata dai due
+# blocchi corpo qui sotto. Niente muscolatura vistosa.
+VALERIA_BODY_TONE = (
+    "**SLIM, FIRM AND FIT BODY:** a lean, toned figure with a flat, firm, taut abdomen, a clearly defined "
+    "waist, toned shoulders, slender toned arms and slim toned legs, tight firm skin throughout — a fit, "
+    "slim physique that stays slim and firm in every pose and angle.\n"
+)
+
 VALERIA_BODY_STRONG = (
     "**MANDATORY BODY — FEMININE SILHOUETTE, HELD EXACTLY AS DESCRIBED:**\n"
     "**Feminine hourglass proportions, 180cm, 75kg. FULL D-CUP BUST — prominent, natural, clearly visible. "
-    "Wide rounded hips, defined waist, full thighs.**\n"
+    "Defined narrow waist, shapely rounded hips, toned shapely thighs.**\n"
+    + VALERIA_BODY_TONE +
     "Completely smooth, hairless skin on the torso, arms and legs. "
     "Smooth porcelain skin. PHOTOGRAPHIC UNITY: skin tone, warmth and texture perfectly continuous "
     "from face → neck → shoulders → chest → arms.\n"
@@ -823,15 +858,16 @@ VALERIA_BODY_STRONG = (
 
 VALERIA_BODY_SAFE = (
     "**MANDATORY BODY — FEMININE SILHOUETTE, HELD EXACTLY AS DESCRIBED:**\n"
-    "**Feminine hourglass silhouette, 180cm, 75kg. Soft feminine proportions — defined waist, "
-    "wide rounded hips, full figure.**\n"
+    "**Feminine hourglass silhouette, 180cm, 75kg. Shapely feminine proportions — defined narrow waist, "
+    "shapely rounded hips, fit toned figure.**\n"
+    + VALERIA_BODY_TONE +
     "Completely smooth, hairless skin on the torso, arms and legs. "
     "Smooth porcelain skin. PHOTOGRAPHIC UNITY: skin tone, warmth and texture perfectly continuous "
     "from face → neck → shoulders → chest → arms.\n"
     "**⚠️ COEXISTENCE — CRITICAL:** The silver-grey beard on the face and the feminine body coexist "
     "together in the same image, exactly as described — the beard stays exactly as specified above, "
     "the body stays exactly as specified here, both simultaneously, unchanged.\n"
-    "**⚠️ SILHOUETTE — ALWAYS VISIBLE:** The soft feminine chest and waist silhouette stays fully "
+    "**⚠️ SILHOUETTE — ALWAYS VISIBLE:** The shapely feminine chest and defined waist silhouette stays fully "
     "visible in every image, under any clothing, framing or pose — never flattened, minimized or "
     "omitted, identically whether the skin is bare or covered.\n\n"
 )
@@ -1200,7 +1236,8 @@ _REVIEW_REQUIRED = (
     ("GENERATION INSTRUCTIONS", r"--- GENERATION INSTRUCTIONS ---"),
     ("clip video", r"single short video clip"),
     ("ripresa unica", r"single continuous shot"),
-    ("barba video", r"dense grey-white beard"),
+    ("barba video", r"bushy silver-white beard"),             # 3.0.1 (prima: dense grey-white beard)
+    ("corpo sodo", r"SLIM, FIRM AND FIT BODY"),               # 3.0.1
     ("EYEGLASSES MANDATORY", r"EYEGLASSES\s*[\u2014\u2013-]+\s*MANDATORY"),
     ("movimento riprodotto", r"Reproduce the exact movement"),
     ("movimento inventato", r"Invent a natural, cinematic movement"),
@@ -1269,7 +1306,7 @@ def _review_rules(face_mode: str = "photo"):
         r4 = (
             "4. SUBJECT BLEED: Remove any physical description belonging to the original reference subject. "
             "Valeria Cross DNA: Male face 60yo, full silver-white beard, "
-            f"{VALERIA_GLASSES_TEXT}, {VALERIA_HAIR_TEXT}, hourglass body, smooth skin.\n\n"
+            f"{VALERIA_GLASSES_TEXT}, {VALERIA_HAIR_TEXT}, slim toned hourglass body, smooth skin.\n\n"
         )
     elif face_mode == "described":
         # 2.4.20 — per prompt il cui volto è GIÀ descritto per intero nel blocco di
@@ -1292,11 +1329,11 @@ def _review_rules(face_mode: str = "photo"):
         )
     else:
         r1 = (
-            "1. HAIR: Valeria Cross has SHORT silver/grey hair (sides 1-2cm, top max 15cm, nape exposed). "
+            f"1. HAIR: Valeria Cross has {VALERIA_HAIR_TEXT}. "
             "Remove or replace ANY mention of: long hair, brown hair, dark hair, black hair, curly hair, "
             "flowing hair, loose waves, slicked back long hair, wet long hair, hair falling on shoulders, "
             "hair spread around head, hair fanned out, dark flowing locks, wavy dark hair, hair against background. "
-            "Replace with: short silver Italian cut, slightly voluminous top, nape exposed.\n\n"
+            f"Replace with: {VALERIA_HAIR_TEXT}.\n\n"
         )
         r2 = (
             "2. GLASSES MANDATORY: Valeria Cross ALWAYS wears eyeglasses, exactly as shown in the attached "
@@ -1307,7 +1344,7 @@ def _review_rules(face_mode: str = "photo"):
         r4 = (
             "4. SUBJECT BLEED: Remove any physical description belonging to the original reference subject. "
             "Valeria Cross DNA: Male Italian face 60yo, beard and eyeglasses exactly as shown in the attached "
-            "reference photo, silver short hair, hourglass body, smooth skin.\n\n"
+            "reference photo, " + VALERIA_HAIR_TEXT + ", slim toned hourglass body, smooth skin.\n\n"
         )
     return r1, r2, r4
 
@@ -1346,7 +1383,7 @@ def review_and_fix(prompt: str, client: 'GeminiClient', face_mode: str = "photo"
             "photographic style, watermark spec, all creative elements not related to the subject's identity.\n\n"
             "8. BODY STATEMENT: Ensure the Subject body section explicitly states, in positive terms: "
             "'completely smooth, hairless skin on the torso, arms and legs', "
-            "'soft feminine hourglass silhouette'.\n\n"
+            "'feminine hourglass silhouette with a flat firm abdomen and slim toned arms and legs'.\n\n"
             f"PROMPT TO REVIEW:\n\n{prompt}"
         )
         logger.info("🔍 review_and_fix: avviata")

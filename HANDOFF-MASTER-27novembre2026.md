@@ -1,5 +1,5 @@
 # HANDOFF MASTER — Valeria Cross AI · Moltbot
-**Generato:** 13/11/2026, sera inoltrata — secondo giro; aggiornato il 23/11/2026 (notte: nuovi nomi file, versioni 3.0.0+)
+**Generato:** 13/11/2026, sera inoltrata — secondo giro; aggiornato il 23/11/2026 (notte: nuovi nomi file, versioni 3.0.0+); aggiornato il 27/11/2026 (corpo tonico, capelli/barba allineati, occhiali blu sottili)
 **Da:** Walter Caponi
 **Per:** prossima sessione Claude
 
@@ -44,7 +44,9 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 ---
 
-## 2. STATO FILE ATTUALE (23/11/2026)
+## 2. STATO FILE ATTUALE (27/11/2026)
+
+**Nota (27/11/2026):** corpo tonico, capelli/barba allineati, occhiali blu sottili — shared 3.0.1 (stesso nome), Vogue 5.0.1 (`Vogue_501.py`), Atelier 3.0.3 (`Atelier_303.py`), Surprise 3.0.1 (`Surprise_301.py`). Architect e Filtro invariati. I lanciatori `vogue.py`, `atelier.py`, `surprise.py` puntano ai file nuovi; il Run command su Koyeb non cambia. Vedi sezione 2quadragesima.
 
 **Nota (23/11, notte, dopo il push):** Atelier 3.0.0 → 3.0.1 (`Atelier_301.py`): la data di produzione non compariva nel `/start` di Atelier senza filtro attivo (errore di Claude, trovato da Walter dallo screenshot dopo il redeploy). Gli altri quattro bot non hanno il problema.
 
@@ -70,12 +72,12 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 | File | Versione | Koyeb service | Run command | Chiavi API |
 |------|---------|---------------|--------------|-----------|
-| `shared300.py` | **3.0.0** | (comune a tutti) | — | — |
-| `Vogue_500.py` | **5.0.0** | colossal-giselle/vogue | `python vogue.py` (ingresso fisso → `BOT_FILE`) | 2 |
+| `shared300.py` | **3.0.1** | (comune a tutti) | — | — |
+| `Vogue_501.py` | **5.0.1** | colossal-giselle/vogue | `python vogue.py` (ingresso fisso → `BOT_FILE`) | 2 |
 | `Architect_400.py` | **4.0.0** | homely-annabelle/thearchitect | `python architect.py` (ingresso fisso → `BOT_FILE`) | 1 |
-| `Atelier_302.py` | **3.0.2** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
+| `Atelier_303.py` | **3.0.3** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
 | `Filtro_300.py` | **3.0.0** | screeching-jobina/filtro | `python filtro.py` (ingresso fisso → `BOT_FILE`) | 1 |
-| `Surprise_300.py` | **3.0.0** | surprise1/sorpresa | `python surprise.py` (ingresso fisso → `BOT_FILE`) | 1 |
+| `Surprise_301.py` | **3.0.1** | surprise1/sorpresa | `python surprise.py` (ingresso fisso → `BOT_FILE`) | 1 |
 
 **Totale chiavi API: 10** (Atelier 5 + Vogue 2 + Architect 1 + Filtro 1 + Surprise 1) — tutte e 10 confermate su progetti Google Cloud distinti il 04/07 (vedi sezione 2quinquies). Prima di quella verifica, Filtro e Surprise condividevano la stessa chiave fisica per un errore di assegnazione: risolto.
 
@@ -84,6 +86,20 @@ Repository: `valeriacross/Moltbot-Start` — region Frankfurt.
 **Nota versioning (corretta il 10/07):** il numero nel nome file **corrisponde sempre esattamente** alla VERSION interna, senza punti (es. `2.0.4` → `Atelier_204.py`, `3.0.2` → `Architect_302.py`) — non è un contatore progressivo indipendente. Su un salto di versione non incrementale (es. `2.0.6` → `3.0.0`), il nome file deve riflettere il nuovo numero di versione per intero, non "il prossimo della sequenza". Vedi sezione 2duodecies per il dettaglio dell'errore fatto e corretto in questa data.
 
 **Nota chiavi (25/06):** una chiave spostata da Architect (2→1) ad Atelier (4→5). `C_shared100.py` ora legge fino a `GOOGLE_API_KEY_5`.
+
+---
+
+## 2quadragesima. SESSIONE 27/11/2026 — CORPO TONICO, CAPELLI/BARBA ALLINEATI, OCCHIALI BLU SOTTILI (SHARED 3.0.1, VOGUE 5.0.1, ATELIER 3.0.3, SURPRISE 3.0.1)
+
+*Richiesta di Walter.* Nelle immagini al limite del safety Flow genera spesso un corpo maschile un po' sovrappeso, con la pancia flaccida, diverso dalla clessidra del prompt. Walter è realmente 180 cm × 75 kg e vuole che, anche se il corpo viene reso più maschile, sia **tonico**. Vale per tutti i bot che iniettano il DNA. Capelli e barba sono ormai più lunghi: tenere l'ultimo aggiornamento. Occhiali secondari: montatura blu sottile e semplice.
+
+*Decisioni (domande fatte prima di scrivere).* (1) Tono: **magro e sodo** (addome piatto e sodo, nessuna muscolatura vistosa). (2) Le parole che spingevano verso un corpo pesante vengono sostituite. (3) Capelli e barba allineati al testo di `/volto` (l'ultimo aggiornamento). (4) Occhiali: "montatura blu sottile e semplice" dove la montatura è a parole; dove il volto rimanda alla foto allegata resta "come nella foto". `/pride` e il Minifig di Filtro non si toccano (decisione del 12/11 confermata).
+
+*Cosa è cambiato.* **shared 3.0.1:** nuova `VALERIA_BODY_TONE` ("SLIM, FIRM AND FIT BODY: flat, firm, taut abdomen, clearly defined waist, toned shoulders, slender toned arms, slim toned legs, tight firm skin"), inserita in `VALERIA_BODY_STRONG` e `VALERIA_BODY_SAFE`; "full thighs" → "toned shapely thighs", "full figure" → "fit toned figure", "soft feminine proportions" → "shapely feminine proportions", "wide rounded hips" → "shapely rounded hips"; clessidra, vita stretta e seno D invariati. `VALERIA_HAIR_TEXT`, nuova `VALERIA_BEARD_TEXT` e `VALERIA_GLASSES_TEXT` definite UNA volta, prima di `VALERIA_FACE`, e usate da `VALERIA_FACE` (foto), `VALERIA_FACE_TEXT`, regole di `review_and_fix()` (regola 1 uguale in modalità foto e testo; regole 4 e 8 con corpo snello e sodo). Controlli della revisione: la barba del prompt video è "bushy silver-white beard" (prima "dense grey-white beard", che non esiste più) e "SLIM, FIRM AND FIT BODY" deve restare. **Vogue 5.0.1:** `VALERIA_FACE_VIDEO` usa le costanti di shared (prima capelli radi, barba "dense grey-white", occhiali bicolore asimmetrici). **Atelier 3.0.3:** `_face_locks()` con "slim, firm, toned build"; HAIR LOCK da `VALERIA_HAIR_TEXT` anche in modalità foto (prima "Italian crop" corto con nuca visibile); scene "Letto" con "slim toned build". **Surprise 3.0.1:** righe locali "Body" e corpo di `/flag`.
+
+*Verificato offline (nessuna chiamata Gemini, nessuna rete):* pyflakes pulito su tutti i file; i prompt di Vogue video, Atelier (3 filtri × singolo/mosaico × foto/testo, Shooting Editorial) e Surprise (singolo, mosaico, `/flag`) contengono il blocco corpo e le stesse descrizioni di capelli e barba, nessuna delle vecchie frasi; il prompt di `/pride` è identico; una revisione di Gemini che perde il blocco corpo o la barba viene scartata; i bot si importano con le versioni nuove. **Non verificato:** quanto Flow rispetti il testo nelle scene al limite del safety — il testo può solo spingere, non forzare. **Non ancora testato in produzione.**
+
+*Lasciato com'è, per decisione di Walter:* `/pride` (occhiali Havana, trucco), Minifig di Filtro, watermark "Valeria Cross AI" di `/flag`. Architect (descrive il soggetto reale) e Filtro (non inietta il DNA) non cambiano. Il Run command su Koyeb non cambia: i lanciatori puntano ai file nuovi.
 
 ---
 
@@ -893,7 +909,9 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 4. SHARED300.PY (ex C_SHARED100.PY) — STORICO COMPLETO FIX (v2.3.0 → v3.0.0)
+## 4. SHARED300.PY (ex C_SHARED100.PY) — STORICO COMPLETO FIX (v2.3.0 → v3.0.1)
+
+- **v3.0.1 (27/11/2026):** corpo tonico (`VALERIA_BODY_TONE` in `VALERIA_BODY_STRONG` e `VALERIA_BODY_SAFE`, parole "full/soft/wide" sostituite), costanti uniche `VALERIA_HAIR_TEXT`, `VALERIA_BEARD_TEXT`, `VALERIA_GLASSES_TEXT` (occhiali blu sottili), regole di `review_and_fix()` allineate, controlli della revisione aggiornati (barba video "bushy silver-white beard", blocco "SLIM, FIRM AND FIT BODY"). Vedi sezione 2quadragesima. Non ancora testato in produzione.
 
 - **v3.0.0 (23/11/2026):** file rinominato `C_shared100.py` → `shared300.py` e portato a 3.0.0 su richiesta di Walter; nessuna modifica al codice né al DNA.
 - **v2.4.22 (13/11/2026, sera inoltrata):** `generate()` solleva su `finish_reason` MAX_TOKENS invece di consegnare il testo troncato; ordine delle chiavi fissato per richiesta (niente più dipendenza da `self._key_index` tra thread) e `_rotate_key(from_idx)`; su 429 del modello richiesto prima le altre chiavi con lo stesso modello e poi i modelli di riserva; `genai.Client` con timeout HTTP (`GEMINI_HTTP_TIMEOUT_S`, 120 s); nuova `gemini_error_category()` usata da `analyze_scene()`, `generate_caption()`, `generate_mini_caption()` (e da Vogue); `_REVIEW_REQUIRED` esteso al prompt video di Vogue. DNA non toccato; 69 prompt di Atelier identici alla 2.4.21. Non ancora testato in produzione. Vedi sezione 2sextriginta.
@@ -944,7 +962,9 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 5. VOGUE — STORICO E STATO (v5.0.0)
+## 5. VOGUE — STORICO E STATO (v5.0.1)
+
+- **v5.0.1 (27/11/2026):** `Vogue_501.py`; DNA del video con corpo tonico (shared 3.0.1), capelli/barba/occhiali dalle costanti di shared (prima: capelli radi, barba "dense grey-white", occhiali bicolore asimmetrici). Vedi sezione 2quadragesima.
 
 **Nota (29/09):** questa lista era ferma alla 2.1.0 da prima del 29/08 — mancano i bump 2.2.0 (multi-soggetto, 01/08), 3.0.0/3.1.0 (video, 05-10/08), 4.0-4.3 (sempre video, 11-14/08), già narrati nelle sezioni 2duovicies/2quattuorvicies/2quinvicies ma mai riportati qui puntualmente. Non ricostruito in questa sessione su indicazione esplicita di Walter ("bypassa le versioni mancanti") — aggiunti solo i due bump verificati questa settimana.
 
@@ -993,7 +1013,9 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 7. ATELIER — STORICO E STATO (v3.0.2)
+## 7. ATELIER — STORICO E STATO (v3.0.3)
+
+- **v3.0.3 (27/11/2026):** `Atelier_303.py`; `_face_locks()` con corpo "slim, firm, toned build", HAIR LOCK da `VALERIA_HAIR_TEXT` anche in modalità foto, barba silver-white, scene "Letto" con costruzione snella e tonica. Vedi sezione 2quadragesima.
 
 **Nota (29/09):** lista ferma alla 2.5.4 da prima del 29/08 — mancano i bump 2.6.0/2.6.1 (multi-soggetto, 01-02/08), 2.6.2 (checklist mosaico condizionale), 2.7.0 (codice errore nell'header fallback), tutti narrati nelle sezioni 2duovicies/2trevicies ma mai riportati qui puntualmente. Non ricostruito su indicazione di Walter — aggiunto solo il bump verificato di questa settimana.
 
@@ -1052,7 +1074,9 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 9. SURPRISE — STORICO E STATO (v3.0.0)
+## 9. SURPRISE — STORICO E STATO (v3.0.1)
+
+- **v3.0.1 (27/11/2026):** `Surprise_301.py`; i prompt ereditano corpo/capelli/barba da shared 3.0.1; righe locali "Body" e corpo di `/flag` aggiornate. `/pride` non toccato. Vedi sezione 2quadragesima.
 
 - **v3.0.0 (23/11/2026):** `Surprise_300.py`; shared → `shared300.py`; `VERSION_DATE` mostrata nel `/start`. Nessun cambio ai prompt.
 - **v2.1.3 (13/11/2026, sera inoltrata):** flusso Manuale che non va più in `KeyError` con tastiere vecchie (avviso e ripartenza); con una location da foto nel prompt entrano solo BACKGROUND e CAMERA (luce e mood restano quelli scelti). Prompt senza foto identici alla 2.1.2. File `Surprise_213.py`. Vedi sezione 2sextriginta.
@@ -1221,3 +1245,5 @@ Pool locale di location (254, verificato via `len(LOCATION_POOL)` — l'etichett
 70. **TODO aperto (13/11, sera inoltrata), priorità alta.** Caricare su GitHub `C_shared100.py` (2.4.22), `Vogue_434.py`, `Filtro_223.py`, `Surprise_213.py`, `README.md`, `HANDOFF-MASTER-13novembre2026.md`; togliere `Vogue_433.py`, `Filtro_222.py`, `Surprise_212.py` (e `Atelier_282.py` se c'è ancora) dopo aver cambiato i Run command Koyeb: `colossal-giselle/vogue` → `python Vogue_434.py`, `screeching-jobina/filtro` → `python Filtro_223.py`, `surprise1/sorpresa` → `python Surprise_213.py` (lezione #21); poi redeploy di tutti e 5 (Atelier e Architect solo per prendere shared 2.4.22). Chiedere a Walter se il redeploy della consegna di sera (shared 2.4.21, Atelier_283) è stato fatto.
 71. **TODO aperto (13/11, sera inoltrata): da osservare dopo il deploy.** (a) Log: "troncata — MAX_TOKENS" (frequenza), "finish_reason=", "review_and_fix: risposta non utilizzabile (…)" anche su Vogue video, timeout HTTP; se un'analisi video di Vogue fallisce per timeout, alzare `GEMINI_HTTP_TIMEOUT_S` su Koyeb. (b) Surprise: Manuale dopo un `/start` con una tastiera vecchia → avviso, non silenzio; con una location da foto il prompt ha una sola riga LIGHTING e una MOOD. (c) Filtro: scegliere un filtro dopo "3D Stereo" o "Mirror" e inviare la foto → va al filtro, non allo stereo. (d) Vogue: un prompt video con movimento nella foto/clip deve dire "Reproduce the exact movement…".
 72. **TODO aperto (13/11, sera inoltrata), da decidere con Walter, ognuno col suo "Vai".** Punti della revisione dei quattro bot non corretti: elenco completo in sezione 2sextriginta. In ordine di priorità proposto: token Telegram nel messaggio d'errore di download (Architect, Surprise, Vogue); whitelist su `/help`, `/info`, `/shared`, `/lastprompt`, `/dna`; foto inviata come documento; prompt spezzati a metà parola; Surprise (Pride Mini prompt, tastiera tolta da Mini caption/Mini prompt, TASK contro POSE); Filtro (frasi negative contro la regola di CLAUDE.md, `_run_generation` silenzioso).
+
+73. **TODO aperto (27/11/2026), priorità alta.** Dopo il deploy di shared 3.0.1, Vogue 5.0.1, Atelier 3.0.3 e Surprise 3.0.1: generare in Flow almeno 5-6 immagini al limite del safety (le stesse scene che davano il corpo maschile sovrappeso) e confrontare con quelle vecchie. Se il corpo è ancora flaccido, valutare con Walter se alzare il tono a "atletico naturale" (provato solo "magro e sodo"). Annotare quali parole spostano il risultato. Vedi sezione 2quadragesima.

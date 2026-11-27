@@ -321,8 +321,15 @@ logger = logging.getLogger(__name__)
 # Tolto il flag dai quattro filtri e tolto il meccanismo safe da build_full_prompt() e
 # _face_locks() (non serviva più). Nessun cambio ai testi delle scene. VALERIA_BODY_SAFE resta
 # in shared ma Atelier non lo usa più. Rollback: ripristinare Atelier_301.py da Git.
-VERSION = "3.0.2"
-VERSION_DATE = "23/11/2026"
+# CHANGELOG 3.0.3 (27/11/2026): corpo tonico e capelli allineati, su richiesta di Walter (vedi shared
+# 3.0.1). _face_locks(): il corpo è "slanciato e sodo" (clessidra, seno pieno, addome piatto e
+# sodo, braccia e gambe tonici); il blocco HAIR LOCK usa VALERIA_HAIR_TEXT in modalità foto come
+# in modalità testo (prima "Italian crop" corto con nuca visibile, in contrasto con i capelli
+# attuali); la barba è "silver-white" e gli occhiali del volto a testo "thin blue-framed". Nelle
+# scene "Letto" la frase sul corpo include la costruzione snella e tonica. Il testo delle altre
+# scene non cambia. Rollback: Atelier_302.py da Git.
+VERSION = "3.0.3"
+VERSION_DATE = "27/11/2026"
 TOKEN   = os.environ.get("TELEGRAM_TOKEN_CLOSET")
 
 # GeminiClient da C_shared100 v2.2.0 — gestisce nativamente la rotation
@@ -430,7 +437,7 @@ FILTERS = {
                     "Warm natural light entering from a large window (left side), creating golden reflections and soft shadows on skin and fabrics. "
                     "Neutral background, minimal bright room.\n\n"
                     "**Outfit:** Faithfully reproduce the exact garment from the reference photo provided: same model, same colors, same central decoration, "
-                    "same fabric details, adapted to body proportions (D-cup bust, hourglass figure) without changing design or color.\n\n"
+                    "same fabric details, adapted to body proportions (D-cup bust, hourglass figure, slim toned build) without changing design or color.\n\n"
                     "**Style:** Soft but directional lights: warm highlights on body high points (shoulders, bust, abdomen, thighs), "
                     "soft shadows in sheet folds. Luminous and natural skin. Intimate, sophisticated, photographic atmosphere, zero vulgarity.\n\n"
                 ),
@@ -447,7 +454,7 @@ FILTERS = {
                     "Soft diffused lighting with warm nocturnal ambient light, accent lamps creating an intimate, elegant and cinematic atmosphere. "
                     "Soft shadows, controlled contrast, natural and realistic skin rendering.\n\n"
                     "**Outfit:** Faithfully reproduce the exact garment from the reference photo provided: same model, same colors, same central decoration, "
-                    "same fabric details, adapted to body proportions (D-cup bust, hourglass figure) without changing design or color.\n\n"
+                    "same fabric details, adapted to body proportions (D-cup bust, hourglass figure, slim toned build) without changing design or color.\n\n"
                     "**Technical:** f/2.8, ISO 200, 1/160s, 85mm, soft cinematic depth of field, natural bokeh, warm diffused light, "
                     "ultra-detailed glossy finish, neutral color calibration, ultra-realistic 8K.\n\n"
                 ),
@@ -736,7 +743,7 @@ def _face_locks(face_mode: str = "photo", scope: str = "single") -> str:
     face_mode="photo": testo storico identico alla 2.7.2 (rimando alla foto allegata).
     face_mode="text": volto descritto in shared (VALERIA_FACE_TEXT), capelli da VALERIA_HAIR_TEXT."""
     mosaic = scope == "mosaic"
-    shape = "the feminine hourglass silhouette and full bust described above"
+    shape = "the feminine hourglass silhouette, full bust and slim, firm, toned build described above"
     body = (
         "The body keeps " + shape + ", with completely "
         "smooth, hairless skin on the torso, arms and legs"
@@ -746,7 +753,7 @@ def _face_locks(face_mode: str = "photo", scope: str = "single") -> str:
     if face_mode == "text":
         identity = (
             "**\u26a0\ufe0f IDENTITY LOCK \u2014 ABSOLUTE PRIORITY:** The face stays mature, around 60 years old, with the "
-            "full silver-white beard and the deep-teal rounded glasses always present, exactly as described in the "
+            "full silver-white beard and the thin blue-framed glasses always present, exactly as described in the "
             "face identity above, identical to the described identity with zero drift"
             + (", in EVERY shot" if mosaic else "")
             + ". " + body
@@ -761,16 +768,13 @@ def _face_locks(face_mode: str = "photo", scope: str = "single") -> str:
         return identity + hair
     identity = (
         "**\u26a0\ufe0f IDENTITY LOCK \u2014 ABSOLUTE PRIORITY:** The face stays mature, around 60 years old, with the "
-        "full silver-grey beard and eyeglasses always present, exactly as shown in the attached reference photo, "
+        "full silver-white beard and eyeglasses always present, exactly as shown in the attached reference photo, "
         "identical to the reference identity with zero drift"
         + (", in EVERY shot" if mosaic else "")
         + ". " + body
     )
     hair = (
-        "**\u26a0\ufe0f HAIR LOCK \u2014 ABSOLUTE PRIORITY:** The hairstyle is exactly: short silver-grey hair, an "
-        "Italian crop cut, short on the sides and back with the nape and ears clearly visible, slightly "
-        "voluminous only on top, ending well above the shoulders \u2014 an exact middle length, not shaved "
-        "bald and not grown long"
+        "**\u26a0\ufe0f HAIR LOCK \u2014 ABSOLUTE PRIORITY:** The hairstyle is exactly: " + VALERIA_HAIR_TEXT
         + (", in EVERY shot" if mosaic else "")
         + ". This exact length, color and style stays fully present and unchanged"
         + (", identically across all 4 shots" if mosaic else "")

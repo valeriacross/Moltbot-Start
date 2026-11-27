@@ -2,6 +2,7 @@ import os, logging, re, telebot, html, threading
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from shared300 import GeminiClient, HealthServer, is_allowed, genai_types, analyze_scene, gemini_error_category
 from shared300 import VALERIA_BODY_STRONG, VALERIA_WATERMARK, VALERIA_TEXTURE_LOCK
+from shared300 import VALERIA_HAIR_TEXT, VALERIA_BEARD_TEXT, VALERIA_GLASSES_TEXT
 from shared300 import generate_caption, review_and_fix, SHARED_VERSION, SHARED_DATE, body_art_clause, multi_subject_clause, MODEL
 
 # --- VERSIONE ---
@@ -237,8 +238,15 @@ from shared300 import generate_caption, review_and_fix, SHARED_VERSION, SHARED_D
 #   3) Etichetta del messaggio "Key N · call #M" corretta in "call totali #M" (come
 #   Atelier 2.8.4): M è il totale di TUTTE le chiavi (shared: _total_calls), non della
 #   chiave mostrata.
-VERSION = "5.0.0"
-VERSION_DATE = "23/11/2026"
+# CHANGELOG 5.0.1 (27/11/2026): corpo tonico, capelli/barba allineati, occhiali blu sottili, su
+# richiesta di Walter (vedi shared 3.0.1). Il DNA del VIDEO usa ora VALERIA_BODY_STRONG con il
+# blocco "SLIM, FIRM AND FIT BODY" (addome piatto e sodo, braccia e gambe tonici) e le costanti
+# uniche di shared per capelli (ciuffo 8-10 cm, sopra il colletto), barba (piena, larga,
+# bianco-argento) e occhiali (montatura blu sottile e semplice). Prima: capelli "radi", barba
+# "dense grey-white" e occhiali bicolore asimmetrici, descrizioni diverse da quelle degli altri
+# bot. Il resto del volto video (pelle, rughe) non cambia. Rollback: Vogue_500.py da Git.
+VERSION = "5.0.1"
+VERSION_DATE = "27/11/2026"
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -461,18 +469,11 @@ VALERIA_FACE_VIDEO = (
     "**⚠️ FACE IDENTITY LOCK — ABSOLUTE PRIORITY:** Mature Italian male face in his 60s, oval "
     "shape, weathered sun-tanned skin, deep horizontal forehead wrinkles, pronounced smile "
     "creases beside the mouth, warm complexion.\n"
-    "**Hair:** Receding grey-silver hair, thinning sharply at the temples and crown, fuller and "
-    "slightly wavy at the sides and back.\n"
-    "**⚠️ BEARD — MANDATORY — NON-NEGOTIABLE:** Full, dense grey-white beard with darker "
-    "salt-and-pepper strands mixed through, thick and bushy, extending down the jaw and neck, "
-    "moustache blending into it with no visible upper lip. Clearly visible in every shot, a "
-    "permanent part of the identity.\n"
-    "**⚠️ EYEGLASSES — MANDATORY, ALWAYS PRESENT:** Distinctive two-tone eyeglasses — a thick "
-    "dark teal/forest-green frame with an unusual asymmetric shape: the left lens noticeably "
-    "rounder/circular, the right lens more rectangular/squared, both held by the same "
-    "continuous chunky frame. A deliberately mismatched, statement-piece design, not a "
-    "standard uniform pair — this asymmetry is the single most identifying detail and must be "
-    "preserved exactly.\n"
+    "**Hair:** " + VALERIA_HAIR_TEXT[:1].upper() + VALERIA_HAIR_TEXT[1:] + ".\n"
+    "**⚠️ BEARD — MANDATORY — NON-NEGOTIABLE:** " + VALERIA_BEARD_TEXT[:1].upper() + VALERIA_BEARD_TEXT[1:]
+    + ". Clearly visible in every shot, a permanent part of the identity.\n"
+    "**⚠️ EYEGLASSES — MANDATORY, ALWAYS PRESENT:** " + VALERIA_GLASSES_TEXT[:1].upper() + VALERIA_GLASSES_TEXT[1:]
+    + ", kept exactly as written in every shot.\n"
     "**Rendering:** Subsurface Scattering, Global Illumination, Ambient Occlusion, Fresnel Effect. "
     "8K, cinematic, 85mm, f/2.8, ISO 200.\n\n"
 )

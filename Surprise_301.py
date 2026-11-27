@@ -95,8 +95,14 @@ from shared300 import VALERIA_FACE, VALERIA_BODY_STRONG, VALERIA_WATERMARK
 #   1) Il modulo comune si chiama ora shared300.py (era C_shared100.py): import aggiornati.
 #   2) /start mostra la data di produzione accanto alla versione: nuova costante
 #   VERSION_DATE, da aggiornare a ogni nuova versione (data da `date`).
-VERSION = "3.0.0"
-VERSION_DATE = "23/11/2026"
+# CHANGELOG 3.0.1 (27/11/2026): corpo tonico, su richiesta di Walter (vedi shared 3.0.1). I prompt
+# Flow di /start usano VALERIA_FACE e VALERIA_BODY_STRONG di shared: ereditano da soli il blocco
+# "SLIM, FIRM AND FIT BODY", i capelli e la barba aggiornati. Qui cambiano solo le due righe locali
+# (riepilogo "Body" mostrato in chat e corpo del mosaico /flag: "defined narrow waist, shapely
+# hips, slim firm toned figure"). /pride (Walter, Carlotta, Fufos, Fritz) NON è stato toccato,
+# per decisione di Walter. Rollback: Surprise_300.py da Git.
+VERSION = "3.0.1"
+VERSION_DATE = "27/11/2026"
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -1103,7 +1109,7 @@ def _mini_prompt_from_scenario(scenario, tipo):
         f"🎨 <b>Style:</b> {html.escape(_short(scenario.get('style', ''), 200))}\n"
         f"💃 <b>Pose:</b> {html.escape(_short(scenario.get('pose', ''), 200))}\n"
         f"✨ <b>Mood:</b> {html.escape(_short(scenario.get('mood', ''), 200))}\n"
-        f"🏛 <b>Body:</b> Feminine hourglass, 180cm 75kg, D-cup bust, smooth skin"
+        f"🏛 <b>Body:</b> Feminine hourglass, 180cm 75kg, D-cup bust, slim and toned, smooth skin"
     )
 
 # --- /start ---
@@ -1823,7 +1829,8 @@ def _build_flag_prompt() -> str:
         "---\n\n"
         "**FACE:** Use the attached reference image — ZERO identity drift across all 6 panels.\n\n"
         "**BODY — HELD EXACTLY AS DESCRIBED:**\n"
-        "Feminine hourglass. Height 180 cm, D-cup bust, defined waist, full hips. "
+        "Feminine hourglass. Height 180 cm, D-cup bust, defined narrow waist, shapely hips. "
+        "Slim, firm, toned figure with a flat firm abdomen. "
         "Completely smooth, hairless skin throughout. Long slim legs.\n\n"
         "---\n\n"
         "**PANEL TEMPLATE:**\n"
