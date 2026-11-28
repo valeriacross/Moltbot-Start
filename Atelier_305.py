@@ -3,7 +3,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from shared300 import GeminiClient, HealthServer, is_allowed, analyze_scene, SHARED_VERSION, SHARED_DATE, MODEL
-from shared300 import EDITORIAL_WRAPPER, build_valeria_identity, generate_caption, review_and_fix, body_art_clause, multi_subject_clause, has_multiple_figures
+from shared300 import EDITORIAL_WRAPPER, build_valeria_identity, generate_caption, review_and_fix, body_art_clause, multi_subject_clause, has_multiple_figures, sheer_fabric_clause
 from shared300 import VALERIA_HAIR_TEXT
 
 # --- LOGGING ---
@@ -11,6 +11,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # --- CONFIGURAZIONE ---
+# CHANGELOG 3.0.5 (28/11/2026): SHEER FABRIC LOCK. Un abito di tulle trasparente usciva da Flow come
+# tessuto beige opaco (NB lite) o champagne con pois crema (NB 2.1). Ora l'analisi (shared 3.0.3)
+# descrive livello di trasparenza, colore della base senza pelle e parti opache; i tre prompt
+# (singolo, mosaico, filtro) inseriscono sheer_fabric_clause() dopo il COLOR LOCK.
 # CHANGELOG 2.0.8 (14/07/2026): fix 2.0.7 era incompleto — protetto solo
 # un lato (anti-calvizie), non l'altro. Walter ha mostrato output Flow
 # reali con capelli lunghi mossi oltre le spalle, in tutti e 4 gli scatti
@@ -333,8 +337,8 @@ logger = logging.getLogger(__name__)
 # attuali); la barba è "silver-white" e gli occhiali del volto a testo "thin blue-framed". Nelle
 # scene "Letto" la frase sul corpo include la costruzione snella e tonica. Il testo delle altre
 # scene non cambia. Rollback: Atelier_302.py da Git.
-VERSION = "3.0.4"
-VERSION_DATE = "27/11/2026"
+VERSION = "3.0.5"
+VERSION_DATE = "28/11/2026"
 TOKEN   = os.environ.get("TELEGRAM_TOKEN_CLOSET")
 
 # GeminiClient da C_shared100 v2.2.0 — gestisce nativamente la rotation
@@ -802,6 +806,7 @@ def build_full_prompt(filter_key, outfit_description, scene_override=None, mode=
         f"including the precise HEX codes listed in the COLOR PALETTE section — vivid and saturated, "
         f"true to the exact hue specified (vivid cyan-turquoise stays vivid cyan-turquoise, not powder "
         f"blue or steel blue). Color fidelity is exact and non-negotiable.\n\n"
+        f"{sheer_fabric_clause(outfit_description)}"
         f"**⚠️ OUTFIT DETAIL LOCK — ABSOLUTE PRIORITY:** Every embellishment, texture and construction "
         f"detail described above appears fully and precisely — filigree, embroidery, beading, gemstones, "
         f"lacing, stitching, hardware, layering, trim — in the same density and placement as described. "
@@ -838,6 +843,7 @@ def build_shooting_prompt(outfit_desc, mode="mosaic", face_mode="photo"):
             f"**⚠️ COLOR LOCK — ABSOLUTE PRIORITY:** The colors match exactly as described above, including "
             f"the precise HEX codes listed in the COLOR PALETTE section — vivid and saturated, true to the "
             f"exact hue specified. Color fidelity is exact and non-negotiable.\n\n"
+            f"{sheer_fabric_clause(outfit_desc)}"
             f"**⚠️ OUTFIT DETAIL LOCK — ABSOLUTE PRIORITY:** Every embellishment, texture and construction "
             f"detail described above appears fully and precisely — filigree, embroidery, beading, gemstones, "
             f"lacing, stitching, hardware, layering, trim — in the same density and placement as described. "
@@ -887,6 +893,7 @@ def build_shooting_prompt(outfit_desc, mode="mosaic", face_mode="photo"):
             f"**⚠️ COLOR LOCK — ABSOLUTE PRIORITY:** The colors match exactly as described above, including "
             f"the precise HEX codes listed in the COLOR PALETTE section — vivid and saturated, true to the "
             f"exact hue specified, identically in all 4 shots. Color fidelity is exact and non-negotiable.\n\n"
+            f"{sheer_fabric_clause(outfit_desc)}"
             f"**⚠️ OUTFIT DETAIL LOCK — ABSOLUTE PRIORITY:** Every embellishment, texture and construction "
             f"detail described above appears fully and precisely — filigree, embroidery, beading, gemstones, "
             f"lacing, stitching, hardware, layering, trim — in the same density and placement as described, "

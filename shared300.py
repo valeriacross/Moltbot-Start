@@ -758,9 +758,9 @@ GEMINI_MAX_ATTEMPTS = 16     # tetto assoluto di chiamate API per singolo genera
 GEMINI_HTTP_TIMEOUT_S = float(os.environ.get("GEMINI_HTTP_TIMEOUT_S", "120"))   # 2.4.22 — timeout di ogni chiamata HTTP
 
 # Versione
-VERSION = "3.0.2"
-SHARED_VERSION = "3.0.2"   # aggiornare ad ogni modifica
-SHARED_DATE    = "27/11/2026"  # aggiornare ad ogni modifica
+VERSION = "3.0.3"
+SHARED_VERSION = "3.0.3"   # aggiornare ad ogni modifica
+SHARED_DATE    = "28/11/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 shared300.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
 
@@ -1024,6 +1024,32 @@ def multi_subject_clause(scene_description: str) -> str:
     if not has_multiple_figures(scene_description):
         return ""
     return VALERIA_MULTI_SUBJECT_LOCK
+
+# SHEER FABRIC LOCK — introdotta in 3.0.3 (28/11/2026). Causa: un abito di tulle
+# trasparente (base quasi incolore, pois neri) usciva da Flow come tessuto beige
+# opaco o velina color carne. L'analisi dava la base "beige (#F5F5DC)" e il
+# COLOR LOCK imponeva il colore esatto; nessun blocco diceva che la pelle si vede
+# attraverso il tessuto. Stesso pattern di body_art_clause(): compare solo se
+# l'analisi parla di tessuto trasparente, altrimenti stringa vuota. Solo positivo.
+SHEER_FABRIC_LOCK_TEXT = (
+    "**⚠️ SHEER FABRIC LOCK — ABSOLUTE PRIORITY:** Every garment described as sheer, mesh, tulle, "
+    "see-through or transparent is rendered as real see-through fabric: the base is clear, colourless "
+    "gauze through which the skin, the body contours and any garment worn underneath are plainly "
+    "visible, exactly as in the reference photograph. Only the dots, embroidery, lace appliqué, trim "
+    "and seams are opaque, in the colours given for them; any HEX code listed for such a garment "
+    "belongs to those opaque details, while the transparent base takes the colour of the skin seen "
+    "through it. The transparency covers the whole garment, identically in every shot and in every "
+    "pose, framing and movement.\n\n"
+)
+_SHEER_RE = re.compile(r"\b(sheer|see-through|transparent|translucent|tulle|semi-sheer)\b", re.IGNORECASE)
+
+def sheer_fabric_clause(scene_description: str) -> str:
+    """Restituisce SHEER_FABRIC_LOCK_TEXT SOLO se la descrizione dell'outfit parla di
+    tessuto sheer/see-through/transparent/translucent/tulle — altrimenti stringa vuota.
+    Usare subito dopo il COLOR LOCK nei bot che passano da analyze_scene()."""
+    if not scene_description:
+        return ""
+    return SHEER_FABRIC_LOCK_TEXT if _SHEER_RE.search(scene_description) else ""
 
 # TEXTURE & PATTERN FIDELITY LOCK — introdotta in 2.4.4. Generica, non legata
 # a una scena/foto specifica: si applica a qualunque pattern, texture o
@@ -1421,7 +1447,8 @@ def review_and_fix(prompt: str, client: 'GeminiClient', face_mode: str = "photo"
             "6. NAME REMOVAL: Remove any occurrence of 'Valeria Cross' or 'DNA of Valeria Cross' from the prompt body, "
             "EXCEPT inside the watermark text of rule 5, which stays exactly 'feat. Valeria Cross 👠'.\n\n"
             "7. KEEP INTACT: scene, outfit, lighting, environment, pose, mood, camera settings, "
-            "photographic style, watermark spec, all creative elements not related to the subject's identity.\n\n"
+            "photographic style, watermark spec, all LOCK blocks about the outfit (including the SHEER FABRIC LOCK block when present), "
+            "all creative elements not related to the subject's identity.\n\n"
             "8. BODY STATEMENT: Ensure the Subject body section explicitly states, in positive terms: "
             "'completely smooth, hairless skin on the torso, arms and legs', "
             "'feminine hourglass silhouette with a flat firm abdomen and slim toned arms and legs'.\n\n"
@@ -1462,7 +1489,12 @@ _ANALYZE_PROMPT = (
     "ART below. If only one person is present, write 'One figure.']\n\n"
     "OUTFIT: [Every garment as a standalone object — exact name, color with HEX code, fabric, "
     "cut, fit, coverage, embellishments, details. "
-    "Describe the garment as if it exists independently — no wearer mentioned.]\n\n"
+    "Describe the garment as if it exists independently — no wearer mentioned. "
+    "For every sheer, mesh, tulle, lace or see-through fabric, state explicitly: how transparent it is "
+    "(e.g. fully transparent, the skin and any garment underneath clearly visible through it), the "
+    "colour of the base fabric itself as it would look WITHOUT the skin behind it (clear, colourless, "
+    "ivory...), and which parts are opaque (dots, embroidery, appliqué, trim, seams) with their own "
+    "HEX codes. Do not use the colour of the skin seen through the fabric as the fabric colour.]\n\n"
     "ACCESSORIES: [Every accessory as a standalone object — jewelry, footwear, headwear, bags, "
     "with color+HEX.]\n\n"
     "PROPS & ACTIONS: [Physical objects interacting directly with the subject's body — "

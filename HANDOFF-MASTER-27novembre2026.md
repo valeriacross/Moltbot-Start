@@ -48,6 +48,8 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 **Nota (27/11/2026, sera):** volto reale a confronto con Flow — shared 3.0.2, Vogue 5.0.2 (`Vogue_502.py`), Atelier 3.0.4 (`Atelier_304.py`), Surprise 3.0.2 (`Surprise_302.py`); lanciatori aggiornati. Vedi sezione 2unquadragesima.
 
+**Nota (28/11/2026):** tessuti trasparenti — shared 3.0.3, Atelier 3.0.5 (`Atelier_305.py`); lanciatore `atelier.py` aggiornato. Vedi sezione 2duoquadragesima.
+
 **Nota (27/11/2026):** corpo tonico, capelli/barba allineati, occhiali blu sottili — shared 3.0.1 (stesso nome), Vogue 5.0.1 (`Vogue_501.py`), Atelier 3.0.3 (`Atelier_303.py`), Surprise 3.0.1 (`Surprise_301.py`). Architect e Filtro invariati. I lanciatori `vogue.py`, `atelier.py`, `surprise.py` puntano ai file nuovi; il Run command su Koyeb non cambia. Vedi sezione 2quadragesima.
 
 **Nota (23/11, notte, dopo il push):** Atelier 3.0.0 → 3.0.1 (`Atelier_301.py`): la data di produzione non compariva nel `/start` di Atelier senza filtro attivo (errore di Claude, trovato da Walter dallo screenshot dopo il redeploy). Gli altri quattro bot non hanno il problema.
@@ -74,10 +76,10 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 | File | Versione | Koyeb service | Run command | Chiavi API |
 |------|---------|---------------|--------------|-----------|
-| `shared300.py` | **3.0.2** | (comune a tutti) | — | — |
+| `shared300.py` | **3.0.3** | (comune a tutti) | — | — |
 | `Vogue_502.py` | **5.0.2** | colossal-giselle/vogue | `python vogue.py` (ingresso fisso → `BOT_FILE`) | 2 |
 | `Architect_400.py` | **4.0.0** | homely-annabelle/thearchitect | `python architect.py` (ingresso fisso → `BOT_FILE`) | 1 |
-| `Atelier_304.py` | **3.0.4** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
+| `Atelier_305.py` | **3.0.5** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
 | `Filtro_300.py` | **3.0.0** | screeching-jobina/filtro | `python filtro.py` (ingresso fisso → `BOT_FILE`) | 1 |
 | `Surprise_302.py` | **3.0.2** | surprise1/sorpresa | `python surprise.py` (ingresso fisso → `BOT_FILE`) | 1 |
 
@@ -88,6 +90,20 @@ Repository: `valeriacross/Moltbot-Start` — region Frankfurt.
 **Nota versioning (corretta il 10/07):** il numero nel nome file **corrisponde sempre esattamente** alla VERSION interna, senza punti (es. `2.0.4` → `Atelier_204.py`, `3.0.2` → `Architect_302.py`) — non è un contatore progressivo indipendente. Su un salto di versione non incrementale (es. `2.0.6` → `3.0.0`), il nome file deve riflettere il nuovo numero di versione per intero, non "il prossimo della sequenza". Vedi sezione 2duodecies per il dettaglio dell'errore fatto e corretto in questa data.
 
 **Nota chiavi (25/06):** una chiave spostata da Architect (2→1) ad Atelier (4→5). `C_shared100.py` ora legge fino a `GOOGLE_API_KEY_5`.
+
+---
+
+## 2duoquadragesima. SESSIONE 28/11/2026 — TESSUTI TRASPARENTI (SHARED 3.0.3, ATELIER 3.0.5)
+
+*Punto di partenza.* Walter ha mandato in Atelier la foto di un abito di tulle trasparente (base quasi incolore, pois neri, bordino crema, ricamo floreale nero e grigio con perline, reggiseno a ferretto trasparente, perizoma, piercing all'ombelico) e poi le immagini di Flow, con lo stesso prompt e la stessa foto del volto: **NB lite (3:4)** ha dato un abito beige opaco e corto, senza pizzo nero, perizoma e piercing, e un volto diverso dalla foto; **NB 2.1 (4:3)** ha dato un abito lungo e trasparente, con pizzo nero e volto fedele, ma con base champagne e pois crema invece che neri.
+
+*Causa.* Nel testo: l'analisi scriveva la base come "semi-sheer … beige (#F5F5DC)", il COLOR LOCK imponeva il colore esatto "vivid and saturated" e il TEXTURE LOCK chiedeva un materiale continuo; nessun blocco diceva che la pelle si vede attraverso il tessuto. Il beige reale era solo il bordino e la pelle vista in trasparenza. La resa del volto e il taglio della gonna in NB lite sono un limite del modello, non risolvibile dal prompt.
+
+*Decisione di Walter.* Usa entrambi i modelli (con più personaggi NB 2.1 segue il prompt, NB lite genera una immagine per personaggio): la correzione vale per tutti.
+
+*Cosa è cambiato.* **shared 3.0.3:** `_ANALYZE_PROMPT` (campo OUTFIT) chiede, per ogni tessuto trasparente, il livello di trasparenza, il colore della base senza la pelle dietro e le parti opache con il loro HEX; nuova costante `SHEER_FABRIC_LOCK_TEXT` e funzione `sheer_fabric_clause(descrizione)` (compare solo se la descrizione contiene sheer, see-through, transparent, translucent, tulle; "mesh" da solo non basta); la regola 7 di `review_and_fix()` protegge il blocco. **Atelier 3.0.5:** `sheer_fabric_clause()` subito dopo il COLOR LOCK in `build_full_prompt()` e nei due rami di `build_shooting_prompt()`. Vogue, Filtro, Architect, Surprise: nessuna modifica di codice (Filtro e Vogue ricevono la nuova descrizione dell'outfit dall'analisi condivisa).
+
+*Verificato offline:* il blocco compare una sola volta, tra COLOR LOCK e OUTFIT DETAIL LOCK, solo con outfit trasparente; assente con outfit normale e con "mesh" da solo; sopravvive a `review_and_fix()`; nessun "not/never" nel testo; test DNA e generazione invariati.
 
 ---
 
@@ -927,8 +943,9 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 4. SHARED300.PY (ex C_SHARED100.PY) — STORICO COMPLETO FIX (v2.3.0 → v3.0.2)
+## 4. SHARED300.PY (ex C_SHARED100.PY) — STORICO COMPLETO FIX (v2.3.0 → v3.0.3)
 
+- **v3.0.3 (28/11/2026):** SHEER FABRIC LOCK (`sheer_fabric_clause()`), analisi OUTFIT con trasparenza e colore della base; regola 7 di `review_and_fix()`. Vedi sezione 2duoquadragesima.
 - **v3.0.2 (27/11/2026, sera):** `glasses_text()` con colore a caso fra blu, verde e rosso; `valeria_face()` e `valeria_face_text()` al posto delle costanti (che restano, blu fisso); barba "neatly trimmed natural beard", capelli fino alla nuca, sopracciglia grigio chiaro; regole di `review_and_fix()` senza colore fisso. Vedi sezione 2unquadragesima.
 - **v3.0.1 (27/11/2026):** corpo tonico (`VALERIA_BODY_TONE` in `VALERIA_BODY_STRONG` e `VALERIA_BODY_SAFE`, parole "full/soft/wide" sostituite), costanti uniche `VALERIA_HAIR_TEXT`, `VALERIA_BEARD_TEXT`, `VALERIA_GLASSES_TEXT` (occhiali blu sottili), regole di `review_and_fix()` allineate, controlli della revisione aggiornati (barba video "bushy silver-white beard", blocco "SLIM, FIRM AND FIT BODY"). Vedi sezione 2quadragesima. Non ancora testato in produzione.
 
@@ -1033,8 +1050,9 @@ Su richiesta esplicita di Walter ("analizzare tutti i codici per trovare bug ed 
 
 ---
 
-## 7. ATELIER — STORICO E STATO (v3.0.4)
+## 7. ATELIER — STORICO E STATO (v3.0.5)
 
+- **v3.0.5 (28/11/2026):** `Atelier_305.py`; SHEER FABRIC LOCK dopo il COLOR LOCK nei tre prompt. Vedi sezione 2duoquadragesima.
 - **v3.0.4 (27/11/2026, sera):** `Atelier_304.py`; occhiali di riserva a colore casuale nel volto in modalità foto, "neatly trimmed grey beard" nei blocchi locali. Vedi sezione 2unquadragesima.
 - **v3.0.3 (27/11/2026):** `Atelier_303.py`; `_face_locks()` con corpo "slim, firm, toned build", HAIR LOCK da `VALERIA_HAIR_TEXT` anche in modalità foto, barba silver-white, scene "Letto" con costruzione snella e tonica. Vedi sezione 2quadragesima.
 
@@ -1271,3 +1289,5 @@ Pool locale di location (254, verificato via `len(LOCATION_POOL)` — l'etichett
 73. **TODO aperto (27/11/2026), priorità alta.** Dopo il deploy di shared 3.0.1, Vogue 5.0.1, Atelier 3.0.3 e Surprise 3.0.1: generare in Flow almeno 5-6 immagini al limite del safety (le stesse scene che davano il corpo maschile sovrappeso) e confrontare con quelle vecchie. Se il corpo è ancora flaccido, valutare con Walter se alzare il tono a "atletico naturale" (provato solo "magro e sodo"). Annotare quali parole spostano il risultato. Vedi sezione 2quadragesima.
 
 74. **TODO aperto (27/11/2026, sera), priorità alta.** Dopo il deploy generare in Flow, SENZA foto allegata, 4-6 immagini con le stesse scene delle due ricevute e confrontarle con la foto reale: barba (curata, grigia), occhiali (tondi, colore a caso), capelli (all'indietro, fino alla nuca), corpo (magro e sodo). Se Flow ignora ancora un dettaglio, annotare quale. Vedi sezione 2unquadragesima. (Resta aperto anche il TODO 73.)
+
+75. **TODO aperto (28/11/2026), priorità alta.** Dopo il deploy rigenerare in Flow, con NB 2.1 e con NB lite, l'abito di tulle trasparente (stessa foto, stesso volto) e controllare: base incolore con la pelle visibile, pois neri, ricamo e bordino crema, lunghezza fino a terra. Se NB lite continua a opacizzare il tessuto, annotare cosa perde. Vedi sezione 2duoquadragesima.
