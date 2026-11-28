@@ -48,6 +48,8 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 **Nota (27/11/2026, sera):** volto reale a confronto con Flow — shared 3.0.2, Vogue 5.0.2 (`Vogue_502.py`), Atelier 3.0.4 (`Atelier_304.py`), Surprise 3.0.2 (`Surprise_302.py`); lanciatori aggiornati. Vedi sezione 2unquadragesima.
 
+**Nota (28/11/2026, sera):** disegni nello stile originale — shared 3.0.4, Atelier 3.0.6 (`Atelier_306.py`), Vogue 5.0.3 (`Vogue_503.py`); lanciatori `atelier.py` e `vogue.py` aggiornati. Vedi sezione 2triquadragesima.
+
 **Nota (28/11/2026):** tessuti trasparenti — shared 3.0.3, Atelier 3.0.5 (`Atelier_305.py`); lanciatore `atelier.py` aggiornato. Vedi sezione 2duoquadragesima.
 
 **Nota (27/11/2026):** corpo tonico, capelli/barba allineati, occhiali blu sottili — shared 3.0.1 (stesso nome), Vogue 5.0.1 (`Vogue_501.py`), Atelier 3.0.3 (`Atelier_303.py`), Surprise 3.0.1 (`Surprise_301.py`). Architect e Filtro invariati. I lanciatori `vogue.py`, `atelier.py`, `surprise.py` puntano ai file nuovi; il Run command su Koyeb non cambia. Vedi sezione 2quadragesima.
@@ -76,10 +78,10 @@ Walter Caponi, sviluppatore solo, basato a Lisbona. Progetto: "Valeria Cross AI"
 
 | File | Versione | Koyeb service | Run command | Chiavi API |
 |------|---------|---------------|--------------|-----------|
-| `shared300.py` | **3.0.3** | (comune a tutti) | — | — |
-| `Vogue_502.py` | **5.0.2** | colossal-giselle/vogue | `python vogue.py` (ingresso fisso → `BOT_FILE`) | 2 |
+| `shared300.py` | **3.0.4** | (comune a tutti) | — | — |
+| `Vogue_503.py` | **5.0.3** | colossal-giselle/vogue | `python vogue.py` (ingresso fisso → `BOT_FILE`) | 2 |
 | `Architect_400.py` | **4.0.0** | homely-annabelle/thearchitect | `python architect.py` (ingresso fisso → `BOT_FILE`) | 1 |
-| `Atelier_305.py` | **3.0.5** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
+| `Atelier_306.py` | **3.0.6** | flexible-denna/atelier | `python atelier.py` (ingresso fisso → `BOT_FILE`) | 5 |
 | `Filtro_300.py` | **3.0.0** | screeching-jobina/filtro | `python filtro.py` (ingresso fisso → `BOT_FILE`) | 1 |
 | `Surprise_302.py` | **3.0.2** | surprise1/sorpresa | `python surprise.py` (ingresso fisso → `BOT_FILE`) | 1 |
 
@@ -90,6 +92,20 @@ Repository: `valeriacross/Moltbot-Start` — region Frankfurt.
 **Nota versioning (corretta il 10/07):** il numero nel nome file **corrisponde sempre esattamente** alla VERSION interna, senza punti (es. `2.0.4` → `Atelier_204.py`, `3.0.2` → `Architect_302.py`) — non è un contatore progressivo indipendente. Su un salto di versione non incrementale (es. `2.0.6` → `3.0.0`), il nome file deve riflettere il nuovo numero di versione per intero, non "il prossimo della sequenza". Vedi sezione 2duodecies per il dettaglio dell'errore fatto e corretto in questa data.
 
 **Nota chiavi (25/06):** una chiave spostata da Architect (2→1) ad Atelier (4→5). `C_shared100.py` ora legge fino a `GOOGLE_API_KEY_5`.
+
+---
+
+## 2triquadragesima. SESSIONE 28/11/2026 (SERA) — DISEGNI NELLO STILE ORIGINALE (SHARED 3.0.4, ATELIER 3.0.6, VOGUE 5.0.3)
+
+*Richiesta di Walter.* Se l'immagine fornita è un disegno (stile Pixar, Ghibli, Disney o uno scarabocchio), il prompt mantiene lo stile originale, fermi restando tutti gli altri indicatori.
+
+*Decisioni (domande fatte prima di scrivere).* Bot: **Atelier e Vogue** (foto e video); Filtro, Architect e Surprise esclusi. Riconoscimento automatico con avviso a Walter. Valeria stilizzata nello stesso stile, con tutto il DNA. Contano come disegno anche anime, manga, fumetto, pittura, 3D, CGI, videogioco e clay. Si sostituiscono solo le parole di realismo: inquadratura, ottica, luce e 8K restano. In Atelier vale per tutti i filtri e per Shooting Editorial.
+
+*Cosa è cambiato.* **shared 3.0.4:** `analyze_scene(img, client, detect_style=False)`: con `True` usa `_ANALYZE_PROMPT_STYLE` (= `_ANALYZE_PROMPT` con `ART_STYLE_SECTION` in testa: "PHOTOGRAPH" oppure "DRAWING | nome breve | descrizione", solo tratti visivi, senza nomi di studi o marchi). Senza parametro l'analisi è identica alla 3.0.3, quindi Filtro non cambia. Nuove `art_style_of()`, `art_style_clause()` (blocco ART STYLE LOCK) e `apply_art_style()` (photorealistic/hyperrealistic/realistic → true-to-style, photograph → image, photography → imagery, photographic → visual, "a real photographed material" → "the material in the original artwork"; "photo", la foto del volto allegata, non viene toccata). `review_and_fix()`: regola 7 protegge l'ART STYLE LOCK, nuova regola 9; il blocco è in `_REVIEW_REQUIRED`. **Atelier 3.0.6:** `detect_style=True`, `art_style_clause()` dopo il COLOR LOCK nei tre prompt, `_finalize()` = `apply_art_style()` prima e dopo `review_and_fix()`, avviso "🎨 Rilevato disegno". **Vogue 5.0.3:** foto con `detect_style=True`, `_ANALYZE_PROMPT_VIDEO` con `ART_STYLE_SECTION` prima di MOVEMENT, `art_style_clause()` dopo il DNA in `build_prompt_video()`, `_finalize_video()` e `_notify_style()`.
+
+*Scelta (ipotesi non verificata):* il nome dello stile è generico ("3D animated cartoon"), senza Pixar, Disney o Ghibli, per non rischiare blocchi di Flow sui marchi; lo stile passa attraverso i tratti visivi descritti.
+
+*Verificato offline (librerie esterne simulate, nessuna chiamata Gemini):* con una foto (campo assente o PHOTOGRAPH) i 32 prompt di Atelier (tutti i filtri, singolo e mosaico, Shooting Editorial) e il prompt video di Vogue sono identici a quelli di Atelier 3.0.5 e Vogue 5.0.2; il prompt di analisi di default (Filtro) è identico; con un disegno l'ART STYLE LOCK compare una volta in ogni prompt e non restano parole di realismo; una revisione che perde il blocco viene scartata; formato con markdown e parentesi riconosciuto; pyflakes e `ast.parse()` puliti, decorator invariati. **Non verificato:** quanto Gemini classifichi bene foto e disegni e quanto Flow rispetti lo stile, soprattutto con la foto reale del volto allegata (può spingere verso il fotorealismo). **Non ancora testato in produzione.**
 
 ---
 

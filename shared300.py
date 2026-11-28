@@ -1,9 +1,22 @@
 """
 shared300.py — Valeria Cross AI · Oggetti comuni a tutti i bot
-Versione: 3.0.2
+Versione: 3.0.4
 
 REGOLA: questo file si aggiorna SEMPRE in-place con lo stesso nome shared300.py.
 Non rinominare mai in shared301.py o simili — tutti i bot importano da shared300.
+CHANGELOG 3.0.4 (28/11/2026): DISEGNI — stile originale mantenuto, su richiesta di Walter (Atelier e Vogue).
+  - analyze_scene(img, client, detect_style=False): con detect_style=True l'analisi aggiunge il campo
+    ART STYLE (ART_STYLE_SECTION): "PHOTOGRAPH" oppure "DRAWING | nome breve | descrizione" per cartoon,
+    animazione 3D o a mano, anime, manga, fumetto, pittura, CGI, videogioco, clay, scarabocchio. Senza il
+    parametro (Filtro) l'analisi resta identica alla 3.0.3. Nessuna chiamata Gemini in più.
+  - Nuove art_style_of(desc) → (nome, descrizione) o None, art_style_clause(desc) → blocco ART STYLE LOCK
+    (tutta l'immagine, Valeria compresa, nello stile del disegno, DNA intatto) e apply_art_style(prompt, desc),
+    che con un disegno sostituisce solo le parole di realismo (photorealistic, hyperrealistic, realistic,
+    photograph/photography) — inquadratura, ottica, luce e 8K restano. Con una foto non cambia nulla.
+  - review_and_fix(): regola 7 protegge l'ART STYLE LOCK, nuova regola 9 sullo stile; una revisione che
+    perde il blocco viene scartata (_REVIEW_REQUIRED).
+CHANGELOG 3.0.3 (28/11/2026): tessuti trasparenti — SHEER_FABRIC_LOCK_TEXT, sheer_fabric_clause(), campo
+  OUTFIT di _ANALYZE_PROMPT (vedi HANDOFF, sezione 2duoquadragesima).
 CHANGELOG 3.0.2 (27/11/2026, sera): volto reale a confronto con le immagini di Flow, su richiesta di Walter.
   - Occhiali: Walter ne ha tre paia identici (tondi, stile panto, acetato trasparente di medio
     spessore) in blu, verde e rosso. Nuova glasses_text(color=None): il colore è scelto a caso fra
@@ -727,6 +740,7 @@ __all__ = [
     'build_valeria_identity', 'generate_caption', 'generate_mini_caption', 'generate_mini_prompt',
     'review_and_fix', 'multi_subject_clause', 'has_multiple_figures',
     'body_art_clause', 'BODY_ART_EXCEPTION_TEXT',
+    'ART_STYLE_SECTION', 'art_style_of', 'art_style_clause', 'apply_art_style',
     'analyze_scene', 'genai_types', 'MODEL', 'MODEL_LITE', 'detect_mime_type',
     'SHARED_VERSION', 'SHARED_DATE',
 ]
@@ -758,8 +772,8 @@ GEMINI_MAX_ATTEMPTS = 16     # tetto assoluto di chiamate API per singolo genera
 GEMINI_HTTP_TIMEOUT_S = float(os.environ.get("GEMINI_HTTP_TIMEOUT_S", "120"))   # 2.4.22 — timeout di ogni chiamata HTTP
 
 # Versione
-VERSION = "3.0.3"
-SHARED_VERSION = "3.0.3"   # aggiornare ad ogni modifica
+VERSION = "3.0.4"
+SHARED_VERSION = "3.0.4"   # aggiornare ad ogni modifica
 SHARED_DATE    = "28/11/2026"  # aggiornare ad ogni modifica
 
 logger.info(f"📦 shared300.py v{VERSION} ({SHARED_DATE}) caricato — MODEL={MODEL} fallback={MODEL_FALLBACKS}")
@@ -1051,6 +1065,84 @@ def sheer_fabric_clause(scene_description: str) -> str:
         return ""
     return SHEER_FABRIC_LOCK_TEXT if _SHEER_RE.search(scene_description) else ""
 
+# ART STYLE — introdotta in 3.0.4 (28/11/2026), su richiesta di Walter: se l'immagine di
+# riferimento è un disegno (cartoon, animazione, anime, fumetto, pittura, 3D, videogioco,
+# scarabocchio) il prompt mantiene lo stile originale, Valeria compresa, con tutto il DNA.
+# Usata da Atelier e Vogue (analyze_scene(..., detect_style=True)); Filtro resta escluso.
+# Il nome breve evita nomi di studi e marchi: lo stile passa a Flow attraverso i tratti visivi.
+ART_STYLE_SECTION = (
+    "ART STYLE: [Decide whether this image is a real photograph or a drawn or rendered artwork. "
+    "Write exactly 'PHOTOGRAPH' for a real photograph, including retouched or filtered photos. "
+    "Write 'DRAWING | <short generic style name, at most 6 words> | <detailed style description>' for "
+    "any non-photographic artwork: cartoon, 3D animated film look, hand-drawn animation, anime, manga, "
+    "comic book, painting (watercolour, oil, gouache, pastel), CGI or 3D render, video-game graphics, "
+    "claymation, sketch or childlike scribble. Describe the style through its visual traits only, with "
+    "no studio, brand or artist names: line work (presence, thickness and colour of outlines), colouring "
+    "(flat, cel-shaded, painterly, gradients, texture of the medium), shading and light treatment, level "
+    "of detail, and how bodies and faces are stylised (proportions, eye size, simplification). Example: "
+    "'DRAWING | 3D animated cartoon | soft rounded shapes, smooth glossy surfaces...'. All the other "
+    "sections below describe the content of the artwork as usual.]\n\n"
+)
+_ART_STYLE_RE = re.compile(r"ART STYLE\W*(DRAWING|PHOTOGRAPH)\b(.*?)(?=\n\s*\n|\Z)", re.IGNORECASE | re.DOTALL)
+
+def art_style_of(scene_description: str):
+    """(nome, descrizione) se il campo ART STYLE dell'analisi dice DRAWING, altrimenti None
+    (foto, campo assente, analisi fatta senza detect_style)."""
+    if not scene_description:
+        return None
+    m = _ART_STYLE_RE.search(scene_description)
+    if not m or m.group(1).upper() != "DRAWING":
+        return None
+    parts = [p.strip(" \t\n*[]'\"—–-.") for p in m.group(2).split("|")]
+    parts = [p for p in parts if p]
+    name = parts[0] if parts else "drawn"
+    descr = " ".join(parts[1:]) if len(parts) > 1 else name
+    return name, descr
+
+def art_style_clause(scene_description: str) -> str:
+    """Blocco ART STYLE LOCK SOLO se l'analisi ha rilevato un disegno — altrimenti stringa vuota.
+    Usare subito dopo il COLOR LOCK, come sheer_fabric_clause()."""
+    st = art_style_of(scene_description)
+    if not st:
+        return ""
+    name, descr = st
+    return (
+        f"**⚠️ ART STYLE LOCK — ABSOLUTE PRIORITY:** The reference image is an artwork in {name} style. "
+        f"The whole output is rendered in this same art style: {descr}. "
+        "Every element — the subject's face, hair, beard, glasses, body, skin and body art, the outfit, props, "
+        "background and lighting — is drawn in this style, with the same line work, colouring, shading and "
+        "level of detail as the reference. The subject's identity stays complete and recognisable exactly as "
+        "described in this prompt (face, hair, beard, glasses, body shape, body art), translated into the style. "
+        "The camera, lens and lighting indications describe framing, perspective and light inside the artwork. "
+        "The style stays identical in every shot.\n\n"
+    )
+
+_REALISM_SUBS = (
+    (re.compile(r"\ba real photographed material\b", re.I), "the material in the original artwork"),
+    (re.compile(r"\b(?:ultra-?|hyper-?)?photo-?realistic\b|\b(?:hyper|ultra)-?realistic\b|\brealistic\b", re.I), "true-to-style"),
+    (re.compile(r"\bphotographs\b", re.I), "images"),
+    (re.compile(r"\bphotograph\b", re.I), "image"),
+    (re.compile(r"\bphotography\b", re.I), "imagery"),
+    (re.compile(r"\bphotographic\b", re.I), "visual"),
+)
+
+def _keep_case(found: str, rep: str) -> str:
+    if len(found) > 1 and found.isupper():
+        return rep.upper()
+    return rep[:1].upper() + rep[1:] if found[:1].isupper() else rep
+
+def apply_art_style(prompt: str, scene_description: str) -> str:
+    """Con un disegno rilevato sostituisce solo le parole di realismo del prompt
+    (photorealistic, hyperrealistic, realistic, photograph/photography/photographic); inquadratura,
+    ottica, luce e risoluzione restano. Con una foto restituisce il prompt invariato.
+    "photo" (la foto del volto allegata) non viene toccato."""
+    if not prompt or not art_style_of(scene_description):
+        return prompt
+    out = prompt
+    for rx, rep in _REALISM_SUBS:
+        out = rx.sub(lambda m, r=rep: _keep_case(m.group(0), r), out)
+    return out
+
 # TEXTURE & PATTERN FIDELITY LOCK — introdotta in 2.4.4. Generica, non legata
 # a una scena/foto specifica: si applica a qualunque pattern, texture o
 # superficie descritta (mosaico, tessuto, marmo, stampa, ecc.), su qualunque
@@ -1308,6 +1400,7 @@ _REVIEW_REQUIRED = (
     ("EYEGLASSES MANDATORY", r"EYEGLASSES\s*[\u2014\u2013-]+\s*MANDATORY"),
     ("movimento riprodotto", r"Reproduce the exact movement"),
     ("movimento inventato", r"Invent a natural, cinematic movement"),
+    ("ART STYLE LOCK", r"ART STYLE LOCK"),                     # 3.0.4
 )
 # 2.4.21 — un preambolo tipo "Here is the corrected prompt:" e le intestazioni che finiscono
 # con ":" o ":**" (troncamento subito dopo il titolo di un blocco) non sono revisioni valide.
@@ -1447,11 +1540,14 @@ def review_and_fix(prompt: str, client: 'GeminiClient', face_mode: str = "photo"
             "6. NAME REMOVAL: Remove any occurrence of 'Valeria Cross' or 'DNA of Valeria Cross' from the prompt body, "
             "EXCEPT inside the watermark text of rule 5, which stays exactly 'feat. Valeria Cross 👠'.\n\n"
             "7. KEEP INTACT: scene, outfit, lighting, environment, pose, mood, camera settings, "
-            "photographic style, watermark spec, all LOCK blocks about the outfit (including the SHEER FABRIC LOCK block when present), "
+            "photographic style, watermark spec, all LOCK blocks about the outfit (including the SHEER FABRIC LOCK block when present), the ART STYLE LOCK block when present, "
             "all creative elements not related to the subject's identity.\n\n"
             "8. BODY STATEMENT: Ensure the Subject body section explicitly states, in positive terms: "
             "'completely smooth, hairless skin on the torso, arms and legs', "
             "'feminine hourglass silhouette with a flat firm abdomen and slim toned arms and legs'.\n\n"
+            "9. ART STYLE: ONLY if the prompt contains an ART STYLE LOCK block — the whole prompt describes an "
+            "artwork in that art style: keep the block word for word and keep every rendering word consistent "
+            "with that style (the subject is drawn in the style, with the same identity).\n\n"
             f"PROMPT TO REVIEW:\n\n{prompt}"
         )
         logger.info("🔍 review_and_fix: avviata")
@@ -1537,9 +1633,16 @@ _ANALYZE_PROMPT = (
 )
 
 
-def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None, str | None]:
+_ANALYZE_SECTIONS_HEAD = "Return a structured description with these exact sections:\n\n"
+# 3.0.4 — stessa analisi con in più il campo ART STYLE in testa (Atelier, Vogue)
+_ANALYZE_PROMPT_STYLE = _ANALYZE_PROMPT.replace(_ANALYZE_SECTIONS_HEAD, _ANALYZE_SECTIONS_HEAD + ART_STYLE_SECTION, 1)
+assert _ANALYZE_PROMPT_STYLE != _ANALYZE_PROMPT
+
+
+def analyze_scene(img_bytes: bytes, client: 'GeminiClient', detect_style: bool = False) -> tuple[str | None, str | None]:
     """
     Analisi immagine centralizzata — singolo tentativo, nessun retry.
+    detect_style=True (3.0.4): aggiunge il campo ART STYLE (foto o disegno), letto da art_style_of().
     Returns: (result, error)
     """
     if not client.available:
@@ -1549,7 +1652,8 @@ def analyze_scene(img_bytes: bytes, client: 'GeminiClient') -> tuple[str | None,
         mime = detect_mime_type(img_bytes)
         img_part = genai_types.Part.from_bytes(data=img_bytes, mime_type=mime)
         logger.info(f"🔍 analyze_scene: mime={mime} ({len(img_bytes)} bytes)")
-        result = client.generate(_ANALYZE_PROMPT, contents=[img_part], max_tokens=8192)
+        result = client.generate(_ANALYZE_PROMPT_STYLE if detect_style else _ANALYZE_PROMPT,
+                                 contents=[img_part], max_tokens=8192)
         if result:
             logger.info(f"✅ analyze_scene: completato ({len(result)} chars)")
             return result, None

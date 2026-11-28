@@ -4,6 +4,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from shared300 import GeminiClient, HealthServer, is_allowed, analyze_scene, SHARED_VERSION, SHARED_DATE, MODEL
 from shared300 import EDITORIAL_WRAPPER, build_valeria_identity, generate_caption, review_and_fix, body_art_clause, multi_subject_clause, has_multiple_figures, sheer_fabric_clause
+from shared300 import art_style_of, art_style_clause, apply_art_style
 from shared300 import VALERIA_HAIR_TEXT
 
 # --- LOGGING ---
@@ -337,7 +338,13 @@ logger = logging.getLogger(__name__)
 # attuali); la barba è "silver-white" e gli occhiali del volto a testo "thin blue-framed". Nelle
 # scene "Letto" la frase sul corpo include la costruzione snella e tonica. Il testo delle altre
 # scene non cambia. Rollback: Atelier_302.py da Git.
-VERSION = "3.0.5"
+# CHANGELOG 3.0.6 (28/11/2026): disegni, su richiesta di Walter (vedi shared 3.0.4). L'analisi passa
+# detect_style=True: se l'immagine è un disegno (cartoon, animazione, anime, fumetto, pittura, 3D,
+# videogioco, scarabocchio) tutti i filtri e Shooting Editorial ricevono l'ART STYLE LOCK dopo il
+# COLOR LOCK e apply_art_style() sostituisce le parole di realismo prima e dopo review_and_fix().
+# Il bot avvisa con "🎨 Rilevato disegno". Con una foto il prompt è identico alla 3.0.5.
+# Rollback: Atelier_305.py da Git.
+VERSION = "3.0.6"
 VERSION_DATE = "28/11/2026"
 TOKEN   = os.environ.get("TELEGRAM_TOKEN_CLOSET")
 
@@ -723,7 +730,7 @@ def describe_outfit_from_image(img_bytes):
     """
     try:
         logger.info(f"🔍 describe_outfit: {len(img_bytes)} bytes → analyze_scene()")
-        result, err = analyze_scene(img_bytes, gemini)
+        result, err = analyze_scene(img_bytes, gemini, detect_style=True)
         if result:
             logger.info(f"👗 Outfit descritto ({len(result)} chars)")
             return result, None
@@ -806,6 +813,7 @@ def build_full_prompt(filter_key, outfit_description, scene_override=None, mode=
         f"including the precise HEX codes listed in the COLOR PALETTE section — vivid and saturated, "
         f"true to the exact hue specified (vivid cyan-turquoise stays vivid cyan-turquoise, not powder "
         f"blue or steel blue). Color fidelity is exact and non-negotiable.\n\n"
+        f"{art_style_clause(outfit_description)}"
         f"{sheer_fabric_clause(outfit_description)}"
         f"**⚠️ OUTFIT DETAIL LOCK — ABSOLUTE PRIORITY:** Every embellishment, texture and construction "
         f"detail described above appears fully and precisely — filigree, embroidery, beading, gemstones, "
@@ -817,6 +825,11 @@ def build_full_prompt(filter_key, outfit_description, scene_override=None, mode=
         f"{_face_locks(face_mode, 'mosaic' if mode == 'mosaic' else 'single')}"
         f"**Technical:** 8K, cinematic, photorealistic.\n"
     )
+
+def _finalize(prompt, outfit_desc):
+    """3.0.6 — con un disegno rilevato toglie le parole di realismo prima e dopo la revisione;
+    con una foto equivale a review_and_fix(prompt, gemini)."""
+    return apply_art_style(review_and_fix(apply_art_style(prompt, outfit_desc), gemini), outfit_desc)
 
 # --- SHOOTING EDITORIAL PROMPT ---
 def build_shooting_prompt(outfit_desc, mode="mosaic", face_mode="photo"):
@@ -843,6 +856,7 @@ def build_shooting_prompt(outfit_desc, mode="mosaic", face_mode="photo"):
             f"**⚠️ COLOR LOCK — ABSOLUTE PRIORITY:** The colors match exactly as described above, including "
             f"the precise HEX codes listed in the COLOR PALETTE section — vivid and saturated, true to the "
             f"exact hue specified. Color fidelity is exact and non-negotiable.\n\n"
+            f"{art_style_clause(outfit_desc)}"
             f"{sheer_fabric_clause(outfit_desc)}"
             f"**⚠️ OUTFIT DETAIL LOCK — ABSOLUTE PRIORITY:** Every embellishment, texture and construction "
             f"detail described above appears fully and precisely — filigree, embroidery, beading, gemstones, "
@@ -893,6 +907,7 @@ def build_shooting_prompt(outfit_desc, mode="mosaic", face_mode="photo"):
             f"**⚠️ COLOR LOCK — ABSOLUTE PRIORITY:** The colors match exactly as described above, including "
             f"the precise HEX codes listed in the COLOR PALETTE section — vivid and saturated, true to the "
             f"exact hue specified, identically in all 4 shots. Color fidelity is exact and non-negotiable.\n\n"
+            f"{art_style_clause(outfit_desc)}"
             f"{sheer_fabric_clause(outfit_desc)}"
             f"**⚠️ OUTFIT DETAIL LOCK — ABSOLUTE PRIORITY:** Every embellishment, texture and construction "
             f"detail described above appears fully and precisely — filigree, embroidery, beading, gemstones, "
@@ -1151,6 +1166,11 @@ def handle_photo(m):
                 reply_markup=get_confirm_keyboard())
             return
 
+        _style = art_style_of(outfit_desc)
+        if _style:
+            bot.send_message(cid, f"🎨 <b>Rilevato disegno:</b> {html.escape(_style[0])}\n"
+                                  "Il prompt mantiene lo stile originale.", parse_mode="HTML")
+
         settings = user_settings[uid]
         mode = settings.get('mode', 'single')
         flt = FILTERS[filter_key]
@@ -1160,7 +1180,7 @@ def handle_photo(m):
         if flt.get("shooting"):
             mode = settings.get('mode', 'mosaic')
             mode_label = "🗂️ Mosaico 4 foto" if mode == "mosaic" else "📷 Scatti separati"
-            full_p = review_and_fix(build_shooting_prompt(outfit_desc, mode), gemini)
+            full_p = _finalize(build_shooting_prompt(outfit_desc, mode), outfit_desc)
             last_prompt[uid] = {'full_p': full_p, 'outfit_desc': outfit_desc}
 
             # --- Nota fallback MODEL_LITE, se scattato durante analisi o review_and_fix ---
@@ -1198,7 +1218,7 @@ def handle_photo(m):
         if is_dual:
             variant_list = []
             for v in flt["variants"]:
-                full_p = review_and_fix(build_full_prompt(filter_key, outfit_desc, scene_override=v["scene"], mode=mode), gemini)
+                full_p = _finalize(build_full_prompt(filter_key, outfit_desc, scene_override=v["scene"], mode=mode), outfit_desc)
                 variant_list.append({'name': v["name"], 'full_p': full_p})
             last_prompt[uid] = {'is_dual': True, 'variants': variant_list, 'outfit_desc': outfit_desc}
 
@@ -1232,7 +1252,7 @@ def handle_photo(m):
                         bot.send_message(cid, f"<i>({idx}/{len(chunks)})</i>\n<code>{html.escape(chunk)}</code>", parse_mode="HTML")
             bot.send_message(cid, f"{header}Cosa vuoi fare adesso?", reply_markup=get_confirm_keyboard())
         else:
-            full_p = review_and_fix(build_full_prompt(filter_key, outfit_desc, mode=mode), gemini)
+            full_p = _finalize(build_full_prompt(filter_key, outfit_desc, mode=mode), outfit_desc)
             last_prompt[uid] = {'full_p': full_p, 'outfit_desc': outfit_desc}
 
             # --- Nota fallback MODEL_LITE — stessa logica di 2.7.0/2.7.2, vedi sopra ---

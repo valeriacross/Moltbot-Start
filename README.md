@@ -10,13 +10,13 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 | Bot | File | Versione | Koyeb | Chiavi |
 |-----|------|---------|-------|--------|
-| VogueBot | `Vogue_502.py` | 5.0.2 | colossal-giselle/vogue | 2 |
+| VogueBot | `Vogue_503.py` | 5.0.3 | colossal-giselle/vogue | 2 |
 | ArchitectBot | `Architect_400.py` | 4.0.0 | homely-annabelle/thearchitect | 1 |
-| AtelierBot | `Atelier_305.py` | 3.0.5 | flexible-denna/atelier | 5 |
+| AtelierBot | `Atelier_306.py` | 3.0.6 | flexible-denna/atelier | 5 |
 | FiltroBot | `Filtro_300.py` | 3.0.0 | screeching-jobina/filtro | 1 |
 | SurpriseBot | `Surprise_302.py` | 3.0.2 | surprise1/sorpresa | 1 |
 
-**Shared:** `shared300.py` v3.0.3 · **10 API key totali**
+**Shared:** `shared300.py` v3.0.4 · **10 API key totali**
 
 ---
 
@@ -24,9 +24,9 @@ Sistema multi-bot Telegram per la generazione di prompt Flow con il DNA di Valer
 
 ```
 shared300.py         # Libreria condivisa
-Vogue_502.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
+Vogue_503.py         # Analisi foto/video → prompt VIDEO Flow (I2V/V2V, no testo)
 Architect_400.py     # Prompt testuale completo di un'immagine — nessun DNA Valeria
-Atelier_305.py       # Outfit analysis → prompt con filtri (filtro persistente)
+Atelier_306.py       # Outfit analysis → prompt con filtri (filtro persistente)
 atelier.py           # Ingresso fisso per Koyeb: avvia il file indicato in BOT_FILE
 vogue.py, architect.py, filtro.py, surprise.py   # Ingressi fissi per Koyeb, uno per bot, come atelier.py
 Filtro_300.py        # 7 categorie + LEGO + Mosaic + Scarabocchio + Director's Cut (12 registi)
@@ -193,6 +193,8 @@ Dettagli storici in `HANDOFF-MASTER`, sezioni 2bis, 2ter, 2quater, 2quinquies, 2
 **TODO aperto (09/10):** deploy con `pyTelegramBotAPI==4.37.0` non ancora osservato — Walter deve controllare al primo redeploy su Koyeb che polling, callback inline ed edit dei messaggi funzionino su tutti i bot (refactor interno dichiarato nelle note della 4.37.0); se qualcosa si rompe, primo sospetto è questo bump, rollback `==4.36.0`. Da confermare anche l'upper bound `google-genai<3`.
 
 **Il 27/11/2026, sera — volto reale a confronto con Flow (shared 3.0.2, Vogue 5.0.2, Atelier 3.0.4, Surprise 3.0.2).** Walter ha mandato tre immagini (due da solo testo, una con il volto reale) e una foto vera. Differenze trovate: barba del testo troppo bianca e folta (reale: grigia sale e pepe, curata, più lunga sul mento), occhiali neri e spessi senza foto allegata (reali: tondi panto, acetato trasparente di medio spessore), sopracciglia del testo troppo marcate. Ora: barba "neatly trimmed natural beard", capelli all'indietro da un'attaccatura alta, fino alla nuca, sopracciglia grigio chiaro; occhiali tondi panto in **blu, verde o rosso scelto a caso a ogni prompt** (Walter ne ha tre paia identici); in modalità foto la descrizione degli occhiali è solo una riserva se la foto non è allegata. Niente centimetri né "full/bushy/voluminous". **Non ancora testato in produzione.**
+
+**Il 28/11/2026, sera — disegni nello stile originale (shared 3.0.4, Atelier 3.0.6, Vogue 5.0.3).** Su richiesta di Walter: se l'immagine mandata ad Atelier o a Vogue (foto o clip) è un disegno (cartoon, animazione 3D o a mano, anime, manga, fumetto, pittura, CGI, videogioco, clay, scarabocchio), il prompt mantiene lo stile originale. L'analisi comune (`analyze_scene(..., detect_style=True)`) aggiunge il campo ART STYLE, senza chiamate Gemini in più. Con un disegno: blocco **ART STYLE LOCK** dopo il COLOR LOCK (Atelier, tutti i filtri e Shooting Editorial) o dopo il DNA (Vogue), Valeria disegnata nello stesso stile con tutto il DNA; le parole di realismo (photorealistic, hyperrealistic, realistic, photograph, photographic) diventano "true-to-style", "image", "visual"; inquadratura, ottica, luce e 8K restano. Il bot avvisa con "🎨 Rilevato disegno". Con una foto i prompt sono identici a prima. Filtro, Architect e Surprise esclusi. **Non ancora testato in produzione.**
 
 **Il 28/11/2026 — tessuti trasparenti (shared 3.0.3, Atelier 3.0.4 → 3.0.5).** Walter ha provato un abito di tulle trasparente (base quasi incolore, pois neri, ricamo floreale nero e grigio). Con lo stesso prompt e la stessa foto del volto: NB lite ha dato un abito beige opaco, corto e senza dettagli, con un volto che non somigliava alla foto; NB 2.1 ha dato un abito lungo e trasparente ma con base champagne e pois crema. Causa nel testo: l'analisi scriveva la base come "beige (#F5F5DC)", il COLOR LOCK imponeva quel colore esatto e nessun blocco diceva che la pelle si vede attraverso il tessuto. Ora l'analisi (shared) descrive trasparenza, colore della base senza pelle e parti opache; nuovo blocco SHEER FABRIC LOCK (`sheer_fabric_clause()`), solo se l'outfit è trasparente, inserito da Atelier dopo il COLOR LOCK nei tre prompt. Vale per tutti i modelli. **Verificato da Walter il 28/11 su NB lite e NB 2.1: la trasparenza regge.** Limite noto di Flow: il seno prosperoso con la barba resta poco visibile; non si spinge oltre con il testo.
 

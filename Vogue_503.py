@@ -4,6 +4,7 @@ from shared300 import GeminiClient, HealthServer, is_allowed, genai_types, analy
 from shared300 import VALERIA_BODY_STRONG, VALERIA_WATERMARK, VALERIA_TEXTURE_LOCK
 from shared300 import VALERIA_HAIR_TEXT, VALERIA_BEARD_TEXT, VALERIA_GLASSES_COLORS, glasses_text
 from shared300 import generate_caption, review_and_fix, SHARED_VERSION, SHARED_DATE, body_art_clause, multi_subject_clause, MODEL
+from shared300 import ART_STYLE_SECTION, art_style_of, art_style_clause, apply_art_style
 
 # --- VERSIONE ---
 # CHANGELOG 2.1.0 (17/07/2026): cambio di motore, non un patch — versione
@@ -251,8 +252,14 @@ from shared300 import generate_caption, review_and_fix, SHARED_VERSION, SHARED_D
 # bianco-argento) e occhiali (montatura blu sottile e semplice). Prima: capelli "radi", barba
 # "dense grey-white" e occhiali bicolore asimmetrici, descrizioni diverse da quelle degli altri
 # bot. Il resto del volto video (pelle, rughe) non cambia. Rollback: Vogue_500.py da Git.
-VERSION = "5.0.2"
-VERSION_DATE = "27/11/2026"
+# CHANGELOG 5.0.3 (28/11/2026): disegni, su richiesta di Walter (vedi shared 3.0.4). Foto: analyze_scene()
+# con detect_style=True; video: _ANALYZE_PROMPT_VIDEO con il campo ART STYLE (ART_STYLE_SECTION) in
+# testa. Se la foto o la clip è un disegno o un'animazione, build_prompt_video() aggiunge l'ART STYLE
+# LOCK dopo il DNA e apply_art_style() sostituisce le parole di realismo prima e dopo
+# review_and_fix(); il bot avvisa con "🎨 Rilevato disegno". Con una foto o una clip reale il prompt
+# è identico alla 5.0.2. Rollback: Vogue_502.py da Git.
+VERSION = "5.0.3"
+VERSION_DATE = "28/11/2026"
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -271,6 +278,7 @@ _ANALYZE_PROMPT_VIDEO = (
     "Analyze this short video clip in its entirety — every frame, not just the first one. "
     "Return a structured description of the scene AND the movement that actually happens in "
     "the clip, with these exact sections:\n\n"
+    + ART_STYLE_SECTION +
     "MOVEMENT: [Describe literally what motion happens across the clip, in chronological order "
     "— what the subject's body does (e.g. turns, walks, shifts weight, reaches, tilts head), how "
     "fast or slow, in which direction, and how the environment responds (hair, fabric, water, "
@@ -368,7 +376,7 @@ def _expire_caption(uid: int):
 # --- ANALISI FOTO — usa analyze_scene() centralizzata da shared300 ---
 def analyze_photo(img_bytes):
     """Wrapper su analyze_scene() — interfaccia invariata per il resto del bot."""
-    result, err = analyze_scene(img_bytes, client=gemini)
+    result, err = analyze_scene(img_bytes, client=gemini, detect_style=True)
     if result:
         return result, None
     return None, err or "⚠️ Analisi immagine non disponibile."
@@ -537,6 +545,7 @@ def build_prompt_video(scene_description):
     prompt = (
         f"{EDITORIAL_WRAPPER_VIDEO}\n"
         f"{build_dna_video()}\n"
+        f"{art_style_clause(scene_description)}"
         f"{body_art_clause(scene_description)}"
         f"{multi_subject_clause(scene_description)}"
         f"--- SCENE REFERENCE ---\n"
@@ -551,6 +560,19 @@ def build_prompt_video(scene_description):
         f"unchanged throughout.\n"
     )
     return prompt
+
+def _finalize_video(scene_desc):
+    """5.0.3 — prompt video rivisto; con un disegno rilevato toglie le parole di realismo
+    prima e dopo la revisione. Con una foto o una clip reale equivale alla 5.0.2."""
+    p = apply_art_style(build_prompt_video(scene_desc), scene_desc)
+    return apply_art_style(review_and_fix(p, gemini, face_mode="described"), scene_desc)
+
+def _notify_style(cid, scene_desc):
+    """5.0.3 — avviso a Walter quando l'analisi rileva un disegno o un'animazione."""
+    st = art_style_of(scene_desc)
+    if st:
+        bot.send_message(cid, f"🎨 <b>Rilevato disegno:</b> {html.escape(st[0])}\n"
+                              "Il prompt mantiene lo stile originale.")
 
 # --- KEYBOARD POST-PROMPT ---
 def get_after_prompt_keyboard():
@@ -732,7 +754,8 @@ def handle_photo(m):
         bot.send_message(m.chat.id, err or "❌ Analisi fallita. Riprova.", parse_mode="HTML")
         return
 
-    prompt = review_and_fix(build_prompt_video(scene_desc), gemini, face_mode="described")
+    _notify_style(m.chat.id, scene_desc)
+    prompt = _finalize_video(scene_desc)
     last_prompt[uid] = prompt
 
     bot.send_message(m.chat.id, "✅ <b>Prompt Video Flow-ready</b> (da foto)\n\nCopia e incolla su Flow:")
@@ -798,7 +821,8 @@ def handle_video(m):
         bot.send_message(m.chat.id, err or "❌ Analisi fallita. Riprova.", parse_mode="HTML")
         return
 
-    prompt = review_and_fix(build_prompt_video(scene_desc), gemini, face_mode="described")
+    _notify_style(m.chat.id, scene_desc)
+    prompt = _finalize_video(scene_desc)
     last_prompt[uid] = prompt
 
     bot.send_message(m.chat.id, "✅ <b>Prompt Video Flow-ready</b> (da video)\n\nCopia e incolla su Flow:")
